@@ -1,15 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SUBJECTIVE.JS — Subjective module (QOTD + Proper Exam + Topic List)
+   SUBJECTIVE.JS — Subjective module (QOTD + Exam + List + Custom Builder)
 
    Loaded via <script src="subjective.js"> AFTER app.js and objective.js
    in user.html. Classic global, no modules.
 
    Depends on globals from app.js:
-     S, LS, APP_CONFIG, APPS, _save, _load, toast, esc, fmtHMS (if any),
-     QDB, netFetch, qs, pluralize, today
+     S, LS, APP_CONFIG, APPS, _save, _load, toast, esc, QDB, netFetch,
+     qs, pluralize, today
 
    Reads window.SUBJECTIVE_DATA / window.SUBJECTIVE_FILE_REFS /
-   window.SUBJECTIVE_CHAPTERS from the two sibling files.
+   window.SUBJECTIVE_CHAPTERS from sibling files.
 
    Question-bank file shape (per chapter, one Drive file each):
      { "group": "...", "sections": [
@@ -22,8 +22,8 @@
    "3+3.5+3.5=10". _parseMarks() reads the total.
 
    Exposes on window:
-     SUBJ        — user-facing module (QOTD, Exam, List)
-     SUBJ_SMART  — Smart Paste parser used by admin.html
+     SUBJ        — user-facing module
+     SUBJ_SMART  — Smart Paste parser (used by admin.html)
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
@@ -31,14 +31,14 @@
 const $   = id => document.getElementById(id);
 const esc = (typeof window.esc === 'function') ? window.esc : (s => String(s == null ? '' : s));
 
-/* ── Backend URL from config.js ── */
+/* ── Backend URL ── */
 function _backendUrl(){
   if(typeof window.ABHYAS_CONFIG !== 'undefined' && window.ABHYAS_CONFIG.GAS_URL) return window.ABHYAS_CONFIG.GAS_URL;
   if(typeof window.APPS !== 'undefined') return window.APPS;
   return '';
 }
 
-/* ── Auth params — piggyback on the session app.js manages ── */
+/* ── Auth params ── */
 function _authParams(){
   const u = (window.S && S.user) || {};
   return { username: u.username || '', token: u.token || '' };
@@ -67,40 +67,80 @@ async function _api(action, params, method){
 
 /* ── Constants ── */
 const TIMERS = {
-  solveSecondsFor5:  10 * 60,   // 10 min for a 5-mark question
-  solveSecondsFor10: 20 * 60,   // 20 min for a 10-mark question
+  solveSecondsFor5:  10 * 60,
+  solveSecondsFor10: 20 * 60,
   solveSecondsFallback: 15 * 60,
-  uploadSeconds: 5 * 60,        // 5 min to upload the PDF after solving
-  examSeconds:  3 * 60 * 60     // 3 hours for the full 100-mark paper
+  uploadSeconds: 5 * 60,
+  examSeconds:  3 * 60 * 60
 };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CUSTOM EXAM COOLDOWN
+   ─────────────────────────────────────────────────────────────────────
+   The "Build Your Own Paper" feature is rate-limited to once every 6
+   hours per user. The cooldown timestamp is stored in localStorage
+   under a per-user key so switching accounts on a shared device doesn't
+   leak the timer.
+
+   Change CUSTOM_EXAM_COOLDOWN_MS to adjust — the UI reads it directly.
+   ═══════════════════════════════════════════════════════════════════════ */
+const CUSTOM_EXAM_COOLDOWN_MS = 6 * 60 * 60 * 1000;   // 6 hours
+
+function _customExamKey(){
+  const u = (window.S && S.user && S.user.username) || 'anon';
+  return 'abhyas_subj_custom_last_' + String(u).toLowerCase();
+}
+function _getCustomExamLast(){
+  try{
+    const raw = localStorage.getItem(_customExamKey());
+    const n = Number(raw);
+    return isFinite(n) && n > 0 ? n : 0;
+  }catch(e){ return 0; }
+}
+function _setCustomExamLast(ts){
+  try{ localStorage.setItem(_customExamKey(), String(ts)); }catch(e){}
+}
+function _customExamCooldownRemainingMs(){
+  const last = _getCustomExamLast();
+  if(!last) return 0;
+  const elapsed = Date.now() - last;
+  const remaining = CUSTOM_EXAM_COOLDOWN_MS - elapsed;
+  return remaining > 0 ? remaining : 0;
+}
+function _customExamIsLocked(){ return _customExamCooldownRemainingMs() > 0; }
+function _fmtCooldown(ms){
+  if(ms <= 0) return 'now';
+  const totalSec = Math.ceil(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if(h > 0) return `${h}h ${m}m`;
+  if(m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
 
 const LS_QOTD = 'abhyas_subj_qotd_v1';
 const LS_EXAM = 'abhyas_subj_exam_v1';
 const MAX_PDF_BYTES = 8 * 1024 * 1024;
 const FETCH_CONCURRENCY = 4;
 
-/* ── Chapter data (from subjective-data.js) ── */
 const SUBJ_FILE_REFS = window.SUBJECTIVE_FILE_REFS || [];
 
 /* ═══════════════════════════════════════════════════════════════════════
-   QUESTION-BANK LOADER — one JSON file per chapter, cached in IndexedDB
+   QUESTION-BANK LOADER
    ═══════════════════════════════════════════════════════════════════════ */
 
 let BANK = { byChapter: {}, loaded: false, loading: false, error: null };
-const _fetchPromises = {};   // fileId → Promise (dedupe concurrent loads)
+const _fetchPromises = {};
 
-/* Marks arrive as: 5  |  "5"  |  "5+5=10"  |  "3+3.5+3.5=10".
-   Anything that doesn't resolve to 5 or 10 collapses to 10 — the timer
-   table only knows those two values, and defaulting to 10 is the safe
-   choice for a subjective question. */
+/* Marks arrive as: 5 | "5" | "5+5=10" | "3+3.5+3.5=10".
+   Anything that doesn't resolve to 5 or 10 collapses to 10. */
 function _parseMarks(raw){
   if (typeof raw === 'number' && isFinite(raw)) {
     return (raw === 5 || raw === 10) ? raw : 10;
   }
   const s = String(raw == null ? '' : raw).trim();
   if (!s) return 10;
-
-  // "a+b+...=TOTAL" — trust the stated total after the last "=".
   const eq = s.lastIndexOf('=');
   if (eq > -1) {
     const m = s.slice(eq + 1).match(/\d+(?:\.\d+)?/);
@@ -109,8 +149,6 @@ function _parseMarks(raw){
       return (n === 5 || n === 10) ? n : 10;
     }
   }
-
-  // "a+b" with no "=" — sum them.
   if (s.includes('+')) {
     const parts = s.split('+').map(x => parseFloat(x)).filter(x => isFinite(x));
     if (parts.length) {
@@ -118,26 +156,18 @@ function _parseMarks(raw){
       return (sum === 5 || sum === 10) ? sum : 10;
     }
   }
-
-  // Plain number string.
   const m = s.match(/\d+(?:\.\d+)?/);
   if (!m) return 10;
   const n = Math.round(parseFloat(m[0]));
   return (n === 5 || n === 10) ? n : 10;
 }
 
-/* Two accepted file shapes:
-     1) { group, sections: [ { section, questions: [...] } ] }  ← current
-     2) bare array  OR  { questions: [...] }                     ← legacy
-   Both are normalized into the same flat array of question objects
-   tagged with their chapter and topic (section label). */
 function _normalizeSubjRaw(raw, fileId, chapterId, chapterName){
   if(raw && typeof raw === 'object' && !Array.isArray(raw) && raw.success === false){
     console.warn('[SUBJ] Server error for', fileId, '—', raw.error);
     return [];
   }
 
-  // ── Shape 1: sections-wrapped ──
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && Array.isArray(raw.sections)) {
     const out = [];
     raw.sections.forEach(sec => {
@@ -161,7 +191,6 @@ function _normalizeSubjRaw(raw, fileId, chapterId, chapterName){
     return out;
   }
 
-  // ── Shape 2: bare array or { questions: [...] } ──
   let arr = Array.isArray(raw) ? raw
           : (raw && Array.isArray(raw.questions) ? raw.questions : null);
   if (!Array.isArray(arr) || !arr.length) {
@@ -202,7 +231,6 @@ async function _fetchSubjFile(ref){
   if(_fetchPromises[ref.fileId]) return _fetchPromises[ref.fileId];
   const cacheKey = 'subj_' + ref.fileId;
   const promise = (async () => {
-    // Offline-first: try IndexedDB before the network.
     if(typeof QDB !== 'undefined'){
       try{
         const cached = await QDB.get(cacheKey);
@@ -213,7 +241,7 @@ async function _fetchSubjFile(ref){
           }
           return _normalizeSubjRaw(cached, ref.fileId, ref.chapterId, ref.name);
         }
-      }catch(e){ /* fall through to network */ }
+      }catch(e){ /* fall through */ }
     }
     if(typeof S !== 'undefined' && (!S.online || S.forcedOffline)) return [];
     try{
@@ -252,8 +280,6 @@ async function loadBank(force){
   }
   await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, refs.length) }, worker));
 
-  // Sort each chapter's questions by section label, preserving the
-  // order the author placed them in within a section.
   Object.keys(byChapter).forEach(ch => {
     byChapter[ch].sort((a, b) => String(a.topic).localeCompare(String(b.topic)));
   });
@@ -262,7 +288,6 @@ async function loadBank(force){
   return BANK;
 }
 
-/* ── Accessors ── */
 function _allQuestions(){
   return Object.values(BANK.byChapter).flat();
 }
@@ -627,7 +652,7 @@ async function _qotdSubmit(){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   PROPER EXAM — 100-mark random paper, 3-hour timer, one PDF upload
+   PROPER EXAM
    ═══════════════════════════════════════════════════════════════════════ */
 
 const EXAM_GROUPS = {
@@ -726,6 +751,10 @@ function _renderExam(){
   }
 
   if(!EXAM){
+    const cdMs = _customExamCooldownRemainingMs();
+    const cooldownNote = cdMs > 0
+      ? `<p style="font-size:.7rem;color:var(--ros);margin-top:.6rem;text-align:center"><i class="ph ph-clock"></i> Custom builder available again in <b>${_fmtCooldown(cdMs)}</b></p>`
+      : '';
     body.innerHTML = `
       <div class="card">
         <div class="card-hd"><h3><i class="ph ph-note-pencil"></i> Proper Exam — 100 Marks</h3>
@@ -738,6 +767,7 @@ function _renderExam(){
         <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ._examGenerate()">
           <i class="ph ph-dice-five"></i> Generate a Random Paper
         </button>
+        ${cooldownNote}
       </div>`;
     return;
   }
@@ -914,7 +944,70 @@ async function _examSubmit(){
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   TOPIC LIST
+   CUSTOM EXAM BUILDER (6-hour cooldown)
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function _buildCustomExam(chapterIds, targetMarks, markFilter){
+  // ── Cooldown gate ──
+  const cdMs = _customExamCooldownRemainingMs();
+  if(cdMs > 0){
+    toast(`⏳ Custom paper is on cooldown — available again in ${_fmtCooldown(cdMs)}`, 5000);
+    return;
+  }
+
+  const all = _allQuestions();
+  if(!all.length){ toast('Question bank not loaded yet'); return; }
+  let pool = chapterIds && chapterIds.length
+    ? all.filter(q => chapterIds.includes(q.chapterId))
+    : all;
+  if(markFilter === '5')  pool = pool.filter(q => q.marks === 5);
+  if(markFilter === '10') pool = pool.filter(q => q.marks === 10);
+  if(!pool.length){ toast('No questions match those filters'); return; }
+
+  const shuffled = _shuffle(pool);
+  const picked = [];
+  let total = 0;
+  for(const q of shuffled){
+    if(total >= targetMarks && picked.length >= 3) break;
+    if(total + q.marks > targetMarks + 10) continue;
+    picked.push(q);
+    total += q.marks;
+    if(total >= targetMarks) break;
+  }
+  if(!picked.length){ toast('Could not build a paper — try a lower total'); return; }
+
+  EXAM = {
+    generatedAt: Date.now(),
+    deadlineAt: Date.now() + TIMERS.examSeconds * 1000,
+    sections: [{
+      group: 'custom',
+      name: 'Custom Paper — ' + picked.length + ' questions',
+      targetMarks: total,
+      questions: picked
+    }],
+    submitted: false,
+    submittedAt: 0
+  };
+  _pendingExamFile = null;
+  _persistExam();
+  _markCustomExamUsed();
+  _renderExam();
+  toast('✅ Custom paper ready · ' + picked.length + ' Qs · ' + total + ' marks · next custom paper in 6h', 5000);
+}
+
+function _markCustomExamUsed(){
+  _setCustomExamLast(Date.now());
+  // Refresh the UI so the cooldown note appears
+  setTimeout(() => {
+    if(document.getElementById('view-subj-exam')?.classList.contains('on')) _renderExam();
+    if(typeof window.SUBJ_BUILDER !== 'undefined' && typeof window.SUBJ_BUILDER._updateCooldownUI === 'function'){
+      window.SUBJ_BUILDER._updateCooldownUI();
+    }
+  }, 50);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QUESTION LIST
    ═══════════════════════════════════════════════════════════════════════ */
 
 function _renderList(){
@@ -931,44 +1024,48 @@ function _renderList(){
     return;
   }
 
+  const f = (window.SUBJ && SUBJ._listFilter) || { query: '', chapter: '' };
   const chapters = window.SUBJECTIVE_CHAPTERS || [];
-  const tree = chapters.map(ch => {
-    const qs = _questionsByChapter(ch.id);
-    if(!qs.length) return '';
+  const tree = chapters
+    .filter(ch => !f.chapter || ch.id === f.chapter)
+    .map(ch => {
+      let qs = _questionsByChapter(ch.id);
+      if(f.query) qs = qs.filter(q => (q.q || '').toLowerCase().includes(f.query));
+      if(!qs.length) return '';
 
-    // Group by section (topic) within this chapter.
-    const byTopic = {};
-    qs.forEach(q => {
-      const key = q.topic || 'General';
-      (byTopic[key] = byTopic[key] || []).push(q);
-    });
-    const topics = Object.keys(byTopic).sort();
+      const byTopic = {};
+      qs.forEach(q => {
+        const key = q.topic || 'General';
+        (byTopic[key] = byTopic[key] || []).push(q);
+      });
+      const topics = Object.keys(byTopic).sort();
 
-    const topicBlocks = topics.map(topic => {
-      const tQs = byTopic[topic];
-      return `<div style="margin:0 0 .55rem">` +
-        `<div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);padding:.35rem .3rem .2rem;border-bottom:1px solid var(--b1)">` +
-          `${esc(topic)} <span style="font-weight:500;opacity:.6">(${tQs.length})</span>` +
+      const topicBlocks = topics.map(topic => {
+        const tQs = byTopic[topic];
+        return `<div style="margin:0 0 .55rem">` +
+          `<div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);padding:.35rem .3rem .2rem;border-bottom:1px solid var(--b1)">` +
+            `${esc(topic)} <span style="font-weight:500;opacity:.6">(${tQs.length})</span>` +
+          `</div>` +
+          tQs.map((q, i) => `<div class="subj-q-row">` +
+            `<span class="qn">${i+1}.</span>` +
+            `<span class="qt">${esc(q.q)}</span>` +
+            `<span class="qm ${q.marks===10?'m10':'m5'}">${q.marks}M</span>` +
+          `</div>`).join('') +
+        `</div>`;
+      }).join('');
+
+      const openClass = (f.query || f.chapter) ? ' open' : '';
+      return `<div class="subj-group${openClass}">` +
+        `<div class="subj-group-hd" onclick="this.parentElement.classList.toggle('open')">` +
+          `<div><div>${ch.icon || ''} ${esc(ch.name)} <span style="color:var(--t3);font-weight:400">· Group ${esc(ch.group || '')}</span></div>` +
+          `<div class="meta">${qs.length} question${qs.length !== 1 ? 's' : ''} · ${topics.length} section${topics.length !== 1 ? 's' : ''}</div></div>` +
+          `<i class="ph ph-caret-right chev"></i>` +
         `</div>` +
-        tQs.map((q, i) => `<div class="subj-q-row">` +
-          `<span class="qn">${i+1}.</span>` +
-          `<span class="qt">${esc(q.q)}</span>` +
-          `<span class="qm ${q.marks===10?'m10':'m5'}">${q.marks}M</span>` +
-        `</div>`).join('') +
+        `<div class="subj-group-body">${topicBlocks}</div>` +
       `</div>`;
-    }).join('');
+    }).filter(Boolean).join('');
 
-    return `<div class="subj-group">` +
-      `<div class="subj-group-hd" onclick="this.parentElement.classList.toggle('open')">` +
-        `<div><div>${ch.icon || ''} ${esc(ch.name)} <span style="color:var(--t3);font-weight:400">· Group ${esc(ch.group || '')}</span></div>` +
-        `<div class="meta">${qs.length} question${qs.length !== 1 ? 's' : ''} · ${topics.length} section${topics.length !== 1 ? 's' : ''}</div></div>` +
-        `<i class="ph ph-caret-right chev"></i>` +
-      `</div>` +
-      `<div class="subj-group-body">${topicBlocks}</div>` +
-    `</div>`;
-  }).filter(Boolean).join('');
-
-  body.innerHTML = tree || _emptyCard('ph-list-dashes','No chapters loaded','');
+  body.innerHTML = tree || _emptyCard('ph-list-dashes','No matching questions','Try clearing the search or picking a different chapter.');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1028,6 +1125,27 @@ const SUBJ = {
   _renderQotd,
   _renderExam,
   _renderList,
+
+  /* ── Custom exam builder with 6h cooldown ── */
+  _buildCustomExam,
+
+  /* ── Public cooldown helpers (user.html can call these) ── */
+  customExamCooldownRemainingMs: _customExamCooldownRemainingMs,
+  customExamIsLocked: _customExamIsLocked,
+  customExamCooldownLabel(){
+    const ms = _customExamCooldownRemainingMs();
+    return ms > 0 ? _fmtCooldown(ms) : '';
+  },
+
+  /* ── Question list filter ── */
+  _listFilter: { query: '', chapter: '' },
+
+  _filterList(query){
+    if(typeof query === 'string') this._listFilter.query = query.toLowerCase();
+    const sel = document.getElementById('subj-list-chapter');
+    if(sel) this._listFilter.chapter = sel.value;
+    _renderList();
+  },
 
   _refreshBadge(){
     const b = $('subj-qotd-badge');
