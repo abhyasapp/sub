@@ -682,6 +682,10 @@ html.session-bridge .gate-alt,
 #an-overlay-canvas{cursor:crosshair;touch-action:none}
 .an-pagebar{display:flex;align-items:center;gap:var(--sp-2);justify-content:center;padding:var(--sp-2);
   border-top:1px solid var(--sep);background:var(--surface);flex-shrink:0}
+/* Dialogs opened while the annotate overlay (z-index:900) is up must
+   sit above it — otherwise the confirm dialog opens behind and the
+   user never sees it. */
+#ov-confirm,#ov-pwd,#ov-review,#ov-user,#ov-sheet{ z-index:1000; }
 </style>
 </head>
 <body>
@@ -3455,8 +3459,12 @@ const PDF_ANNOTATE = {
     this._redrawOverlay();
   },
 
-  async save(){
+   async save(){
     if (!this.ctx) return;
+    if (!this.pdfDoc) {
+      TOAST.show('The PDF is no longer loaded — close the overlay and reopen the annotation view.', 'error', 6000);
+      return;
+    }
     const ok = await CONFIRM.ask({
       title: 'Save annotated PDF',
       body: 'This overwrites the Drive file for <b>' + esc(this.ctx.username) +
@@ -4616,11 +4624,11 @@ document.addEventListener('keydown', e => {
   if (e.key === '/' && !typing && $('app').classList.contains('on')) {
     e.preventDefault(); PALETTE.open(); return;
   }
-  if (e.key === 'Escape') {
+   if (e.key === 'Escape') {
+    if ($('ov-confirm').classList.contains('show')) { CONFIRM._no(); return; }
     if ($('ov-annotate').classList.contains('show')) { PDF_ANNOTATE.close(); return; }
     if ($('palette').classList.contains('show')) { PALETTE.close(); return; }
     UI.closeMenu();
-    if ($('ov-confirm').classList.contains('show')) { CONFIRM._no(); return; }
     MODAL.closeAll();
     UI.railClose();
     return;
