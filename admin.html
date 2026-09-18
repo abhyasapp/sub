@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F2F4F3">
 <script src="config.js"></script>
 <script>(function(){
@@ -34,7 +34,8 @@
   --sky:#2B6CB0;--sky-glow:rgba(43,108,176,.20);
   --grn:#2E7D4F;--grn-glow:rgba(46,125,79,.20);
   --ros:#C1433C;--ros-glow:rgba(193,67,60,.20);
-  --amb-rgb:46,139,87;--grn-rgb:46,125,79;--ros-rgb:193,67,60;--vio-rgb:91,75,138;--sky-rgb:43,108,176;
+  --wrn:#C98410;--wrn-glow:rgba(201,132,16,.20);
+  --amb-rgb:46,139,87;--grn-rgb:46,125,79;--ros-rgb:193,67,60;--vio-rgb:91,75,138;--sky-rgb:43,108,176;--wrn-rgb:201,132,16;
   --ok:var(--grn);--ok-bg:rgba(46,125,79,.09);--ok-bd:rgba(46,125,79,.28);
   --bad:var(--ros);--bad-bg:rgba(193,67,60,.08);--bad-bd:rgba(193,67,60,.26);
   --warn:var(--amb);--warn-bg:rgba(46,139,87,.09);--warn-bd:rgba(46,139,87,.26);
@@ -58,7 +59,8 @@
   --sky:#6DA3DE;--sky-glow:rgba(109,163,222,.28);
   --grn:#4FAE79;--grn-glow:rgba(79,174,121,.28);
   --ros:#E2695F;--ros-glow:rgba(226,105,95,.28);
-  --amb-rgb:61,174,116;--grn-rgb:79,174,121;--ros-rgb:226,105,95;--vio-rgb:138,122,194;--sky-rgb:109,163,222;
+  --wrn:#E0A048;--wrn-glow:rgba(224,160,72,.28);
+  --amb-rgb:61,174,116;--grn-rgb:79,174,121;--ros-rgb:226,105,95;--vio-rgb:138,122,194;--sky-rgb:109,163,222;--wrn-rgb:224,160,72;
   --ok-bg:rgba(79,174,121,.16);--ok-bd:rgba(79,174,121,.4);
   --bad-bg:rgba(226,105,95,.16);--bad-bd:rgba(226,105,95,.4);
   --warn-bg:rgba(61,174,116,.16);--warn-bd:rgba(61,174,116,.4);
@@ -71,6 +73,7 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 ::selection{background:rgba(46,139,87,.22);color:var(--t1)}
 :focus-visible{outline:2px solid var(--amb);outline-offset:2px;border-radius:4px}
 
+/* ═══ GATE ═══ */
 #gate{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:var(--c0);flex-direction:column}
 .gate-card{width:100%;max-width:400px;margin:1rem;background:var(--c2);border-radius:var(--r4);padding:2rem 1.5rem;box-shadow:var(--ne-lg);animation:enter .4s var(--spring)}
 @keyframes enter{from{opacity:0;transform:translateY(20px) scale(.96)}to{opacity:1;transform:none}}
@@ -84,6 +87,10 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 .fld input{width:100%;background:var(--c0);border:none;border-radius:var(--r2);padding:.7rem .85rem;color:var(--t1);font-size:.88rem;font-family:var(--ff);outline:none;transition:box-shadow var(--ease);box-shadow:var(--ne-in-sm)}
 .fld input:focus{box-shadow:var(--ne-in-sm),0 0 0 3px rgba(46,139,87,.16)}
 .fld input::placeholder{color:var(--t3);opacity:.5}
+.pw-field{position:relative}
+.pw-field input{padding-right:2.5rem}
+.pw-toggle{position:absolute;top:50%;right:.5rem;transform:translateY(-50%);background:none;border:none;padding:.35rem;cursor:pointer;color:var(--t2);font-size:.9rem;line-height:1;border-radius:6px}
+.pw-toggle:hover{color:var(--t1)}
 .btn{width:100%;padding:.82rem;background:linear-gradient(150deg,var(--amb),var(--amb2));border:none;border-radius:var(--r2);color:var(--on-accent);font-size:.92rem;font-weight:700;font-family:var(--fd);cursor:pointer;transition:all var(--ease);box-shadow:var(--ne-sm);letter-spacing:.3px}
 .btn:hover:not(:disabled){box-shadow:var(--ne-md)}
 .btn:active:not(:disabled),.btn-s:active:not(:disabled),.tb-btn:active,.sb-item:active{transform:scale(.97)}
@@ -95,9 +102,9 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 .link-row{text-align:center;margin-top:1rem;font-size:.76rem;color:var(--t3)}
 .link-row a{color:var(--amb);cursor:pointer;text-decoration:underline;font-weight:700}
 
+/* ═══ APP SHELL ═══ */
 #app{display:none;flex-direction:column;min-height:100vh}
 #app.on{display:flex}
-
 #tb{height:56px;background:rgba(250,250,250,.9);backdrop-filter:blur(20px) saturate(1.3);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 1rem;position:sticky;top:0;z-index:500;flex-shrink:0}
 .dark #tb{background:rgba(24,27,25,.92)}
 .tb-brand{display:flex;align-items:center;gap:.55rem;font-family:var(--fd);font-size:.95rem;font-weight:700;color:var(--t1);cursor:pointer;background:transparent;border:none;padding:0;text-align:left}
@@ -109,6 +116,10 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 .tb-btn:hover{background:var(--b1);color:var(--t1);border-color:var(--b2)}
 .tb-btn.danger{color:var(--ros);border-color:var(--bad-bd)}.tb-btn.danger:hover{background:var(--bad-bg)}
 .tb-btn.icon-only{width:32px;justify-content:center;padding:0}
+.tb-cmdk{display:flex;align-items:center;gap:.4rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);padding:.28rem .55rem;font-size:.68rem;font-weight:600;color:var(--t3);cursor:pointer;height:32px;transition:all var(--ease);font-family:var(--ff)}
+.tb-cmdk:hover{background:var(--b1);color:var(--t1);border-color:var(--b2)}
+.tb-cmdk kbd{font-family:var(--fm);font-size:.62rem;background:var(--c2);border:1px solid var(--b1);border-radius:4px;padding:.05rem .3rem}
+@media(max-width:700px){.tb-cmdk{display:none}}
 #menu-btn{display:none}
 @media(max-width:900px){#menu-btn{display:flex !important}}
 
@@ -122,7 +133,7 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 #ov.show{display:block}
 .sb-close{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin:0 0 .5rem auto;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.85rem;cursor:pointer}
 @media(max-width:900px){.sb-close{display:flex}}
-.sb-item{display:flex;align-items:center;gap:.55rem;padding:.4rem .5rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:.3rem;border:1px solid transparent;background:transparent;width:100%;text-align:left;font-family:var(--ff)}
+.sb-item{display:flex;align-items:center;gap:.55rem;padding:.4rem .5rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:.3rem;border:1px solid transparent;background:transparent;width:100%;text-align:left;font-family:var(--ff);position:relative}
 .sb-item:hover{background:var(--c2);color:var(--t1);box-shadow:var(--ne-sm)}
 .sb-item.active{background:var(--c2);color:var(--amb);font-weight:600;box-shadow:var(--ne-in-sm)}
 .sb-item.active .sb-ic{background:var(--c4);color:var(--amb)}
@@ -130,6 +141,8 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 .sb-lbl{font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);padding:.45rem .45rem .1rem;margin-bottom:.1rem;margin-top:.35rem}
 .sb-lbl:first-child{margin-top:0}
 .sb-div{height:1px;background:var(--b1);margin:.3rem .45rem}
+.sb-badge{margin-left:auto;background:var(--ros);color:#fff;font-size:.56rem;font-weight:800;padding:.08rem .35rem;border-radius:20px;min-width:18px;text-align:center}
+.sb-badge.ok{background:var(--grn)}
 
 #main{flex:1;overflow-y:auto;padding:1rem 1rem 1.5rem}
 @media(max-width:900px){#main{padding:.8rem .7rem 1.2rem}}
@@ -174,23 +187,115 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 .btn-c:hover:not(:disabled){background:var(--sky);color:#fff;box-shadow:0 0 20px var(--sky-glow)}
 .btn-sm{padding:.26rem .55rem;font-size:.68rem}
 
-.tbl-wrap{overflow-x:auto;border:1px solid var(--b1);border-radius:var(--r2);background:var(--c2)}
+/* ═══ TABLE + MOBILE CARDS ═══ */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--b1);border-radius:var(--r2);background:var(--c2);max-height:calc(100vh - 340px);overflow-y:auto}
 table{width:100%;border-collapse:collapse;font-size:.76rem}
-th{background:var(--c1);color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-size:.6rem;padding:.55rem .7rem;text-align:left;border-bottom:1px solid var(--b1)}
+th{background:var(--c1);color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.6px;font-size:.6rem;padding:.55rem .7rem;text-align:left;border-bottom:1px solid var(--b1);position:sticky;top:0;z-index:2}
 td{padding:.5rem .7rem;border-bottom:1px solid var(--b1);color:var(--t2);vertical-align:middle}
 tr:hover td{background:var(--b0)}
 tr:last-child td{border-bottom:none}
 .mono{font-family:var(--fm);font-size:.72rem}
-.badge{display:inline-flex;align-items:center;gap:.2rem;padding:.12rem .4rem;border-radius:20px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
-.badge-trial{background:rgba(43,108,176,.12);color:var(--sky);border:1px solid rgba(43,108,176,.25)}
-.badge-active{background:rgba(46,125,79,.12);color:var(--grn);border:1px solid rgba(46,125,79,.3)}
-.badge-expired{background:rgba(193,67,60,.12);color:var(--ros);border:1px solid rgba(193,67,60,.3)}
-.badge-pending{background:rgba(46,139,87,.12);color:var(--amb);border:1px solid rgba(46,139,87,.3)}
-.badge-verified{background:rgba(46,125,79,.12);color:var(--grn);border:1px solid rgba(46,125,79,.3)}
-.badge-rejected{background:rgba(193,67,60,.12);color:var(--ros);border:1px solid rgba(193,67,60,.3)}
-.ctag{font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:.14rem .5rem;border-radius:20px;display:inline-flex;align-items:center;gap:.22rem}
-.tg{background:rgba(var(--grn-rgb),.11);color:var(--grn)}.ta{background:rgba(var(--amb-rgb),.13);color:var(--amb)}.tr{background:rgba(var(--ros-rgb),.11);color:var(--ros)}.tp{background:rgba(var(--vio-rgb),.13);color:var(--vio)}
 
+.avatar{width:26px;height:26px;border-radius:50%;background:var(--c4);color:var(--amb);display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase}
+.cell-user{display:flex;align-items:center;gap:.5rem;min-width:0}
+.cell-user-info{min-width:0;overflow:hidden}
+.cell-user-name{font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell-user-sub{font-size:.68rem;color:var(--t3);font-family:var(--fm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Unified status pill */
+.st{display:inline-flex;align-items:center;gap:.3rem;padding:.14rem .5rem;border-radius:20px;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;line-height:1.4}
+.st::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.st-trial{background:rgba(var(--sky-rgb),.12);color:var(--sky)}
+.st-active{background:rgba(var(--grn-rgb),.14);color:var(--grn)}
+.st-expired{background:rgba(var(--ros-rgb),.12);color:var(--ros)}
+.st-payment_pending,.st-pending{background:rgba(var(--wrn-rgb),.14);color:var(--wrn)}
+.st-rejected{background:rgba(var(--ros-rgb),.12);color:var(--ros)}
+.st-verified{background:rgba(var(--grn-rgb),.14);color:var(--grn)}
+.st-open{background:rgba(var(--wrn-rgb),.14);color:var(--wrn)}
+.st-resolved{background:rgba(var(--grn-rgb),.12);color:var(--grn)}
+.st-dismissed{background:var(--b0);color:var(--t3)}
+.st-live{background:rgba(var(--grn-rgb),.14);color:var(--grn)}
+.st-scheduled{background:rgba(var(--wrn-rgb),.14);color:var(--wrn)}
+.st-archived{background:var(--b0);color:var(--t3)}
+.st-pending-grade{background:rgba(var(--wrn-rgb),.14);color:var(--wrn)}
+.st-graded{background:rgba(var(--grn-rgb),.14);color:var(--grn)}
+
+/* Mobile card tables */
+@media(max-width:680px){
+  .tbl-wrap{border:none;background:transparent;max-height:none}
+  .tbl-wrap table{display:block}
+  .tbl-wrap thead{display:none}
+  .tbl-wrap tbody{display:block}
+  .tbl-wrap tr{display:block;background:var(--c2);border:1px solid var(--b1);border-radius:12px;padding:.7rem .8rem;margin-bottom:.55rem;position:relative}
+  .tbl-wrap td{display:flex;align-items:center;justify-content:space-between;gap:.6rem;border:none;padding:.22rem 0;font-size:.78rem;text-align:right}
+  .tbl-wrap td::before{content:attr(data-label);font-size:.6rem;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;text-align:left;flex-shrink:0}
+  .tbl-wrap td.td-check{position:absolute;top:.6rem;right:.6rem;padding:0;justify-content:flex-end}
+  .tbl-wrap td.td-check::before{display:none}
+  .tbl-wrap td.td-user{padding-right:2.2rem;justify-content:flex-start;text-align:left}
+  .tbl-wrap td.td-user::before{display:none}
+  .tbl-wrap td.td-actions{justify-content:flex-end;padding-top:.5rem;margin-top:.5rem;border-top:1px dashed var(--b1)}
+  .tbl-wrap td.td-actions::before{display:none}
+}
+
+/* ═══ TODAY VIEW ═══ */
+.today-hero{
+  background:linear-gradient(135deg,rgba(var(--amb-rgb),.09),rgba(var(--sky-rgb),.05));
+  border:1px solid rgba(var(--amb-rgb),.18);border-radius:var(--r3);
+  padding:1rem 1.15rem;margin-bottom:.9rem;
+}
+.today-hero h2{font-family:var(--fd);font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:.45rem;margin-bottom:.15rem}
+.today-hero .date{font-size:.72rem;color:var(--t3);font-weight:500}
+.today-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.7rem;margin-bottom:.9rem}
+@media(max-width:620px){.today-grid{grid-template-columns:1fr}}
+.today-card{
+  background:var(--c2);border-radius:var(--r2);padding:1rem 1.05rem;box-shadow:var(--ne-sm);
+  border:1px solid var(--b1);display:flex;flex-direction:column;gap:.55rem;
+  cursor:pointer;transition:all var(--ease);position:relative;overflow:hidden;
+}
+.today-card:hover{transform:translateY(-2px);box-shadow:var(--ne-md);border-color:var(--b2)}
+.today-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--amb);opacity:.85}
+.today-card.tc-pay::before{background:var(--grn)}
+.today-card.tc-qotd::before{background:var(--vio)}
+.today-card.tc-exam::before{background:var(--sky)}
+.today-card.tc-report::before{background:var(--ros)}
+.today-card.tc-trial::before{background:var(--wrn)}
+.today-card.empty{opacity:.55}
+.today-card.empty::before{opacity:.25}
+.today-card-hd{display:flex;align-items:center;gap:.55rem}
+.today-card-icon{width:36px;height:36px;border-radius:10px;background:var(--c4);display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--amb);flex-shrink:0}
+.today-card.tc-pay .today-card-icon{background:rgba(var(--grn-rgb),.14);color:var(--grn)}
+.today-card.tc-qotd .today-card-icon{background:rgba(var(--vio-rgb),.14);color:var(--vio)}
+.today-card.tc-exam .today-card-icon{background:rgba(var(--sky-rgb),.12);color:var(--sky)}
+.today-card.tc-report .today-card-icon{background:rgba(var(--ros-rgb),.12);color:var(--ros)}
+.today-card.tc-trial .today-card-icon{background:rgba(var(--wrn-rgb),.14);color:var(--wrn)}
+.today-card-title{font-size:.78rem;font-weight:700;color:var(--t1);line-height:1.25}
+.today-card-sub{font-size:.66rem;color:var(--t3);margin-top:.1rem}
+.today-card-num{margin-left:auto;font-family:var(--fm);font-size:1.9rem;font-weight:800;line-height:1;color:var(--t1)}
+.today-card.empty .today-card-num{color:var(--t3);opacity:.5}
+.today-card-cta{font-size:.68rem;font-weight:700;color:var(--amb);display:flex;align-items:center;gap:.25rem;margin-top:auto}
+
+/* ═══ COMMAND PALETTE ═══ */
+#cmdk{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);display:none;align-items:flex-start;justify-content:center;padding-top:12vh}
+#cmdk.show{display:flex}
+.cmdk-box{width:100%;max-width:600px;margin:0 1rem;background:var(--c2);border:1px solid var(--b2);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.4);overflow:hidden;animation:cmdkIn .18s var(--spring)}
+@keyframes cmdkIn{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
+.cmdk-input{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.05rem;border-bottom:1px solid var(--b1)}
+.cmdk-input i{font-size:1.05rem;color:var(--t3)}
+.cmdk-input input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:.95rem;font-family:var(--ff)}
+.cmdk-input input::placeholder{color:var(--t3)}
+.cmdk-list{max-height:52vh;overflow-y:auto;padding:.35rem 0}
+.cmdk-group-lbl{font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:var(--t3);padding:.55rem .9rem .25rem}
+.cmdk-item{display:flex;align-items:center;gap:.6rem;padding:.5rem .9rem;cursor:pointer;font-size:.82rem;color:var(--t1);transition:background .1s}
+.cmdk-item:hover,.cmdk-item.sel{background:var(--c1)}
+.cmdk-item i{font-size:.95rem;color:var(--t3);flex-shrink:0;width:20px;text-align:center}
+.cmdk-item .cmd-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdk-item .cmd-sub{font-size:.68rem;color:var(--t3);font-family:var(--fm)}
+.cmdk-item .cmd-kbd{font-family:var(--fm);font-size:.6rem;background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.05rem .3rem;color:var(--t3)}
+.cmdk-empty{padding:1.5rem;text-align:center;color:var(--t3);font-size:.82rem}
+.cmdk-foot{padding:.5rem .9rem;border-top:1px solid var(--b1);display:flex;gap:.9rem;font-size:.66rem;color:var(--t3)}
+.cmdk-foot kbd{font-family:var(--fm);background:var(--c1);border:1px solid var(--b1);border-radius:4px;padding:.05rem .3rem;font-size:.6rem}
+
+/* ═══ TOOLBAR ═══ */
 .toolbar{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center}
 .toolbar input,.toolbar select{background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none}
 .toolbar input:focus,.toolbar select:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(46,139,87,.12)}
@@ -210,13 +315,16 @@ tr:last-child td{border-bottom:none}
 .file-up .file-up-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:.3rem;background:var(--c2);border:1px solid var(--b1);border-radius:7px;padding:.3rem .6rem;font-size:.7rem;font-weight:700;color:var(--t2)}
 .file-up .file-up-name{font-size:.75rem;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* ═══ MODALS ═══ */
 .mbg{position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.72);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:1rem}
 .mbg.show{display:flex}
 .mbox{background:var(--c2);border:1px solid var(--b2);border-radius:var(--r4);width:100%;max-width:480px;max-height:88vh;overflow-y:auto;box-shadow:0 16px 44px rgba(17,19,21,.2);animation:mfade .16s var(--spring)}
 .mbox.wide{max-width:640px}
+.mbox.danger{border-color:rgba(var(--ros-rgb),.35)}
 @keyframes mfade{from{opacity:0;transform:scale(.93) translateY(8px)}to{opacity:1;transform:none}}
 .mhd{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem .55rem;border-bottom:1px solid var(--b1)}
 .mhd h3{font-family:var(--fd);font-size:.88rem;font-weight:700}
+.mhd.danger h3{color:var(--ros)}
 .mcl{background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:.9rem;transition:all var(--ease)}
 .mcl:hover{background:var(--bad-bg);color:var(--ros);border-color:var(--bad-bd)}
 .mbody{padding:.85rem 1rem}
@@ -228,7 +336,10 @@ tr:last-child td{border-bottom:none}
 @keyframes tin{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
 @keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
 
-.empty{text-align:center;padding:2rem 1rem;color:var(--t3)}.empty-i{font-size:2rem;margin-bottom:.4rem;display:flex;align-items:center;justify-content:center}
+.empty{text-align:center;padding:2rem 1rem;color:var(--t3)}
+.empty-i{font-size:2rem;margin-bottom:.4rem;display:flex;align-items:center;justify-content:center}
+.empty p{font-size:.8rem;font-weight:600;color:var(--t2)}
+.empty p+p{font-size:.72rem;font-weight:400;color:var(--t3);margin-top:.2rem}
 hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 
 .pg{display:flex;align-items:center;justify-content:center;gap:.3rem;margin-top:.7rem}
@@ -244,6 +355,12 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 .ld-overlay.show{display:flex}
 .ld-spin{width:32px;height:32px;border:3px solid rgba(54,139,79,.2);border-top-color:var(--amb);border-radius:50%;animation:spin .8s linear infinite}
 .ld-text{font-size:.78rem;color:#fff;font-weight:600}
+
+/* Skeleton loaders */
+.skel{background:linear-gradient(90deg,var(--b0) 25%,var(--b1) 37%,var(--b0) 63%);background-size:400% 100%;animation:skel 1.4s ease infinite;border-radius:6px;height:14px;margin-bottom:.45rem}
+.skel.w40{width:40%}.skel.w60{width:60%}.skel.w80{width:80%}.skel.w100{width:100%}
+.skel-card{background:var(--c2);border-radius:var(--r2);padding:.7rem .8rem;margin-bottom:.5rem;box-shadow:var(--ne-sm)}
+@keyframes skel{from{background-position:100% 50%}to{background-position:0 50%}}
 
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
 @media(max-width:500px){.dgrid{grid-template-columns:1fr}}
@@ -282,37 +399,28 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 .maint-row .maint-input input{background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .55rem;color:var(--t1);font-size:.78rem;font-family:var(--fm);outline:none;width:100px}
 @media(max-width:520px){.maint-row{flex-direction:column;align-items:stretch}.maint-row button{width:100%}}
 
-/* Subjective submission card (new) */
-.sub-card{
-  background:var(--b0);border:1px solid var(--b1);border-radius:12px;
-  padding:.85rem .9rem;margin-bottom:.55rem;
-  transition:border-color .15s, box-shadow .15s;
-}
+/* Subjective tabs */
+.tabs{display:flex;gap:.3rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);padding:.28rem;margin-bottom:.85rem;box-shadow:var(--ne-in-sm)}
+.tab{flex:1;padding:.55rem .5rem;background:transparent;border:none;border-radius:var(--r1);font-family:var(--ff);font-size:.76rem;font-weight:600;color:var(--t3);cursor:pointer;transition:all var(--ease);text-align:center;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:.35rem}
+.tab:hover:not(.active){color:var(--t2)}
+.tab.active{background:var(--c2);color:var(--amb);box-shadow:var(--ne-sm);font-weight:700}
+.tab .tab-count{background:var(--ros);color:#fff;font-size:.56rem;font-weight:800;padding:.05rem .32rem;border-radius:20px;min-width:16px;text-align:center;display:inline-block}
+
+.sub-card{background:var(--b0);border:1px solid var(--b1);border-radius:12px;padding:.85rem .9rem;margin-bottom:.55rem;transition:border-color .15s,box-shadow .15s}
 .sub-card:hover{border-color:var(--b2);box-shadow:0 2px 8px rgba(0,0,0,.04)}
 .sub-card.graded{background:linear-gradient(90deg,rgba(46,125,79,.05),var(--b0))}
 .sub-card-top{display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:.5rem}
 .sub-card-user{font-weight:700;font-size:.85rem;color:var(--t1);display:flex;align-items:center;gap:.4rem}
 .sub-card-meta{font-size:.66rem;color:var(--t3);display:flex;flex-wrap:wrap;gap:.55rem;margin-top:.15rem}
-.sub-card-q{
-  background:var(--c1);border:1px solid var(--b1);border-radius:8px;
-  padding:.55rem .7rem;margin:.45rem 0;font-size:.76rem;line-height:1.5;
-  white-space:pre-wrap;max-height:120px;overflow:auto;font-family:var(--ff);
-}
+.sub-card-q{background:var(--c1);border:1px solid var(--b1);border-radius:8px;padding:.55rem .7rem;margin:.45rem 0;font-size:.76rem;line-height:1.5;white-space:pre-wrap;max-height:120px;overflow:auto;font-family:var(--ff)}
 .sub-card-actions{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.55rem}
-.sub-card-actions .grade-input{
-  width:5.5rem;padding:.35rem .5rem;background:var(--c2);border:1.5px solid var(--b1);
-  border-radius:6px;color:var(--t1);font-size:.78rem;font-family:var(--fm);text-align:center;
-}
+.sub-card-actions .grade-input{width:5.5rem;padding:.35rem .5rem;background:var(--c2);border:1.5px solid var(--b1);border-radius:6px;color:var(--t1);font-size:.78rem;font-family:var(--fm);text-align:center}
 .sub-card-actions .grade-input:focus{outline:none;border-color:var(--amb);box-shadow:0 0 0 3px rgba(46,139,87,.14)}
-.sub-card-actions .feedback-input{
-  flex:1;min-width:200px;padding:.35rem .55rem;background:var(--c2);border:1.5px solid var(--b1);
-  border-radius:6px;color:var(--t1);font-size:.76rem;font-family:var(--ff);
-}
+.sub-card-actions .feedback-input{flex:1;min-width:200px;padding:.35rem .55rem;background:var(--c2);border:1.5px solid var(--b1);border-radius:6px;color:var(--t1);font-size:.76rem;font-family:var(--ff)}
 .sub-card-actions .feedback-input:focus{outline:none;border-color:var(--amb);box-shadow:0 0 0 3px rgba(46,139,87,.14)}
 .sub-card-score{font-size:.74rem;color:var(--grn);font-weight:700}
 .sub-card-feedback{font-size:.72rem;color:var(--t2);margin-top:.4rem;font-style:italic}
 
-/* Smart Paste preview rows */
 .sp-row{display:grid;grid-template-columns:30px 1fr 180px 70px 40px;gap:.5rem;align-items:center;background:var(--c2);padding:.5rem .7rem;border-radius:8px;border-left:4px solid var(--grn)}
 .sp-row.conf-mid{border-left-color:var(--amb)}
 .sp-row.conf-low{border-left-color:var(--ros)}
@@ -320,31 +428,27 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 .sp-row select,.sp-row input{padding:.3rem;background:var(--c1);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:.72rem;font-family:var(--ff)}
 .sp-row .sp-num{font-weight:700;color:var(--t3);text-align:center}
 
-/* Admin cards (new) */
 .admin-card{background:var(--b0);border:1px solid var(--b1);border-radius:12px;padding:.75rem .85rem;margin-bottom:.5rem;transition:border-color .15s}
 .admin-card.owner{background:linear-gradient(90deg,rgba(46,139,87,.06),var(--b0));border-color:rgba(46,139,87,.18)}
 .admin-card-hd{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap}
 .admin-card-info{min-width:0;flex:1}
 .admin-card-name{font-weight:700;font-size:.88rem;color:var(--t1);display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
 .admin-card-meta{font-size:.66rem;color:var(--t3);margin-top:.15rem}
-.admin-card-actions{display:flex;gap:.35rem;flex-shrink:0}
+.admin-card-actions{display:flex;gap:.35rem;flex-shrink:0;flex-wrap:wrap}
 .admin-perms{display:none;margin-top:.7rem;padding-top:.7rem;border-top:1px solid var(--b1)}
 .admin-perms.show{display:block}
+.perm-pill{display:inline-flex;align-items:center;gap:.2rem;font-size:.6rem;font-weight:600;background:var(--b0);border:1px solid var(--b1);border-radius:20px;padding:.12rem .5rem;color:var(--t2)}
+.perm-pill.more{background:transparent;border-style:dashed}
 .perm-group{margin-bottom:.7rem}
 .perm-group-title{font-size:.6rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.3rem}
 .perm-row{display:flex;align-items:center;gap:.5rem;padding:.3rem .45rem;border-radius:6px;cursor:pointer;font-size:.78rem}
 .perm-row:hover{background:var(--c1)}
 .perm-row input{accent-color:var(--amb);width:15px;height:15px}
 
-/* User search picker */
 .user-picker{position:relative}
 .user-picker input{width:100%;padding:.55rem .75rem;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);color:var(--t1);font-size:.82rem;font-family:var(--ff);outline:none}
 .user-picker input:focus{border-color:var(--amb);box-shadow:0 0 0 3px rgba(46,139,87,.12)}
-.user-picker-list{
-  position:absolute;top:100%;left:0;right:0;background:var(--c2);border:1px solid var(--b2);
-  border-radius:8px;box-shadow:0 8px 26px rgba(17,19,21,.16);max-height:220px;overflow-y:auto;
-  z-index:100;display:none;margin-top:.3rem;
-}
+.user-picker-list{position:absolute;top:100%;left:0;right:0;background:var(--c2);border:1px solid var(--b2);border-radius:8px;box-shadow:0 8px 26px rgba(17,19,21,.16);max-height:220px;overflow-y:auto;z-index:100;display:none;margin-top:.3rem}
 .user-picker-list.show{display:block}
 .user-picker-item{padding:.55rem .7rem;cursor:pointer;font-size:.78rem;border-bottom:1px solid var(--b1);display:flex;justify-content:space-between;gap:.5rem;align-items:center}
 .user-picker-item:last-child{border-bottom:none}
@@ -353,12 +457,7 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 .user-picker-item .pu-user{font-family:var(--fm);font-size:.68rem;color:var(--t3)}
 .user-picker-empty{padding:.7rem;text-align:center;color:var(--t3);font-size:.76rem}
 
-/* QOTD header */
-.qotd-banner{
-  background:linear-gradient(135deg,rgba(46,139,87,.10),rgba(43,108,176,.05));
-  border:1px solid rgba(46,139,87,.20);border-radius:14px;
-  padding:1rem 1.1rem;margin-bottom:.9rem;
-}
+.qotd-banner{background:linear-gradient(135deg,rgba(46,139,87,.10),rgba(43,108,176,.05));border:1px solid rgba(46,139,87,.20);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.9rem}
 .qotd-banner h3{font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--t1);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
 .qotd-banner .qotd-text{font-size:.82rem;line-height:1.6;color:var(--t1);background:var(--c2);border-radius:8px;padding:.7rem .8rem;margin-top:.5rem;white-space:pre-wrap;border:1px solid var(--b1)}
 .qotd-banner .qotd-meta{font-size:.68rem;color:var(--t3);margin-top:.45rem;display:flex;flex-wrap:wrap;gap:.7rem}
@@ -366,12 +465,19 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 .qotd-banner .qstat{background:var(--c2);border:1px solid var(--b1);border-radius:8px;padding:.4rem .7rem;font-size:.7rem;display:flex;flex-direction:column;align-items:center;gap:.1rem}
 .qotd-banner .qstat strong{font-family:var(--fm);font-size:.9rem;color:var(--t1);font-weight:700}
 .qotd-banner .qstat span{color:var(--t3);font-size:.58rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+
+.copy-btn{background:transparent;border:none;color:var(--t3);cursor:pointer;padding:.15rem .3rem;border-radius:4px;margin-left:.3rem}
+.copy-btn:hover{color:var(--amb);background:var(--b0)}
+
+/* Copy hint toast inline */
+.copy-hint{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--amb);color:#000;padding:.4rem .9rem;border-radius:20px;font-size:.72rem;font-weight:700;z-index:10003;animation:tin .2s var(--spring)}
 </style>
 </head>
 <body>
 
 <a href="#main" class="skip-link">Skip to content</a>
 
+<!-- ═══ GATE ═══ -->
 <div id="gate">
   <div class="gate-card">
     <div class="gate-logo">
@@ -380,8 +486,19 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
       <p>Abhyas V1 Management</p>
     </div>
     <div class="err" id="err" role="alert" aria-live="assertive"></div>
-    <div class="fld"><label for="ad-user">Admin Username</label><input type="text" id="ad-user" placeholder="admin" autocomplete="username" autocapitalize="none"></div>
-    <div class="fld"><label for="ad-pass">Password</label><div class="pw-field"><input type="password" id="ad-pass" placeholder="••••••••" autocomplete="current-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
+    <div class="fld">
+      <label for="ad-user">Admin Username</label>
+      <input type="text" id="ad-user" placeholder="admin" autocomplete="username" autocapitalize="none">
+    </div>
+    <div class="fld">
+      <label for="ad-pass">Password</label>
+      <div class="pw-field">
+        <input type="password" id="ad-pass" placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
+          <i class="ph ph-eye"></i>
+        </button>
+      </div>
+    </div>
     <button class="btn" id="btn-login" onclick="ADMIN.login()">Enter Admin Panel →</button>
     <div class="link-row"><a onclick="ADMIN._leaveAdminMode()">← Back to User Login</a></div>
   </div>
@@ -392,16 +509,38 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
   <div class="ld-text" id="ld-text">Loading…</div>
 </div>
 
+<!-- ═══ COMMAND PALETTE ═══ -->
+<div id="cmdk" onclick="if(event.target===this)PALETTE.close()" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="cmdk-box" onclick="event.stopPropagation()">
+    <div class="cmdk-input">
+      <i class="ph ph-magnifying-glass"></i>
+      <input type="text" id="cmdk-input" placeholder="Search users, payments, or run a command…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="cmdk-list" id="cmdk-list"></div>
+    <div class="cmdk-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> select</span>
+      <span><kbd>Esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ APP ═══ -->
 <div id="app">
   <div id="tb">
     <div style="display:flex;align-items:center;gap:.5rem">
       <button class="tb-btn icon-only" id="menu-btn" onclick="UI.sidebarOpen()" title="Menu" aria-label="Open menu"><i class="ph ph-list"></i></button>
-      <button class="tb-brand" type="button" onclick="UI.nav('dashboard')">
+      <button class="tb-brand" type="button" onclick="UI.nav('today')">
         <div class="mark"><img src="icon-192.png" alt="Abhyas"></div>
         <span>Admin World</span>
       </button>
     </div>
     <div class="tb-r">
+      <button class="tb-cmdk" onclick="PALETTE.open()" aria-label="Open command palette">
+        <i class="ph ph-magnifying-glass"></i>
+        <span>Search…</span>
+        <kbd>Ctrl K</kbd>
+      </button>
       <div style="font-size:.68rem;color:var(--t3);font-weight:600;margin-right:.4rem" id="admin-name">admin</div>
       <span id="backend-version" style="font-size:.6rem;color:var(--t3);font-family:var(--fm);margin-right:.3rem;opacity:.7" title="Deployed backend version"></span>
       <button class="tb-btn icon-only" onclick="ADMIN.refresh()" title="Refresh" aria-label="Refresh"><i class="ph ph-arrow-clockwise"></i></button>
@@ -417,21 +556,18 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
       <button class="sb-close" onclick="UI.sidebarClose()" aria-label="Close menu"><i class="ph ph-x"></i></button>
 
       <div class="sb-lbl">Overview</div>
-      <button class="sb-item active" id="nav-dashboard" onclick="UI.nav('dashboard')"><div class="sb-ic"><i class="ph ph-chart-bar"></i></div>Dashboard</button>
+      <button class="sb-item active" id="nav-today" onclick="UI.nav('today')"><div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>Today</button>
+      <button class="sb-item" id="nav-dashboard" onclick="UI.nav('dashboard')"><div class="sb-ic"><i class="ph ph-chart-bar"></i></div>Dashboard</button>
 
       <div class="sb-lbl">People</div>
       <button class="sb-item" id="nav-users" onclick="UI.nav('users')"><div class="sb-ic"><i class="ph ph-user"></i></div>Users</button>
-      <button class="sb-item" id="nav-payments" onclick="UI.nav('payments')"><div class="sb-ic"><i class="ph ph-credit-card"></i></div>Payments</button>
+      <button class="sb-item" id="nav-payments" onclick="UI.nav('payments')"><div class="sb-ic"><i class="ph ph-credit-card"></i></div>Payments<span class="sb-badge" id="nav-payments-badge" style="display:none">0</span></button>
       <button class="sb-item" id="nav-admins" onclick="UI.nav('admins')"><div class="sb-ic"><i class="ph ph-shield-check"></i></div>Admins</button>
 
       <div class="sb-lbl">Content</div>
       <button class="sb-item" id="nav-weeklysets" onclick="UI.nav('weeklysets')"><div class="sb-ic"><i class="ph ph-calendar-check"></i></div>Weekly Sets</button>
-      <button class="sb-item" id="nav-qreports" onclick="UI.nav('qreports')"><div class="sb-ic"><i class="ph ph-warning-circle"></i></div>Question Reports</button>
-
-      <div class="sb-lbl">Subjective</div>
-      <button class="sb-item" id="nav-subj-qotd" onclick="UI.nav('subj-qotd')"><div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>Qn of Day</button>
-      <button class="sb-item" id="nav-subj-exam" onclick="UI.nav('subj-exam')"><div class="sb-ic"><i class="ph ph-note-pencil"></i></div>Proper Exam</button>
-      <button class="sb-item" id="nav-subj-add" onclick="UI.nav('subj-add')"><div class="sb-ic"><i class="ph ph-magic-wand"></i></div>Add Questions</button>
+      <button class="sb-item" id="nav-qreports" onclick="UI.nav('qreports')"><div class="sb-ic"><i class="ph ph-warning-circle"></i></div>Reports<span class="sb-badge" id="nav-qreports-badge" style="display:none">0</span></button>
+      <button class="sb-item" id="nav-subjective" onclick="UI.nav('subjective')"><div class="sb-ic"><i class="ph ph-note-pencil"></i></div>Subjective<span class="sb-badge" id="nav-subjective-badge" style="display:none">0</span></button>
 
       <div class="sb-lbl">System</div>
       <button class="sb-item" id="nav-logs" onclick="UI.nav('logs')"><div class="sb-ic"><i class="ph ph-clipboard-text"></i></div>Activity Logs</button>
@@ -445,8 +581,50 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
 
     <div id="main">
 
+      <!-- ═══ TODAY ═══ -->
+      <div class="view on" id="view-today">
+        <div class="today-hero">
+          <h2><i class="ph ph-sun-horizon"></i> Today</h2>
+          <div class="date" id="today-date">—</div>
+        </div>
+        <div class="today-grid" id="today-grid">
+          <div class="skel-card"><div class="skel w60"></div><div class="skel w80"></div></div>
+          <div class="skel-card"><div class="skel w60"></div><div class="skel w80"></div></div>
+          <div class="skel-card"><div class="skel w60"></div><div class="skel w80"></div></div>
+          <div class="skel-card"><div class="skel w60"></div><div class="skel w80"></div></div>
+          <div class="skel-card"><div class="skel w60"></div><div class="skel w80"></div></div>
+        </div>
+
+        <div class="card" id="card-expiring">
+          <div class="card-hd">
+            <h3><i class="ph ph-hourglass-medium"></i> Trials Ending Soon</h3>
+            <div style="display:flex;gap:.3rem;align-items:center">
+              <select id="exp-hours" onchange="EXPIRING.load()" aria-label="Trial expiry window" style="font-size:.7rem;padding:.3rem .45rem;background:var(--c1);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:var(--ff)">
+                <option value="6">Next 6h</option>
+                <option value="24" selected>Next 24h</option>
+                <option value="72">Next 3 days</option>
+                <option value="168">Next 7 days</option>
+              </select>
+              <button class="btn-s btn-c btn-sm" onclick="EXPIRING.load()" aria-label="Refresh"><i class="ph ph-arrow-clockwise"></i></button>
+            </div>
+          </div>
+          <div id="expiring-list"><div class="skel w80"></div><div class="skel w60"></div></div>
+        </div>
+
+        <div class="card" style="background:linear-gradient(135deg,rgba(var(--vio-rgb),.05),var(--c2));border:1px dashed rgba(var(--vio-rgb),.22)">
+          <div style="display:flex;align-items:center;gap:.7rem;flex-wrap:wrap">
+            <i class="ph ph-target" style="font-size:1.4rem;color:var(--vio)"></i>
+            <div style="flex:1;min-width:180px">
+              <div style="font-weight:700;font-size:.85rem">Most Missed Questions</div>
+              <div style="font-size:.72rem;color:var(--t3);margin-top:.15rem">Aggregated analytics across all students.</div>
+            </div>
+            <button class="btn-s btn-p" onclick="UI.nav('dashboard');setTimeout(()=>MISSED.load(),200)"><i class="ph ph-arrow-right"></i> Open analytics</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══ DASHBOARD ═══ -->
-      <div class="view on" id="view-dashboard">
+      <div class="view" id="view-dashboard">
         <div class="pg-head"><h2><i class="ph ph-chart-bar"></i> Dashboard</h2><p>Overview of your study platform</p></div>
         <div class="stats-grid" id="dash-stats">
           <div class="stat-card c-vio" onclick="UI.nav('users')"><div class="stat-v" id="st-users">0</div><div class="stat-l">Total Users</div></div>
@@ -464,28 +642,12 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
           <div style="display:flex;gap:.4rem;flex-wrap:wrap" id="quick-actions">
             <button class="btn-s btn-g" data-perm="users_view" onclick="UI.nav('users')"><i class="ph ph-user"></i> Manage Users</button>
             <button class="btn-s btn-a" data-perm="payments_view" onclick="UI.nav('payments')"><i class="ph ph-credit-card"></i> Review Payments</button>
-            <button class="btn-s btn-p" data-perm="subjective_view" onclick="UI.nav('subj-qotd')"><i class="ph ph-sun-horizon"></i> Qn of Day Queue</button>
+            <button class="btn-s btn-p" data-perm="subjective_view" onclick="UI.nav('subjective')"><i class="ph ph-note-pencil"></i> Subjective</button>
             <button class="btn-s btn-c" data-perm="settings_manage" onclick="UI.nav('settings')"><i class="ph ph-gear"></i> Edit Settings</button>
             <button class="btn-s btn-c" data-perm="exports" onclick="ADMIN.exportUsers()"><i class="ph ph-download-simple"></i> Export Users</button>
             <button class="btn-s btn-c" data-perm="exports" onclick="ADMIN.exportPayments()"><i class="ph ph-download-simple"></i> Export Payments</button>
             <button class="btn-s btn-r" onclick="ADMIN.changePassword()"><i class="ph ph-lock-key"></i> Change My Password</button>
           </div>
-        </div>
-
-        <div class="card" id="card-expiring">
-          <div class="card-hd">
-            <h3><i class="ph ph-hourglass-medium"></i> Trials Ending Soon</h3>
-            <div style="display:flex;gap:.3rem;align-items:center">
-              <select id="exp-hours" onchange="EXPIRING.load()" aria-label="Trial expiry window" style="font-size:.7rem;padding:.3rem .45rem;background:var(--c1);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-family:var(--ff)">
-                <option value="6">Next 6h</option>
-                <option value="24" selected>Next 24h</option>
-                <option value="72">Next 3 days</option>
-                <option value="168">Next 7 days</option>
-              </select>
-              <button class="btn-s btn-c btn-sm" onclick="EXPIRING.load()" aria-label="Refresh"><i class="ph ph-arrow-clockwise"></i></button>
-            </div>
-          </div>
-          <div id="expiring-list"><p style="font-size:.78rem;opacity:.6">Loading…</p></div>
         </div>
 
         <div class="card">
@@ -534,9 +696,10 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
           <button class="btn-s btn-g btn-sm" data-perm="users_bulk" onclick="USERS.bulkGrantAccess('permanent')"><i class="ph ph-check"></i> Grant Permanent</button>
           <button class="btn-s btn-a btn-sm" data-perm="users_bulk" onclick="USERS.bulkGrantAccess('year')"><i class="ph ph-calendar"></i> Grant 1-Year</button>
           <button class="btn-s btn-r btn-sm" data-perm="users_bulk" onclick="USERS.bulkDelete()"><i class="ph ph-trash"></i> Delete</button>
+          <button class="btn-s btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="USERS.clearSelection()">Clear</button>
         </div>
         <div class="tbl-wrap"><table id="users-tbl"><thead><tr>
-          <th><input type="checkbox" class="chk" id="u-chk-all" onchange="USERS.toggleAll()" aria-label="Select all users"></th>
+          <th style="width:34px"><input type="checkbox" class="chk" id="u-chk-all" onchange="USERS.toggleAll()" aria-label="Select all users"></th>
           <th>User</th><th>Contact</th><th>Status</th><th>Created</th><th>Access</th><th style="text-align:right">Actions</th>
         </tr></thead><tbody id="users-body"></tbody></table></div>
         <div class="pg" id="u-pg"></div>
@@ -563,7 +726,7 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
           <button class="btn-s btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="PAYMENTS.clearSelection()">Clear</button>
         </div>
         <div class="tbl-wrap"><table id="payments-tbl"><thead><tr>
-          <th><input type="checkbox" class="chk" id="p-chk-all" onchange="PAYMENTS.toggleAll()" aria-label="Select all payments"></th>
+          <th style="width:34px"><input type="checkbox" class="chk" id="p-chk-all" onchange="PAYMENTS.toggleAll()" aria-label="Select all payments"></th>
           <th>User</th><th>TXN ID</th><th>Amount</th><th>Status</th><th>Submitted</th><th style="text-align:right">Actions</th>
         </tr></thead><tbody id="payments-body"></tbody></table></div>
         <div class="pg" id="p-pg"></div>
@@ -576,10 +739,10 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
         <div class="card" id="card-promote" style="display:none">
           <div class="card-hd">
             <h3><i class="ph ph-user-plus"></i> Promote Existing User</h3>
-            <span class="ctag ta">Recommended</span>
+            <span class="st st-active">Recommended</span>
           </div>
           <p style="font-size:.78rem;color:var(--t2);line-height:1.5;margin:0 0 .8rem">
-            Pick a user below. They'll keep their existing password, and they'll continue to have full access as a regular user too — you'll just be granting them an additional admin role.
+            Pick a user below. They keep their existing password and continue to have full user access — you're only adding an admin role.
           </p>
           <div class="user-picker">
             <input type="text" id="promote-search" placeholder="Type to search users by username, name, or email…" autocomplete="off" oninput="ADMINS._searchPromote(this.value)" onfocus="ADMINS._searchPromote(this.value)">
@@ -706,95 +869,101 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
         </div>
       </div>
 
-      <!-- ═══ SUBJECTIVE — QN OF DAY ═══ -->
-      <div class="view" id="view-subj-qotd">
-        <div class="pg-head"><h2><i class="ph ph-sun-horizon"></i> Qn of Day — Submissions</h2><p>Grade today's daily-question submissions. PDFs open in a new tab; marks are saved per submission.</p></div>
+      <!-- ═══ SUBJECTIVE — tabbed ═══ -->
+      <div class="view" id="view-subjective">
+        <div class="pg-head"><h2><i class="ph ph-note-pencil"></i> Subjective</h2><p>Grade QOTD and exam submissions, or add new questions.</p></div>
 
-        <div class="toolbar">
-          <label class="inline">Date <input type="date" id="qotd-date" onchange="SUBJ_QOTD.render()"></label>
-          <select id="qotd-status" onchange="SUBJ_QOTD.render()" aria-label="Filter by status">
-            <option value="all">All</option>
-            <option value="pending">Pending only</option>
-            <option value="graded">Graded only</option>
-          </select>
-          <button class="btn-s btn-c btn-sm" onclick="SUBJ_QOTD.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="qotd" onclick="SUBJ_TABS.go('qotd')" role="tab" aria-selected="true">
+            <i class="ph ph-sun-horizon"></i> QOTD <span class="tab-count" id="tab-count-qotd" style="display:none">0</span>
+          </button>
+          <button class="tab" data-tab="exam" onclick="SUBJ_TABS.go('exam')" role="tab" aria-selected="false">
+            <i class="ph ph-note-pencil"></i> Exams <span class="tab-count" id="tab-count-exam" style="display:none">0</span>
+          </button>
+          <button class="tab" data-tab="add" onclick="SUBJ_TABS.go('add')" role="tab" aria-selected="false">
+            <i class="ph ph-magic-wand"></i> Add
+          </button>
         </div>
 
-        <div id="qotd-banner"></div>
-        <div id="qotd-list"></div>
-      </div>
-
-      <!-- ═══ SUBJECTIVE — PROPER EXAM ═══ -->
-      <div class="view" id="view-subj-exam">
-        <div class="pg-head"><h2><i class="ph ph-note-pencil"></i> Proper Exam — Submissions</h2><p>Grade full-paper exam submissions. Papers opened in a new tab.</p></div>
-
-        <div class="toolbar">
-          <select id="exam-status" onchange="SUBJ_EXAM.render()" aria-label="Filter by status">
-            <option value="all">All</option>
-            <option value="pending">Pending only</option>
-            <option value="graded">Graded only</option>
-          </select>
-          <input type="text" id="exam-search" placeholder="Search by username…" oninput="SUBJ_EXAM.render()">
-          <button class="btn-s btn-c btn-sm" onclick="SUBJ_EXAM.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+        <div id="subj-panel-qotd" class="subj-panel">
+          <div class="toolbar">
+            <label class="inline">Date <input type="date" id="qotd-date" onchange="SUBJ_QOTD.render()"></label>
+            <select id="qotd-status" onchange="SUBJ_QOTD.render()" aria-label="Filter by status">
+              <option value="all">All</option>
+              <option value="pending">Pending only</option>
+              <option value="graded">Graded only</option>
+            </select>
+            <button class="btn-s btn-c btn-sm" onclick="SUBJ_QOTD.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+          </div>
+          <div id="qotd-banner"></div>
+          <div id="qotd-list"></div>
         </div>
 
-        <div id="exam-list"></div>
-      </div>
+        <div id="subj-panel-exam" class="subj-panel" style="display:none">
+          <div class="toolbar">
+            <select id="exam-status" onchange="SUBJ_EXAM.render()" aria-label="Filter by status">
+              <option value="all">All</option>
+              <option value="pending">Pending only</option>
+              <option value="graded">Graded only</option>
+            </select>
+            <input type="text" id="exam-search" placeholder="Search by username…" oninput="SUBJ_EXAM.render()">
+            <button class="btn-s btn-c btn-sm" onclick="SUBJ_EXAM.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+          </div>
+          <div id="exam-list"></div>
+        </div>
 
-      <!-- ═══ SUBJECTIVE — ADD QUESTIONS ═══ -->
-      <div class="view" id="view-subj-add">
-        <div class="pg-head"><h2><i class="ph ph-magic-wand"></i> Add Subjective Questions</h2><p>Append questions to any chapter's Drive file — either by pasting raw text or uploading a new JSON.</p></div>
-
-        <div class="card">
-          <div class="card-hd"><h3><i class="ph ph-magic-wand"></i> Smart Paste</h3><span class="ctag tg">Append to existing file</span></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">
-            Paste raw text from a PDF, Word doc, or WhatsApp. Each line starting with a number, <code>Qn.</code>, or a bullet becomes one question; the classifier guesses its chapter.
-          </p>
-          <textarea id="sp-raw" style="width:100%;min-height:160px;padding:.75rem;border-radius:var(--r1);border:1.5px solid var(--b1);background:var(--c1);color:var(--t1);font-family:var(--fm);font-size:.78rem" placeholder="1. Explain factors influencing bridge type selection in Nepal. [5]
+        <div id="subj-panel-add" class="subj-panel" style="display:none">
+          <div class="card">
+            <div class="card-hd"><h3><i class="ph ph-magic-wand"></i> Smart Paste</h3><span class="st st-active">Append to existing file</span></div>
+            <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">
+              Paste raw text from a PDF, Word doc, or WhatsApp. Each line starting with a number, <code>Qn.</code>, or a bullet becomes one question; the classifier guesses its chapter.
+            </p>
+            <textarea id="sp-raw" style="width:100%;min-height:160px;padding:.75rem;border-radius:var(--r1);border:1.5px solid var(--b1);background:var(--c1);color:var(--t1);font-family:var(--fm);font-size:.78rem" placeholder="1. Explain factors influencing bridge type selection in Nepal. [5]
 2. Design a two-way slab for 5m x 4m, LL 200 kg/m². [10]"></textarea>
-          <div class="sf" style="margin-top:.6rem">
-            <label for="sp-target">Target chapter file</label>
-            <select id="sp-target" onchange="SUBJADMIN._onChapterChange(this.value)" style="width:100%;padding:.5rem .7rem;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);color:var(--t1);font-size:.78rem">
-              <option value="">Select a chapter…</option>
-            </select>
-            <div class="hint">Pulled from <span class="mono">subjective-data.js</span>.</div>
+            <div class="sf" style="margin-top:.6rem">
+              <label for="sp-target">Target chapter file</label>
+              <select id="sp-target" onchange="SUBJADMIN._onChapterChange(this.value)" style="width:100%;padding:.5rem .7rem;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);color:var(--t1);font-size:.78rem">
+                <option value="">Select a chapter…</option>
+              </select>
+              <div class="hint">Pulled from <span class="mono">subjective-data.js</span>.</div>
+            </div>
+            <div class="sf" style="margin-top:.5rem">
+              <label for="sp-section">Target section</label>
+              <select id="sp-section" onchange="SUBJADMIN._onSectionChange(this.value)" style="width:100%;padding:.5rem .7rem;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);color:var(--t1);font-size:.78rem">
+                <option value="">— Append to default bucket —</option>
+                <option value="__NEW__">➕ Create new section…</option>
+              </select>
+              <input type="text" id="sp-section-new" placeholder="New section name, e.g. 1.3 Retaining Walls" style="margin-top:.4rem;display:none">
+              <div class="hint">Leave blank to use <span class="mono">UNCLASSIFIED (Smart Paste)</span>.</div>
+            </div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem">
+              <button class="btn-s btn-c" onclick="SUBJADMIN.parse()"><i class="ph ph-magnifying-glass"></i> Parse &amp; Preview</button>
+              <button class="btn-s btn-g" id="sp-commit" disabled onclick="SUBJADMIN.commit()"><i class="ph ph-check"></i> Insert into File</button>
+              <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SUBJADMIN.clear()">Clear</button>
+              <span id="sp-status" style="font-size:.72rem;color:var(--t3);margin-left:auto;align-self:center"></span>
+            </div>
+            <div id="sp-preview" style="display:grid;gap:.5rem;margin-top:.75rem"></div>
           </div>
-          <div class="sf" style="margin-top:.5rem">
-            <label for="sp-section">Target section</label>
-            <select id="sp-section" onchange="SUBJADMIN._onSectionChange(this.value)" style="width:100%;padding:.5rem .7rem;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);color:var(--t1);font-size:.78rem">
-              <option value="">— Append to default bucket —</option>
-              <option value="__NEW__">➕ Create new section…</option>
-            </select>
-            <input type="text" id="sp-section-new" placeholder="New section name, e.g. 1.3 Retaining Walls" style="margin-top:.4rem;display:none">
-            <div class="hint">Leave blank to use <span class="mono">UNCLASSIFIED (Smart Paste)</span>.</div>
-          </div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem">
-            <button class="btn-s btn-c" onclick="SUBJADMIN.parse()"><i class="ph ph-magnifying-glass"></i> Parse &amp; Preview</button>
-            <button class="btn-s btn-g" id="sp-commit" disabled onclick="SUBJADMIN.commit()"><i class="ph ph-check"></i> Insert into File</button>
-            <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SUBJADMIN.clear()">Clear</button>
-            <span id="sp-status" style="font-size:.72rem;color:var(--t3);margin-left:auto;align-self:center"></span>
-          </div>
-          <div id="sp-preview" style="display:grid;gap:.5rem;margin-top:.75rem"></div>
-        </div>
 
-        <div class="card">
-          <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload New Chapter File</h3><span class="ctag tp">Create new file</span></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .7rem">
-            Upload a fresh JSON file. Shape: <code class="mono" style="font-size:.7rem">{ "group":"...", "sections":[ {"section":"...","questions":[{"q":"...","marks":5}]} ] }</code>. Paste the returned fileId into <span class="mono">subjective-data.js</span>.
-          </p>
-          <div class="sf">
-            <label for="subj-upload-file">JSON File</label>
-            <label class="file-up" for="subj-upload-file">
-              <input type="file" id="subj-upload-file" accept="application/json,.json" onchange="SUBJ_UPLOAD.onFile(this)">
-              <span class="file-up-btn"><i class="ph ph-upload-simple"></i> Choose File</span>
-              <span class="file-up-name" id="subj-upload-name">No file chosen</span>
-            </label>
+          <div class="card">
+            <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload New Chapter File</h3><span class="st st-pending">Create new file</span></div>
+            <p style="font-size:.78rem;color:var(--t3);margin:0 0 .7rem">
+              Upload a fresh JSON file. Shape: <code class="mono" style="font-size:.7rem">{ "group":"...", "sections":[ {"section":"...","questions":[{"q":"...","marks":5}]} ] }</code>. Paste the returned fileId into <span class="mono">subjective-data.js</span>.
+            </p>
+            <div class="sf">
+              <label for="subj-upload-file">JSON File</label>
+              <label class="file-up" for="subj-upload-file">
+                <input type="file" id="subj-upload-file" accept="application/json,.json" onchange="SUBJ_UPLOAD.onFile(this)">
+                <span class="file-up-btn"><i class="ph ph-upload-simple"></i> Choose File</span>
+                <span class="file-up-name" id="subj-upload-name">No file chosen</span>
+              </label>
+            </div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button class="btn-s btn-g" onclick="SUBJ_UPLOAD.upload()"><i class="ph ph-check"></i> Upload to Drive</button>
+              <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SUBJ_UPLOAD.clear()">Clear</button>
+            </div>
+            <div id="subj-upload-result" style="margin-top:.6rem"></div>
           </div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-            <button class="btn-s btn-g" onclick="SUBJ_UPLOAD.upload()"><i class="ph ph-check"></i> Upload to Drive</button>
-            <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SUBJ_UPLOAD.clear()">Clear</button>
-          </div>
-          <div id="subj-upload-result" style="margin-top:.6rem"></div>
         </div>
       </div>
 
@@ -818,7 +987,7 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
           </select>
         </div>
         <div class="card">
-          <div class="empty" id="logs-empty"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No activity logs</p></div>
+          <div class="empty" id="logs-empty" style="display:none"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No activity logs</p></div>
           <div id="logs-list"></div>
         </div>
         <div class="pg" id="l-pg"></div>
@@ -856,7 +1025,10 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
         </div>
 
         <div class="card">
-          <div class="card-hd"><h3><i class="ph ph-broom"></i> Maintenance</h3></div>
+          <div class="card-hd">
+            <h3><i class="ph ph-broom"></i> Maintenance</h3>
+            <span class="st st-expired">Destructive — review carefully</span>
+          </div>
           <div class="maint-row">
             <div class="maint-info"><div class="maint-title">Prune old progress backups</div><div class="maint-desc">Deletes ProgressBackups rows older than the cutoff.</div></div>
             <div class="maint-input"><label for="maint-backup-days">Keep (days)</label><input type="number" id="maint-backup-days" value="30" min="1" max="3650"></div>
@@ -914,6 +1086,7 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
   </div>
 </div>
 
+<!-- ═══ MODALS ═══ -->
 <div class="mbg" id="mbg-review" role="dialog" aria-modal="true" aria-labelledby="mtitle-review" onclick="MODAL.close('review')">
   <div class="mbox" onclick="event.stopPropagation()">
     <div class="mhd"><h3 id="mtitle-review">Review Payment</h3><button class="mcl" onclick="MODAL.close('review')" aria-label="Close dialog"><i class="ph ph-x"></i></button></div>
@@ -932,6 +1105,13 @@ hr{border:none;border-top:1px solid var(--b1);margin:.6rem 0}
   <div class="mbox wide" onclick="event.stopPropagation()">
     <div class="mhd"><h3 id="mtitle-wspreview">Preview</h3><button class="mcl" onclick="MODAL.close('wspreview')" aria-label="Close dialog"><i class="ph ph-x"></i></button></div>
     <div class="mbody" id="mbody-wspreview"></div>
+  </div>
+</div>
+
+<div class="mbg" id="mbg-confirm" role="dialog" aria-modal="true" aria-labelledby="mtitle-confirm" onclick="MODAL.close('confirm')">
+  <div class="mbox danger" onclick="event.stopPropagation()">
+    <div class="mhd danger"><h3 id="mtitle-confirm">Confirm</h3><button class="mcl" onclick="MODAL.close('confirm')" aria-label="Close dialog"><i class="ph ph-x"></i></button></div>
+    <div class="mbody" id="mbody-confirm"></div>
   </div>
 </div>
 
@@ -970,6 +1150,113 @@ const LS_ADMIN = 'abhyas_admin';
 const LS_USER  = 'abhyas_session';
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   HELPERS — time, initials, toast dedup, focus trap
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escAttrJs(s){ return String(s==null?'':s).replace(/[\\'"]/g, c => '\\'+c); }
+
+function relTime(ts){
+  if (!ts) return '—';
+  const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
+  if (isNaN(t)) return '—';
+  const s = Math.floor((Date.now() - t) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  if (s < 86400*30) return Math.floor(s/86400) + 'd ago';
+  return new Date(t).toLocaleDateString();
+}
+function fullTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  return isNaN(d) ? '' : d.toLocaleString();
+}
+function initials(name){
+  if (!name) return '?';
+  const parts = String(name).trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length-1][0]).toUpperCase();
+}
+function copyText(text){
+  navigator.clipboard.writeText(text).then(
+    () => {
+      const hint = document.createElement('div');
+      hint.className = 'copy-hint';
+      hint.textContent = '📋 Copied';
+      document.body.appendChild(hint);
+      setTimeout(() => hint.remove(), 1200);
+    },
+    () => ADMIN.toast('Copy failed — select manually')
+  );
+}
+function togglePwVisibility(btn){
+  const wrap = btn.closest('.pw-field');
+  const input = wrap && wrap.querySelector('input');
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+  btn.innerHTML = show ? '<i class="ph ph-eye-slash"></i>' : '<i class="ph ph-eye"></i>';
+}
+
+/* Session-storage-backed filter helpers */
+const FSTATE = {
+  get(key, fallback){ try { return sessionStorage.getItem('abhyas_f_'+key) || fallback; } catch(e){ return fallback; } },
+  set(key, val){ try { sessionStorage.setItem('abhyas_f_'+key, val); } catch(e){} }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIRM MODAL — replaces native confirm() for destructive actions
+   ═══════════════════════════════════════════════════════════════════════════ */
+const CONFIRM = {
+  _resolve: null,
+  ask(opts){
+    return new Promise(resolve => {
+      this._resolve = resolve;
+      const { title, body, confirmText, confirmStyle, requireType } = opts;
+      document.getElementById('mtitle-confirm').textContent = title || 'Confirm';
+      const style = confirmStyle === 'danger' ? 'btn-r' : 'btn-g';
+      document.getElementById('mbody-confirm').innerHTML = `
+        <p style="font-size:.85rem;line-height:1.55;margin-bottom:.7rem">${body}</p>
+        ${requireType ? `<div class="sf" style="margin-bottom:.8rem"><label>Type <span class="mono" style="color:var(--ros)">${esc(requireType)}</span> to confirm</label><input type="text" id="cnf-type" autocomplete="off"></div>` : ''}
+        <div style="display:flex;gap:.5rem">
+          <button class="btn-s ${style}" style="flex:1" onclick="CONFIRM._ok()">${esc(confirmText || 'Confirm')}</button>
+          <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="CONFIRM._no()">Cancel</button>
+        </div>`;
+      document.getElementById('mbg-confirm').classList.add('show');
+      FOCUS_TRAP.open('mbg-confirm');
+      if (requireType) {
+        setTimeout(() => {
+          const inp = document.getElementById('cnf-type');
+          if (inp) inp.focus();
+        }, 60);
+      }
+    });
+  },
+  _ok(){
+    const req = document.querySelector('#mbody-confirm .mono');
+    if (req) {
+      const typed = document.getElementById('cnf-type')?.value || '';
+      if (typed !== req.textContent) {
+        ADMIN.toast('❌ Confirmation text does not match');
+        return;
+      }
+    }
+    document.getElementById('mbg-confirm').classList.remove('show');
+    FOCUS_TRAP.close('mbg-confirm');
+    if (this._resolve) this._resolve(true);
+    this._resolve = null;
+  },
+  _no(){
+    document.getElementById('mbg-confirm').classList.remove('show');
+    FOCUS_TRAP.close('mbg-confirm');
+    if (this._resolve) this._resolve(false);
+    this._resolve = null;
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
    ADMIN — CORE
    ═══════════════════════════════════════════════════════════════════════════ */
 const ADMIN = {
@@ -986,10 +1273,6 @@ const ADMIN = {
   },
   state: { uPage:1, pPage:1, lPage:1, qrPage:1, uPerPage:15, pPerPage:15, lPerPage:20, qrPerPage:10 },
 
-  /* ── Leave admin mode ──
-     If this admin ALSO has a user session for the same username, jump
-     straight to user.html — no login round trip. Otherwise fall back
-     to the login page. */
   _leaveAdminMode() {
     try { localStorage.removeItem(LS_ADMIN); } catch(e) {}
     let goDirect = false;
@@ -1136,7 +1419,7 @@ const ADMIN = {
       'admins_view': 'nav-admins',
       'weeklysets_view': 'nav-weeklysets',
       'qreports_view': 'nav-qreports',
-      'subjective_view': 'nav-subj-qotd',
+      'subjective_view': 'nav-subjective',
       'logs_view': 'nav-logs',
       'settings_view': 'nav-settings',
       'imports': 'nav-data',
@@ -1145,17 +1428,9 @@ const ADMIN = {
     Object.entries(sidebarMap).forEach(([feat, navId]) => {
       const el = document.getElementById(navId);
       if (!el) return;
-      // For views gated by multiple features (data view), show if any granted.
-      const anyOf = {
-        'nav-data': ['imports','maintenance']
-      }[navId];
+      const anyOf = { 'nav-data': ['imports','maintenance'] }[navId];
       const allowed = anyOf ? anyOf.some(f => this._hasFeature(f)) : this._hasFeature(feat);
       el.style.display = allowed ? '' : 'none';
-    });
-    // Subjective sub-views share one permission
-    ['nav-subj-exam','nav-subj-add'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.style.display = this._hasFeature('subjective_view') ? '' : 'none';
     });
     const logsBtn = document.getElementById('tb-logs-btn');
     if (logsBtn) logsBtn.style.display = this._hasFeature('logs_view') ? '' : 'none';
@@ -1167,7 +1442,7 @@ const ADMIN = {
     const freshCard = document.getElementById('admin-create-fresh');
     if (freshCard) freshCard.style.display = (this._perms?.role === 'owner') ? '' : 'none';
     const activeNav = document.querySelector('.sb-item.active');
-    if (activeNav && activeNav.style.display === 'none') this.nav('dashboard');
+    if (activeNav && activeNav.style.display === 'none') this.nav('today');
   },
 
   async downloadScreenshot(url, suggestedName) {
@@ -1215,7 +1490,10 @@ const ADMIN = {
         if (k === 'stats') {
           if (r.success) {
             this.renderStats(r.stats);
-            if (document.getElementById('view-dashboard')?.classList.contains('on')) EXPIRING.load();
+            if (document.getElementById('view-today')?.classList.contains('on') ||
+                document.getElementById('view-dashboard')?.classList.contains('on')) {
+              EXPIRING.load();
+            }
           } else failures.push('stats: ' + (r.error || 'unknown'));
         } else if (k === 'users') {
           if (r.success) {
@@ -1254,6 +1532,8 @@ const ADMIN = {
           }
         }
       });
+      _updateSidebarBadges();
+      _renderToday();
       if (failures.length) {
         this.toast('❌ Some data failed to load — ' + failures[0] + (failures.length>1 ? ` (+${failures.length-1} more)` : ''));
       } else if (isFull) {
@@ -1287,14 +1567,22 @@ const ADMIN = {
 
   toast(msg, duration=3000) {
     const box = document.getElementById('toasts');
-    const t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+    // Cap at 3
+    while (box.children.length >= 3) box.firstElementChild.remove();
+    // Suppress identical toasts within 3 seconds
+    const recent = [...box.children].find(t => t.textContent === msg && (Date.now() - (t._ts || 0)) < 3000);
+    if (recent) return;
+    const t = document.createElement('div');
+    t.className='toast';
+    t.textContent=msg;
+    t._ts = Date.now();
     box.appendChild(t);
     setTimeout(()=>{ t.classList.add('out'); setTimeout(()=>t.remove(),220); }, duration);
   },
 
   toCSV(headers, rows) {
-    const esc = v => `"${String(v == null ? '' : v).replace(/"/g,'""')}"`;
-    return [headers.map(esc).join(','), ...rows.map(r => r.map(esc).join(','))].join('\n');
+    const escV = v => `"${String(v == null ? '' : v).replace(/"/g,'""')}"`;
+    return [headers.map(escV).join(','), ...rows.map(r => r.map(escV).join(','))].join('\n');
   },
   exportUsers() {
     const rows = (typeof USERS !== 'undefined' && document.getElementById('u-search')) ? USERS._visibleRows() : ADMIN.data.users;
@@ -1348,61 +1636,227 @@ const ADMIN = {
   }
 };
 
-/* ── Shared helper: open a Drive PDF in a new tab (no download) ── */
-async function openPdfInNewTab(pdfUrl) {
-  if (!pdfUrl) { ADMIN.toast('No PDF available'); return; }
-  // Pre-open synchronously so popup blockers allow it.
-  const tab = window.open('about:blank', '_blank');
-  if (!tab) { ADMIN.toast('❌ Popup blocked — allow popups for this site'); return; }
-  try {
-    tab.document.open();
-    tab.document.write('<!doctype html><title>Loading…</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading PDF…</p></body>');
-    tab.document.close();
-  } catch(e) {}
-  try {
-    const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl });
-    if (!res.success) throw new Error(res.error || 'Could not fetch PDF');
-    const byteChars = atob(res.base64);
-    const bytes = new Uint8Array(byteChars.length);
-    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
-    const blob = new Blob([bytes], { type: res.mimeType || 'application/pdf' });
-    const url = URL.createObjectURL(blob);
-    tab.location.href = url;
-    setTimeout(() => URL.revokeObjectURL(url), 300000);
-  } catch (e) {
-    try {
-      tab.document.open();
-      tab.document.write('<!doctype html><body style="font-family:system-ui;padding:2rem;color:#b33"><h2>Could not load PDF</h2><p>' + (e.message || 'Unknown error') + '</p></body>');
-      tab.document.close();
-    } catch(_) {}
+/* ═══════════════════════════════════════════════════════════════════════════
+   TODAY — the default view
+   ═══════════════════════════════════════════════════════════════════════════ */
+function _renderToday(){
+  const grid = document.getElementById('today-grid');
+  if (!grid) return;
+  const dateEl = document.getElementById('today-date');
+  if (dateEl) {
+    const d = new Date();
+    dateEl.textContent = d.toLocaleDateString(undefined, { weekday:'long', month:'long', day:'numeric', year:'numeric' });
   }
+
+  const pendingPay = (ADMIN.data.payments || []).filter(p => p.status === 'pending').length;
+  const qotdPending = SUBJ_STORE.all.filter(s => s.kind === 'qotd' && s.status !== 'graded').length;
+  const examPending = SUBJ_STORE.all.filter(s => s.kind === 'exam' && s.status !== 'graded').length;
+  const openReports = (QREPORTS.all || []).filter(r => r.status === 'open').length;
+  const expiringCount = document.getElementById('expiring-list')?.dataset.count || 0;
+
+  const cards = [
+    { id:'pay', label:'Payments to verify', num:pendingPay, sub:pendingPay ? 'Awaiting your review' : 'All caught up', icon:'credit-card', onClick:() => UI.nav('payments') },
+    { id:'qotd', label:'QOTD to grade', num:qotdPending, sub:qotdPending ? 'Subjective submissions' : 'All caught up', icon:'sun-horizon', onClick:() => UI.nav('subjective') },
+    { id:'exam', label:'Exams to grade', num:examPending, sub:examPending ? 'Full-paper submissions' : 'All caught up', icon:'note-pencil', onClick:() => UI.nav('subjective') },
+    { id:'report', label:'Open question reports', num:openReports, sub:openReports ? 'Flagged by students' : 'No open flags', icon:'warning-circle', onClick:() => UI.nav('qreports') },
+    { id:'trial', label:'Trials ending soon', num:expiringCount, sub:expiringCount ? 'Within 24 hours' : 'Nothing urgent', icon:'hourglass-medium', onClick:() => { document.getElementById('card-expiring')?.scrollIntoView({behavior:'smooth'}); } }
+  ];
+
+  grid.innerHTML = cards.map(c => `
+    <div class="today-card tc-${c.id} ${c.num === 0 ? 'empty' : ''}" onclick='(${c.onClick.toString()})()' role="button" tabindex="0">
+      <div class="today-card-hd">
+        <div class="today-card-icon"><i class="ph ph-${c.icon}"></i></div>
+        <div style="flex:1;min-width:0">
+          <div class="today-card-title">${c.label}</div>
+          <div class="today-card-sub">${c.sub}</div>
+        </div>
+        <div class="today-card-num">${c.num}</div>
+      </div>
+      <div class="today-card-cta">${c.num > 0 ? 'Review now' : 'View'} <i class="ph ph-arrow-right"></i></div>
+    </div>
+  `).join('');
+}
+
+function _updateSidebarBadges(){
+  const setBadge = (id, n) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (n > 0) { el.textContent = n > 99 ? '99+' : n; el.style.display = ''; }
+    else el.style.display = 'none';
+  };
+  setBadge('nav-payments-badge', (ADMIN.data.payments || []).filter(p => p.status === 'pending').length);
+  setBadge('nav-qreports-badge', (QREPORTS.all || []).filter(r => r.status === 'open').length);
+  const subjPending = SUBJ_STORE.all.filter(s => s.status !== 'graded').length;
+  setBadge('nav-subjective-badge', subjPending);
+  const qotdCount = SUBJ_STORE.all.filter(s => s.kind === 'qotd' && s.status !== 'graded').length;
+  const examCount = SUBJ_STORE.all.filter(s => s.kind === 'exam' && s.status !== 'graded').length;
+  setBadge('tab-count-qotd', qotdCount);
+  setBadge('tab-count-exam', examCount);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   CHAPTERS lookup (for MISSED + QREPORTS)
+   SUBJECTIVE TABS
    ═══════════════════════════════════════════════════════════════════════════ */
-const CHAPTERS = {
-  _map: null, _levels: null,
-  _build() {
-    if (this._map) return;
-    this._map = new Map();
-    this._levels = new Set();
-    if (typeof ChapterData !== 'undefined') {
-      ChapterData.allFileRefs().forEach(ref => {
-        const level = ChapterData.levelLabel(ref.lv);
-        const chapter = ChapterData.chapterName(ref.lv, ref.ch);
-        this._map.set(ref.fid, { level, chapter, label: `${level} — ${chapter}` });
-        this._levels.add(level);
+const SUBJ_TABS = {
+  current: 'qotd',
+  go(tab){
+    this.current = tab;
+    document.querySelectorAll('#view-subjective .tab').forEach(t => {
+      const on = t.dataset.tab === tab;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    ['qotd','exam','add'].forEach(t => {
+      const panel = document.getElementById('subj-panel-' + t);
+      if (panel) panel.style.display = t === tab ? '' : 'none';
+    });
+    if (tab === 'qotd') SUBJ_QOTD.load(false);
+    if (tab === 'exam') SUBJ_EXAM.load(false);
+    if (tab === 'add') SUBJADMIN._populateFilters();
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMMAND PALETTE (Ctrl+K)
+   ═══════════════════════════════════════════════════════════════════════════ */
+const PALETTE = {
+  _items: [],
+  _filtered: [],
+  _idx: 0,
+  _inputHandler: null,
+
+  open(){
+    document.getElementById('cmdk').classList.add('show');
+    const input = document.getElementById('cmdk-input');
+    input.value = '';
+    input.focus();
+    this._build();
+    this._render();
+
+    const self = this;
+    if (!this._inputHandler) {
+      this._inputHandler = e => {
+        if (e.key === 'Escape') { self.close(); return; }
+        if (e.key === 'ArrowDown') { e.preventDefault(); self._idx = Math.min(self._idx + 1, self._filtered.length - 1); self._render(); return; }
+        if (e.key === 'ArrowUp') { e.preventDefault(); self._idx = Math.max(self._idx - 1, 0); self._render(); return; }
+        if (e.key === 'Enter') { e.preventDefault(); self._run(); return; }
+      };
+      input.addEventListener('keydown', this._inputHandler);
+      input.addEventListener('input', () => {
+        self._filter(input.value);
+        self._render();
       });
     }
   },
-  labelFor(fileId) {
-    this._build();
-    return this._map.get(fileId)?.label || (fileId === 'local' ? 'Local File' : 'Unknown / Weekly Set');
+
+  close(){
+    document.getElementById('cmdk').classList.remove('show');
   },
-  allLevels() { this._build(); return [...this._levels].sort(); },
-  allChapters() { this._build(); return [...new Set([...this._map.values()].map(v => v.chapter))].sort(); }
+
+  _build(){
+    const items = [];
+    const add = (group, title, sub, icon, action, kbd) => items.push({group, title, sub, icon, action, kbd});
+
+    // Navigation
+    add('Navigate', 'Today', '', 'sun-horizon', () => UI.nav('today'));
+    add('Navigate', 'Dashboard', '', 'chart-bar', () => UI.nav('dashboard'));
+    add('Navigate', 'Users', '', 'user', () => UI.nav('users'));
+    add('Navigate', 'Payments', '', 'credit-card', () => UI.nav('payments'));
+    add('Navigate', 'Admins', '', 'shield-check', () => UI.nav('admins'));
+    add('Navigate', 'Weekly Sets', '', 'calendar-check', () => UI.nav('weeklysets'));
+    add('Navigate', 'Reports', '', 'warning-circle', () => UI.nav('qreports'));
+    add('Navigate', 'Subjective', '', 'note-pencil', () => UI.nav('subjective'));
+    add('Navigate', 'Logs', '', 'clipboard-text', () => UI.nav('logs'));
+    add('Navigate', 'Data & Maintenance', '', 'database', () => UI.nav('data'));
+    add('Navigate', 'Settings', '', 'gear', () => UI.nav('settings'));
+
+    // Actions
+    add('Actions', 'Refresh data', 'Ctrl R', 'arrow-clockwise', () => ADMIN.refresh());
+    add('Actions', 'Change my password', '', 'lock-key', () => ADMIN.changePassword());
+    add('Actions', 'Export users CSV', '', 'download-simple', () => ADMIN.exportUsers());
+    add('Actions', 'Export payments CSV', '', 'download-simple', () => ADMIN.exportPayments());
+    add('Actions', 'Toggle theme', '', 'circle-half', () => toggleTheme());
+    add('Actions', 'Logout', '', 'power', () => ADMIN.logout());
+
+    // Users
+    (ADMIN.data.users || []).slice(0, 300).forEach(u => {
+      add('Users', u.name || u.username, u.username + (u.email ? ' · ' + u.email : ''), 'user',
+        () => { UI.nav('users'); setTimeout(() => USERS.view(u.username), 100); });
+    });
+
+    // Pending payments
+    (ADMIN.data.payments || []).filter(p => p.status === 'pending').forEach(p => {
+      add('Payments', p.username, 'TXN ' + (p.txId || '—'), 'credit-card',
+        () => { UI.nav('payments'); setTimeout(() => PAYMENTS.review(p.username), 100); });
+    });
+
+    // Weekly sets
+    (WEEKLYSETS.list || []).forEach(s => {
+      add('Weekly Sets', s.title, s.chapterLabel || '', 'calendar-check',
+        () => { UI.nav('weeklysets'); });
+    });
+
+    this._items = items;
+    this._filtered = items;
+    this._idx = 0;
+  },
+
+  _filter(q){
+    const term = (q || '').toLowerCase().trim();
+    if (!term) { this._filtered = this._items; this._idx = 0; return; }
+    this._filtered = this._items.filter(it =>
+      it.title.toLowerCase().includes(term) ||
+      (it.sub || '').toLowerCase().includes(term) ||
+      it.group.toLowerCase().includes(term)
+    );
+    this._idx = 0;
+  },
+
+  _render(){
+    const box = document.getElementById('cmdk-list');
+    if (!this._filtered.length) {
+      box.innerHTML = '<div class="cmdk-empty">No matches. Try a username, TXN ID, or view name.</div>';
+      return;
+    }
+    const show = this._filtered.slice(0, 40);
+    const grouped = {};
+    show.forEach((it, i) => {
+      (grouped[it.group] = grouped[it.group] || []).push({...it, _idx: i});
+    });
+    box.innerHTML = Object.keys(grouped).map(g => `
+      <div class="cmdk-group-lbl">${esc(g)}</div>
+      ${grouped[g].map(it => `
+        <div class="cmdk-item ${it._idx === this._idx ? 'sel' : ''}" data-idx="${it._idx}" onclick="PALETTE._pick(${it._idx})">
+          <i class="ph ph-${it.icon}"></i>
+          <span class="cmd-title">${esc(it.title)}</span>
+          ${it.sub ? `<span class="cmd-sub">${esc(it.sub)}</span>` : ''}
+          ${it.kbd ? `<span class="cmd-kbd">${esc(it.kbd)}</span>` : ''}
+        </div>
+      `).join('')}
+    `).join('');
+    const selEl = box.querySelector('.cmdk-item.sel');
+    if (selEl) selEl.scrollIntoView({block:'nearest'});
+  },
+
+  _pick(i){
+    const it = this._filtered[i];
+    if (!it) return;
+    this.close();
+    try { it.action(); } catch(e) { ADMIN.toast('❌ ' + e.message); }
+  },
+
+  _run(){
+    this._pick(this._idx);
+  }
 };
+
+/* Ctrl+K global */
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault();
+    PALETTE.open();
+  }
+});
 
 /* ═══════════════════════════════════════════════════════════════════════════
    EXPIRING TRIALS
@@ -1412,12 +1866,14 @@ const EXPIRING = {
     const box = document.getElementById('expiring-list');
     if (!box) return;
     const hours = document.getElementById('exp-hours')?.value || 24;
-    box.innerHTML = '<p style="font-size:.78rem;opacity:.6"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Checking…</p>';
+    box.innerHTML = '<div class="skel w80"></div><div class="skel w60"></div>';
     try {
       const res = await ADMIN.post('adminExpiringTrials', { hours });
       if (!res.success) throw new Error(res.error || 'Failed to load');
+      box.dataset.count = res.count || 0;
       if (!res.count) {
         box.innerHTML = `<p style="font-size:.78rem;opacity:.6">No trials expiring in the next ${hours}h. <span style="opacity:.7">Automatic T-2h push warnings run on schedule.</span></p>`;
+        _renderToday();
         return;
       }
       box.innerHTML =
@@ -1427,16 +1883,20 @@ const EXPIRING = {
           const mins = Math.max(0, Math.round((t - Date.now()) / 60000));
           const label = mins < 60 ? `${mins}m` : `${Math.round(mins/60)}h`;
           return `<div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;padding:.4rem .55rem;background:var(--b0);border:1px solid var(--b1);border-radius:7px;margin-bottom:.3rem;font-size:.76rem">
-            <div style="min-width:0;overflow:hidden">
-              <div style="font-weight:600">${esc(u.name) || esc(u.username)}</div>
-              <div class="mono" style="font-size:.65rem;color:var(--t3)">${esc(u.username)} · ${esc(u.email) || 'no email'}</div>
+            <div style="min-width:0;overflow:hidden;display:flex;align-items:center;gap:.5rem">
+              <span class="avatar">${initials(u.name||u.username)}</span>
+              <div style="min-width:0">
+                <div style="font-weight:600">${esc(u.name) || esc(u.username)}</div>
+                <div class="mono" style="font-size:.65rem;color:var(--t3)">${esc(u.username)} · ${esc(u.email) || 'no email'}</div>
+              </div>
             </div>
             <div style="display:flex;gap:.35rem;align-items:center;flex-shrink:0">
-              <span class="ctag ta">${label} left</span>
-              <button class="btn-s btn-c btn-sm" onclick="USERS.view('${escAttrJs(u.username)}')" title="View details" aria-label="View details for ${escAttrJs(u.username)}"><i class="ph ph-eye"></i></button>
+              <span class="st st-scheduled">${label} left</span>
+              <button class="btn-s btn-c btn-sm" onclick="USERS.view('${escAttrJs(u.username)}')" title="View details" aria-label="View details"><i class="ph ph-eye"></i></button>
             </div>
           </div>`;
         }).join('');
+      _renderToday();
     } catch(e) {
       box.innerHTML = `<p style="font-size:.78rem;color:var(--ros)">❌ ${esc(e.message)}</p>`;
     }
@@ -1444,7 +1904,7 @@ const EXPIRING = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   ADMINS — list, promote from user, create fresh, inline permission editor
+   ADMINS
    ═══════════════════════════════════════════════════════════════════════════ */
 const ADMINS = {
   _list: [],
@@ -1470,40 +1930,38 @@ const ADMINS = {
     box.innerHTML = this._list.map(a => {
       const isMe = a.username.toLowerCase() === me;
       const isOwnerRow = a.role === 'owner';
-      const permCount = (a.permissions || []).length;
-      // Is this admin also in the Users sheet? That makes them a "dual-role" account.
+      const perms = a.permissions || [];
       const isDualRole = ADMIN.data.users.some(u => u.username.toLowerCase() === a.username.toLowerCase());
-      const roleBadge = isOwnerRow
-        ? '<span class="ctag ta">Owner</span>'
-        : '<span class="ctag tp">Admin</span>';
-      const dualBadge = isDualRole
-        ? '<span class="ctag tg" title="Also has a user account — can switch to User Portal without logging in again"><i class="ph ph-user-check"></i> Dual</span>'
-        : '<span class="ctag" style="background:var(--b0);color:var(--t3)" title="Admin-only account">Solo</span>';
+
+      const pills = !isOwnerRow && perms.length
+        ? perms.slice(0, 3).map(k => `<span class="perm-pill">${esc(this._featureLabels[k] || k)}</span>`).join('') +
+          (perms.length > 3 ? `<span class="perm-pill more">+${perms.length - 3}</span>` : '')
+        : '';
 
       return `<div class="admin-card ${isOwnerRow?'owner':''}" data-admin="${escAttrJs(a.username)}">
         <div class="admin-card-hd">
           <div class="admin-card-info">
             <div class="admin-card-name">
+              <span class="avatar">${initials(a.username)}</span>
               ${esc(a.username)}
               ${isMe ? '<span style="opacity:.6;font-weight:400;font-size:.7rem">(you)</span>' : ''}
-              ${roleBadge} ${dualBadge}
+              ${isOwnerRow ? '<span class="st st-active">Owner</span>' : '<span class="st st-trial">Admin</span>'}
+              ${isDualRole ? '<span class="st st-graded" title="Also has a user account"><i class="ph ph-user-check"></i> Dual</span>' : '<span class="st st-dismissed" title="Admin-only account">Solo</span>'}
             </div>
-            <div class="admin-card-meta">
-              ${isOwnerRow ? 'Full access — cannot be limited' : (permCount + ' feature' + (permCount===1?'':'s') + ' granted')}
-              ${a.createdBy ? ' · added by ' + esc(a.createdBy) : ''}
-            </div>
+            <div class="admin-card-meta">${a.createdBy ? 'Added by ' + esc(a.createdBy) : 'Created ' + relTime(a.createdAt)}</div>
+            ${pills ? `<div style="display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.4rem">${pills}</div>` : ''}
           </div>
           <div class="admin-card-actions">
             ${(!isMe && isOwner)
               ? `<button class="btn-s btn-p btn-sm" onclick="ADMINS.togglePerms('${escAttrJs(a.username)}')"><i class="ph ph-sliders-horizontal"></i> Permissions</button>`
               : ''}
             ${(!isMe && isOwner && !isOwnerRow)
-              ? `<button class="btn-s btn-r btn-sm" onclick="ADMINS.demote('${escAttrJs(a.username)}')"><i class="ph ph-user-minus"></i> Remove Admin Role</button>`
+              ? `<button class="btn-s btn-r btn-sm" onclick="ADMINS.demote('${escAttrJs(a.username)}')"><i class="ph ph-user-minus"></i> Remove</button>`
               : ''}
           </div>
         </div>
         <div class="admin-perms" id="perms-${escAttrJs(a.username)}">
-          ${this._renderPermEditor(a.username, a.permissions || [], isOwnerRow)}
+          ${this._renderPermEditor(a.username, perms, isOwnerRow)}
         </div>
       </div>`;
     }).join('');
@@ -1567,13 +2025,11 @@ const ADMINS = {
     }
   },
 
-  /* ── Promote-from-user flow ── */
   _searchPromote(q) {
     const list = document.getElementById('promote-results');
     if (!list) return;
     const term = String(q || '').trim().toLowerCase();
     const users = ADMIN.data.users || [];
-    // Filter out users already admins
     const adminNames = new Set((this._list || []).map(a => a.username.toLowerCase()));
     const matches = users.filter(u => {
       if (adminNames.has(u.username.toLowerCase())) return false;
@@ -1590,11 +2046,14 @@ const ADMINS = {
     }
     list.innerHTML = matches.map(u => `
       <div class="user-picker-item" onclick='ADMINS._selectPromote(${JSON.stringify(String(u.username))})'>
-        <div>
-          <div class="pu-name">${esc(u.name || u.username)}</div>
-          <div class="pu-user">${esc(u.username)}${u.email ? ' · ' + esc(u.email) : ''}</div>
+        <div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+          <span class="avatar">${initials(u.name||u.username)}</span>
+          <div style="min-width:0">
+            <div class="pu-name">${esc(u.name || u.username)}</div>
+            <div class="pu-user">${esc(u.username)}${u.email ? ' · ' + esc(u.email) : ''}</div>
+          </div>
         </div>
-        <span class="badge badge-${u.status==='trial'?'trial':u.status==='active'?'active':'expired'}">${u.status}</span>
+        <span class="st st-${u.status||'trial'}">${u.status||'trial'}</span>
       </div>
     `).join('');
     list.classList.add('show');
@@ -1620,7 +2079,6 @@ const ADMINS = {
     const more = document.getElementById('promote-perms-more');
     if (!more) return;
     if (more.innerHTML === '') {
-      // Build the full permission list
       const groups = [
         { name: 'Users', keys: ['users_manage','users_bulk'] },
         { name: 'Payments', keys: ['payments_review','payments_bulk','screenshots'] },
@@ -1662,7 +2120,6 @@ const ADMINS = {
       ADMIN.hideLoading();
       ADMIN.toast('✅ ' + this._promoteSelected + ' is now an admin');
       this._clearPromote();
-      // Reset checkboxes
       document.querySelectorAll('#promote-perms input[data-feat], #promote-perms-more input[data-feat]').forEach(cb => {
         cb.checked = cb.dataset.feat === 'dashboard';
       });
@@ -1698,10 +2155,15 @@ const ADMINS = {
 
   async demote(username) {
     const alsoUser = (ADMIN.data.users || []).some(u => u.username.toLowerCase() === username.toLowerCase());
-    const msg = alsoUser
-      ? `Remove admin role from "${username}"?\n\nThey will keep their user account and password — they just lose admin access.`
-      : `Remove admin role from "${username}"?\n\nThis account has NO user row, so they will lose access entirely and won't be able to log in. Continue?`;
-    if (!confirm(msg)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Remove admin role',
+      body: alsoUser
+        ? `<b>${esc(username)}</b> will keep their user account and password — they just lose admin access.`
+        : `<b>${esc(username)}</b> has NO user row. Removing their admin role will lock them out entirely.`,
+      confirmText: 'Remove admin role',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Removing admin role…');
     try {
       const res = await ADMIN.post('adminDeleteAdmin', { username });
@@ -1721,7 +2183,13 @@ const MAINTENANCE = {
   async pruneOldBackups() {
     const days = parseInt(document.getElementById('maint-backup-days').value, 10);
     if (!days || days < 1) return ADMIN.toast('❌ Enter a positive number of days');
-    if (!confirm(`Delete ProgressBackups rows older than ${days} day(s)?\n\nBackups newer than that stay untouched. This can't be undone.`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Prune old backups',
+      body: `Delete ProgressBackups rows older than <b>${days}</b> day(s)? Backups newer than that stay untouched.`,
+      confirmText: 'Prune',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Pruning backups…');
     try {
       const res = await ADMIN.post('adminPruneOldBackups', { daysToKeep: days });
@@ -1732,11 +2200,14 @@ const MAINTENANCE = {
     ADMIN.hideLoading();
   },
   async clearAllBackups() {
-    const typed = prompt('This will permanently delete EVERY progress-backup row.\n\nType DELETE (uppercase) to confirm:');
-    if (typed !== 'DELETE') {
-      if (typed !== null) ADMIN.toast('Cancelled — nothing was deleted');
-      return;
-    }
+    const ok = await CONFIRM.ask({
+      title: 'Delete ALL progress backups',
+      body: 'This permanently deletes <b>every</b> progress-backup row. This cannot be undone.',
+      confirmText: 'Delete all backups',
+      confirmStyle: 'danger',
+      requireType: 'DELETE'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Clearing all backups…');
     try {
       const res = await ADMIN.post('adminClearProgressBackups');
@@ -1749,7 +2220,13 @@ const MAINTENANCE = {
   async trimLogs() {
     const keep = parseInt(document.getElementById('maint-logs-keep').value, 10);
     if (!keep || keep < 100) return ADMIN.toast('❌ Keep at least 100 rows');
-    if (!confirm(`Keep only the most recent ${keep} log rows and delete everything older?`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Trim activity logs',
+      body: `Keep only the most recent <b>${keep}</b> log rows and delete everything older?`,
+      confirmText: 'Trim logs',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Trimming logs…');
     try {
       const res = await ADMIN.post('adminTrimLogs', { keepLast: keep });
@@ -1760,7 +2237,13 @@ const MAINTENANCE = {
     ADMIN.hideLoading();
   },
   async revokeScreenshotSharing() {
-    if (!confirm('Make every existing payment screenshot private?\n\nThe admin panel will still be able to view them — this only removes the public Drive link.')) return;
+    const ok = await CONFIRM.ask({
+      title: 'Revoke screenshot sharing',
+      body: 'Make every existing payment screenshot private? The admin panel will still be able to view them — this only removes the public Drive link.',
+      confirmText: 'Revoke sharing',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Revoking screenshot sharing…');
     try {
       const res = await ADMIN.post('adminRevokeScreenshotSharing');
@@ -1775,7 +2258,33 @@ const MAINTENANCE = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MOST MISSED QUESTIONS (dashboard)
+   CHAPTERS lookup
+   ═══════════════════════════════════════════════════════════════════════════ */
+const CHAPTERS = {
+  _map: null, _levels: null,
+  _build() {
+    if (this._map) return;
+    this._map = new Map();
+    this._levels = new Set();
+    if (typeof ChapterData !== 'undefined') {
+      ChapterData.allFileRefs().forEach(ref => {
+        const level = ChapterData.levelLabel(ref.lv);
+        const chapter = ChapterData.chapterName(ref.lv, ref.ch);
+        this._map.set(ref.fid, { level, chapter, label: `${level} — ${chapter}` });
+        this._levels.add(level);
+      });
+    }
+  },
+  labelFor(fileId) {
+    this._build();
+    return this._map.get(fileId)?.label || (fileId === 'local' ? 'Local File' : 'Unknown / Weekly Set');
+  },
+  allLevels() { this._build(); return [...this._levels].sort(); },
+  allChapters() { this._build(); return [...new Set([...this._map.values()].map(v => v.chapter))].sort(); }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOST MISSED QUESTIONS
    ═══════════════════════════════════════════════════════════════════════════ */
 const MISSED = {
   lastResults: [],
@@ -1797,7 +2306,7 @@ const MISSED = {
   async load() {
     this._buildFilterOptions();
     const box = document.getElementById('missed-list');
-    box.innerHTML = '<p style="font-size:.8rem;opacity:.7"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Aggregating…</p>';
+    box.innerHTML = '<div class="skel-card"><div class="skel w80"></div><div class="skel w60"></div></div><div class="skel-card"><div class="skel w80"></div><div class="skel w60"></div></div>';
     const params = {
       level: document.getElementById('miss-level').value,
       chapter: document.getElementById('miss-chapter').value,
@@ -1834,9 +2343,9 @@ const MISSED = {
         const text = q ? (q.q || q.question || q.Question || q.stem || q.ques || q.text) : null;
         const chapterLabel = r.chapter || CHAPTERS.labelFor(r.fileId);
         const tags = [
-          r.level ? `<span class="ctag ta">${esc(r.level)}</span>` : '',
-          chapterLabel ? `<span class="ctag tp"><i class="ph ph-book-open"></i> ${esc(chapterLabel)}</span>` : ''
-        ].filter(Boolean).join('');
+          r.level ? `<span class="st st-trial">${esc(r.level)}</span>` : '',
+          chapterLabel ? `<span class="st st-dismissed">${esc(chapterLabel)}</span>` : ''
+        ].filter(Boolean).join(' ');
         return `<div class="miss-card">
           <div style="display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start">
             <div style="font-size:.8rem;flex:1;min-width:0">${text ? esc(String(text).slice(0,220)) : `<span style="opacity:.5;font-family:var(--fm)">${esc(r.uid)}</span>`}</div>
@@ -1932,23 +2441,20 @@ const WEEKLYSETS = {
       const releaseTime = new Date(s.releaseAt).getTime();
       const released = !isNaN(releaseTime) && now >= releaseTime;
       const isArchived = s.status === 'archived';
-      const statusBadge = isArchived
-        ? '<span class="ctag" style="background:var(--b0);color:var(--t3)">Archived</span>'
-        : released
-          ? '<span class="ctag tg">Live</span>'
-          : '<span class="ctag ta">Scheduled</span>';
+      const statusSt = isArchived ? 'st-archived' : (released ? 'st-live' : 'st-scheduled');
+      const statusLabel = isArchived ? 'Archived' : (released ? 'Live' : 'Scheduled');
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.55rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:8px;flex-wrap:wrap">
         <div style="min-width:0">
-          <div style="font-weight:600;font-size:.85rem">${esc(s.title)} ${statusBadge}</div>
-          <div style="font-size:.68rem;opacity:.6">${s.chapterLabel ? esc(s.chapterLabel) + ' · ' : ''}${released ? 'Released' : 'Unlocks'} ${s.releaseAt ? new Date(s.releaseAt).toLocaleString() : '—'}</div>
+          <div style="font-weight:600;font-size:.85rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">${esc(s.title)} <span class="st ${statusSt}">${statusLabel}</span></div>
+          <div style="font-size:.68rem;opacity:.6">${s.chapterLabel ? esc(s.chapterLabel) + ' · ' : ''}${released ? 'Released' : 'Unlocks'} ${s.releaseAt ? fullTime(s.releaseAt) : '—'}</div>
         </div>
         <div style="display:flex;gap:.35rem;flex-shrink:0">
-          <button class="btn-s btn-p btn-sm" onclick="WEEKLYSETS.showResults('${escAttrJs(s.id)}','${escAttrJs(s.title)}')" title="Results" aria-label="View results"><i class="ph ph-chart-bar"></i></button>
-          <button class="btn-s btn-c btn-sm" onclick="WEEKLYSETS.preview('${escAttrJs(s.fileId)}','${escAttrJs(s.title)}')" title="Preview" aria-label="Preview questions"><i class="ph ph-eye"></i></button>
+          <button class="btn-s btn-p btn-sm" onclick="WEEKLYSETS.showResults('${escAttrJs(s.id)}','${escAttrJs(s.title)}')" title="Results"><i class="ph ph-chart-bar"></i></button>
+          <button class="btn-s btn-c btn-sm" onclick="WEEKLYSETS.preview('${escAttrJs(s.fileId)}','${escAttrJs(s.title)}')" title="Preview"><i class="ph ph-eye"></i></button>
           ${canManage ? (isArchived
-            ? `<button class="btn-s btn-g btn-sm" onclick="WEEKLYSETS.setStatus('${escAttrJs(s.id)}','active')" title="Reactivate" aria-label="Reactivate"><i class="ph ph-arrow-counter-clockwise"></i></button>`
-            : `<button class="btn-s btn-c btn-sm" onclick="WEEKLYSETS.setStatus('${escAttrJs(s.id)}','archived')" title="Archive" aria-label="Archive"><i class="ph ph-archive"></i></button>`) : ''}
-          ${canManage ? `<button class="btn-s btn-r btn-sm" onclick="WEEKLYSETS.del('${escAttrJs(s.id)}','${escAttrJs(s.title)}')" title="Delete" aria-label="Delete"><i class="ph ph-trash"></i></button>` : ''}
+            ? `<button class="btn-s btn-g btn-sm" onclick="WEEKLYSETS.setStatus('${escAttrJs(s.id)}','active')" title="Reactivate"><i class="ph ph-arrow-counter-clockwise"></i></button>`
+            : `<button class="btn-s btn-c btn-sm" onclick="WEEKLYSETS.setStatus('${escAttrJs(s.id)}','archived')" title="Archive"><i class="ph ph-archive"></i></button>`) : ''}
+          ${canManage ? `<button class="btn-s btn-r btn-sm" onclick="WEEKLYSETS.del('${escAttrJs(s.id)}','${escAttrJs(s.title)}')" title="Delete"><i class="ph ph-trash"></i></button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -1956,7 +2462,7 @@ const WEEKLYSETS = {
   async preview(fileId, title) {
     if (!fileId) return ADMIN.toast('❌ No fileId to preview');
     document.getElementById('mtitle-wspreview').textContent = 'Preview: ' + (title || fileId);
-    document.getElementById('mbody-wspreview').innerHTML = '<p style="font-size:.8rem;opacity:.7"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Loading…</p>';
+    document.getElementById('mbody-wspreview').innerHTML = '<div class="skel w100"></div><div class="skel w80"></div><div class="skel w60"></div>';
     document.getElementById('mbg-wspreview').classList.add('show');
     FOCUS_TRAP.open('mbg-wspreview');
     try {
@@ -1985,8 +2491,7 @@ const WEEKLYSETS = {
   },
   async showResults(id, title) {
     document.getElementById('mtitle-wspreview').textContent = 'Results: ' + (title || id);
-    document.getElementById('mbody-wspreview').innerHTML =
-      '<p style="font-size:.8rem;opacity:.7"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Aggregating…</p>';
+    document.getElementById('mbody-wspreview').innerHTML = '<div class="skel w100"></div><div class="skel w80"></div><div class="skel w60"></div>';
     document.getElementById('mbg-wspreview').classList.add('show');
     FOCUS_TRAP.open('mbg-wspreview');
     try {
@@ -1994,8 +2499,7 @@ const WEEKLYSETS = {
       if (!res.success) throw new Error(res.error || 'Failed to load results');
       this._lastResults = res;
       if (!res.attempts) {
-        document.getElementById('mbody-wspreview').innerHTML = `
-          <p style="font-size:.82rem;color:var(--t2);margin-bottom:.5rem">No attempts recorded for this set yet.</p>`;
+        document.getElementById('mbody-wspreview').innerHTML = `<p style="font-size:.82rem;color:var(--t2);margin-bottom:.5rem">No attempts recorded for this set yet.</p>`;
         return;
       }
       const maxBucket = Math.max(...res.distribution.map(b => b.count), 1);
@@ -2021,10 +2525,10 @@ const WEEKLYSETS = {
           <tbody>${res.recent.map(r => `
             <tr>
               <td class="mono" style="font-size:.7rem">${esc(r.username)}</td>
-              <td><span class="badge ${r.pct >= 70 ? 'badge-active' : r.pct >= 40 ? 'badge-trial' : 'badge-expired'}">${r.pct}%</span>
+              <td><span class="st st-${r.pct >= 70 ? 'graded' : r.pct >= 40 ? 'pending' : 'rejected'}">${r.pct}%</span>
                   <span style="font-size:.62rem;color:var(--t3);margin-left:.35rem">${r.correct}/${r.total}</span></td>
               <td style="font-size:.68rem;color:var(--t3)">${r.durationSec ? Math.round(r.durationSec/60) + 'm' : '—'}</td>
-              <td style="font-size:.68rem;color:var(--t3)">${r.submittedAt ? new Date(r.submittedAt).toLocaleString() : '—'}</td>
+              <td style="font-size:.68rem;color:var(--t3)">${relTime(r.submittedAt)}</td>
             </tr>`).join('')}</tbody>
         </table></div>
         <div style="display:flex;justify-content:flex-end;margin-top:.85rem">
@@ -2078,7 +2582,13 @@ const WEEKLYSETS = {
     ADMIN.hideLoading();
   },
   async del(id, title) {
-    if (!confirm(`Delete weekly set "${title}"? This can't be undone — archiving is usually better.`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Delete weekly set',
+      body: `Delete <b>${esc(title)}</b>? This can't be undone. Archiving is usually safer.`,
+      confirmText: 'Delete',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Deleting weekly set…');
     try {
       const res = await ADMIN.post('adminDeleteWeeklySet', { id });
@@ -2148,6 +2658,7 @@ const QREPORTS = {
   render(reports) {
     this.all = reports || [];
     this._renderChapterOptions();
+    _updateSidebarBadges();
     const truncEl = document.getElementById('qr-trunc');
     if (truncEl) {
       truncEl.innerHTML = ADMIN.data.qreportsTruncated
@@ -2158,7 +2669,10 @@ const QREPORTS = {
     if (!box) return;
     const shown = this._visibleRows();
     if (!shown.length) {
-      box.innerHTML = '<p style="font-size:.8rem;opacity:.6">No matching reports.</p>';
+      const isFiltered = this.all.length > 0;
+      box.innerHTML = isFiltered
+        ? '<div class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>No reports match</p><p>Try clearing the filters.</p></div>'
+        : '<div class="empty"><div class="empty-i"><i class="ph ph-warning-circle"></i></div><p>No reports yet</p><p>Students will appear here when they flag questions.</p></div>';
       document.getElementById('qr-pg').innerHTML = '';
       return;
     }
@@ -2169,14 +2683,13 @@ const QREPORTS = {
     const pageRows = shown.slice(start, start + perPage);
     const canManage = ADMIN._hasFeature('qreports_manage');
     box.innerHTML = pageRows.map(r => {
-      const badge = r.status === 'open' ? '<span class="ctag tg">Open</span>'
-        : r.status === 'resolved' ? '<span class="ctag" style="background:var(--b0);color:var(--t3)">Resolved</span>'
-        : '<span class="ctag" style="background:var(--b0);color:var(--t3)">Dismissed</span>';
-      const chapterTag = `<span class="ctag ta" style="margin-left:.3rem"><i class="ph ph-book-open"></i> ${esc(this.chapterFor(r.fileId))}</span>`;
+      const statusSt = 'st-' + (r.status||'open');
+      const statusLabel = r.status === 'open' ? 'Open' : (r.status === 'resolved' ? 'Resolved' : 'Dismissed');
+      const chapterTag = `<span class="st st-dismissed">${esc(this.chapterFor(r.fileId))}</span>`;
       return `<div style="background:var(--b0);border:1px solid var(--b1);border-radius:8px;padding:.6rem .7rem">
         <div style="display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;margin-bottom:.4rem;flex-wrap:wrap">
-          <div style="font-size:.68rem;font-weight:700;color:var(--amb)">${esc(this.REASON_LABEL[r.reason] || r.reason)} ${badge}${chapterTag}</div>
-          <div style="font-size:.65rem;opacity:.6;flex-shrink:0">${esc(r.reportedBy)} · ${new Date(r.reportedAt).toLocaleDateString()}</div>
+          <div style="font-size:.68rem;font-weight:700;color:var(--amb);display:flex;gap:.35rem;flex-wrap:wrap;align-items:center">${esc(this.REASON_LABEL[r.reason] || r.reason)} <span class="st ${statusSt}">${statusLabel}</span>${chapterTag}</div>
+          <div style="font-size:.65rem;opacity:.6;flex-shrink:0">${esc(r.reportedBy)} · ${relTime(r.reportedAt)}</div>
         </div>
         <div style="font-size:.8rem;margin-bottom:${r.note ? '.35rem' : '.5rem'}">${esc(r.questionSnapshot || '(question text not captured)')}</div>
         ${r.note ? `<div style="font-size:.74rem;opacity:.75;margin-bottom:.5rem;font-style:italic">"${esc(r.note)}"</div>` : ''}
@@ -2209,7 +2722,13 @@ const QREPORTS = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
   },
   async del(id) {
-    if (!confirm('Delete this report permanently?')) return;
+    const ok = await CONFIRM.ask({
+      title: 'Delete report',
+      body: 'Delete this report permanently?',
+      confirmText: 'Delete',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     try {
       const res = await ADMIN.post('adminDeleteQuestionReport', { id });
       if (res.success) {
@@ -2222,12 +2741,10 @@ const QREPORTS = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SUBJECTIVE — shared store of submissions, loaded once per session
+   SUBJECTIVE — shared store
    ═══════════════════════════════════════════════════════════════════════════ */
 const SUBJ_STORE = {
-  all: [],          // array of { id, username, kind, questionId, questionText, questionMarks, chapterId, submittedAt, pdfUrl, status, score, feedback, ... }
-  loaded: false,
-  loading: false,
+  all: [], loaded: false, loading: false,
   async load(force) {
     if (this.loaded && !force) return this.all;
     if (this.loading) return this.all;
@@ -2237,8 +2754,10 @@ const SUBJ_STORE = {
       if (r.success) {
         this.all = r.submissions || [];
         this.loaded = true;
+        _updateSidebarBadges();
+        _renderToday();
       }
-    } catch(e) { /* leave as-is */ }
+    } catch(e) {}
     this.loading = false;
     return this.all;
   },
@@ -2248,19 +2767,16 @@ const SUBJ_STORE = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SUBJECTIVE — Qn of Day review
+   SUBJECTIVE — QOTD review
    ═══════════════════════════════════════════════════════════════════════════ */
 const SUBJ_QOTD = {
-  _filter: { date: '', status: 'all' },
-
   async load(force) {
     const list = document.getElementById('qotd-list');
     if (!list) return;
-    list.innerHTML = '<p style="font-size:.8rem;opacity:.6"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Loading…</p>';
+    list.innerHTML = '<div class="skel-card"><div class="skel w80"></div><div class="skel w60"></div></div>';
     await SUBJ_STORE.load(force);
     this.render();
   },
-
   render() {
     const bannerEl = document.getElementById('qotd-banner');
     const listEl = document.getElementById('qotd-list');
@@ -2275,7 +2791,6 @@ const SUBJ_QOTD = {
     const dateStr = dateInput.value;
     const statusFilter = document.getElementById('qotd-status').value;
 
-    // Filter: kind='qotd' AND submittedAt date == dateStr
     const items = SUBJ_STORE.byKind('qotd').filter(s => {
       if (!s.submittedAt) return false;
       const d = new Date(s.submittedAt);
@@ -2292,7 +2807,6 @@ const SUBJ_QOTD = {
       ? Math.round(graded.reduce((sum, s) => sum + (Number(s.score) || 0), 0) / graded.length * 10) / 10
       : '—';
 
-    // Banner — show the question text from the first item (or all)
     const sampleQ = items[0];
     bannerEl.innerHTML = `
       <div class="qotd-banner">
@@ -2319,23 +2833,21 @@ const SUBJ_QOTD = {
     }
     listEl.innerHTML = items.map(s => this._cardHtml(s)).join('');
   },
-
   _cardHtml(s) {
-    const when = s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—';
+    const when = s.submittedAt ? fullTime(s.submittedAt) : '—';
+    const whenRel = relTime(s.submittedAt);
     const isGraded = s.status === 'graded';
     const marks = s.questionMarks || 10;
     return `<div class="sub-card ${isGraded ? 'graded' : ''}">
       <div class="sub-card-top">
         <div>
-          <div class="sub-card-user"><i class="ph ph-user"></i> ${esc(s.username)}</div>
+          <div class="sub-card-user"><span class="avatar">${initials(s.username)}</span> ${esc(s.username)}</div>
           <div class="sub-card-meta">
-            <span><i class="ph ph-clock"></i> ${when}</span>
+            <span title="${when}"><i class="ph ph-clock"></i> ${whenRel}</span>
             <span><i class="ph ph-hash"></i> Max ${marks}</span>
           </div>
         </div>
-        ${isGraded
-          ? '<span class="ctag tg">✓ Graded</span>'
-          : '<span class="ctag ta">Pending</span>'}
+        <span class="st st-${isGraded?'graded':'pending-grade'}">${isGraded?'Graded':'Pending'}</span>
       </div>
       <div class="sub-card-actions">
         <button class="btn-s btn-c btn-sm" onclick='openPdfInNewTab(${JSON.stringify(String(s.pdfUrl||""))})'>
@@ -2358,7 +2870,6 @@ const SUBJ_QOTD = {
       ${isGraded && s.feedback ? `<div class="sub-card-feedback">"${esc(s.feedback)}"</div>` : ''}
     </div>`;
   },
-
   async save(id, maxMarks) {
     const scoreEl = document.getElementById('qotd-score-' + id);
     const fbEl = document.getElementById('qotd-fb-' + id);
@@ -2378,7 +2889,6 @@ const SUBJ_QOTD = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
   },
-
   regrade(id) {
     const s = SUBJ_STORE.all.find(x => x.id === id);
     if (!s) return;
@@ -2409,11 +2919,10 @@ const SUBJ_EXAM = {
   async load(force) {
     const list = document.getElementById('exam-list');
     if (!list) return;
-    list.innerHTML = '<p style="font-size:.8rem;opacity:.6"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Loading…</p>';
+    list.innerHTML = '<div class="skel-card"><div class="skel w80"></div><div class="skel w60"></div></div>';
     await SUBJ_STORE.load(force);
     this.render();
   },
-
   render() {
     const listEl = document.getElementById('exam-list');
     if (!listEl) return;
@@ -2432,23 +2941,21 @@ const SUBJ_EXAM = {
     }
     listEl.innerHTML = items.map(s => this._cardHtml(s)).join('');
   },
-
   _cardHtml(s) {
-    const when = s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—';
+    const when = s.submittedAt ? fullTime(s.submittedAt) : '—';
+    const whenRel = relTime(s.submittedAt);
     const isGraded = s.status === 'graded';
     const marks = s.questionMarks || 100;
     return `<div class="sub-card ${isGraded ? 'graded' : ''}">
       <div class="sub-card-top">
         <div>
-          <div class="sub-card-user"><i class="ph ph-user"></i> ${esc(s.username)}</div>
+          <div class="sub-card-user"><span class="avatar">${initials(s.username)}</span> ${esc(s.username)}</div>
           <div class="sub-card-meta">
-            <span><i class="ph ph-clock"></i> ${when}</span>
+            <span title="${when}"><i class="ph ph-clock"></i> ${whenRel}</span>
             <span><i class="ph ph-hash"></i> Max ${marks}</span>
           </div>
         </div>
-        ${isGraded
-          ? '<span class="ctag tg">✓ Graded</span>'
-          : '<span class="ctag ta">Pending</span>'}
+        <span class="st st-${isGraded?'graded':'pending-grade'}">${isGraded?'Graded':'Pending'}</span>
       </div>
       ${s.questionText ? `<div class="sub-card-q">${esc(s.questionText)}</div>` : ''}
       <div class="sub-card-actions">
@@ -2472,7 +2979,6 @@ const SUBJ_EXAM = {
       ${isGraded && s.feedback ? `<div class="sub-card-feedback">"${esc(s.feedback)}"</div>` : ''}
     </div>`;
   },
-
   async save(id, maxMarks) {
     const scoreEl = document.getElementById('exam-score-' + id);
     const fbEl = document.getElementById('exam-fb-' + id);
@@ -2492,7 +2998,6 @@ const SUBJ_EXAM = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
   },
-
   regrade(id) {
     const s = SUBJ_STORE.all.find(x => x.id === id);
     if (!s) return;
@@ -2517,11 +3022,10 @@ const SUBJ_EXAM = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   SUBJECTIVE — Smart Paste + JSON upload (kept from previous version)
+   SUBJECTIVE — Smart Paste + JSON upload
    ═══════════════════════════════════════════════════════════════════════════ */
 const SUBJADMIN = {
   _preview: [],
-
   parse() {
     const raw = document.getElementById('sp-raw').value.trim();
     if (!raw) return ADMIN.toast('Paste some text first');
@@ -2537,7 +3041,6 @@ const SUBJADMIN = {
     document.getElementById('sp-commit').disabled = false;
     document.getElementById('sp-status').textContent = `Parsed ${items.length} — review and insert`;
   },
-
   _renderPreview() {
     const wrap = document.getElementById('sp-preview');
     const CH = (typeof SUBJECTIVE_CHAPTERS !== 'undefined') ? SUBJECTIVE_CHAPTERS : [];
@@ -2560,7 +3063,6 @@ const SUBJADMIN = {
   },
   _setMarks(i, v) { this._preview[i].marks = Math.max(1, Math.min(40, parseInt(v,10)||10)); },
   _drop(i) { this._preview[i].keep = !this._preview[i].keep; this._renderPreview(); },
-
   async _onChapterChange(fileId) {
     const sectionSel = document.getElementById('sp-section');
     const newInput = document.getElementById('sp-section-new');
@@ -2591,7 +3093,6 @@ const SUBJADMIN = {
       ADMIN.toast('⚠️ Could not load sections: ' + e.message);
     }
   },
-
   _onSectionChange(val) {
     const newInput = document.getElementById('sp-section-new');
     if (!newInput) return;
@@ -2602,7 +3103,6 @@ const SUBJADMIN = {
       newInput.style.display = 'none';
     }
   },
-
   async commit() {
     const fileId = (document.getElementById('sp-target') || {}).value || '';
     if (!fileId) return ADMIN.toast('❌ Pick a target chapter first');
@@ -2633,7 +3133,6 @@ const SUBJADMIN = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
   },
-
   clear() {
     document.getElementById('sp-raw').value = '';
     document.getElementById('sp-preview').innerHTML = '';
@@ -2641,7 +3140,6 @@ const SUBJADMIN = {
     document.getElementById('sp-commit').disabled = true;
     this._preview = [];
   },
-
   _populateFilters() {
     const target = document.getElementById('sp-target');
     if (target && !target.dataset.populated) {
@@ -2694,20 +3192,16 @@ const SUBJ_UPLOAD = {
       const box = document.getElementById('subj-upload-result');
       box.innerHTML = `<div style="background:var(--ok-bg);border:1px solid var(--ok-bd);border-radius:8px;padding:.6rem .8rem;font-size:.78rem">
         <div style="font-weight:700;color:var(--grn)">✅ Uploaded · ${r.questionCount} question${r.questionCount===1?'':'s'}</div>
-        <div style="margin-top:.35rem">fileId: <code class="mono" style="background:var(--b0);padding:.1rem .35rem;border-radius:4px">${esc(r.fileId)}</code></div>
-        <button class="btn-s btn-c btn-sm" style="margin-top:.5rem" onclick="SUBJ_UPLOAD._copy('${escAttrJs(r.fileId)}')"><i class="ph ph-copy"></i> Copy fileId</button>
+        <div style="margin-top:.35rem">fileId: <code class="mono" style="background:var(--b0);padding:.1rem .35rem;border-radius:4px">${esc(r.fileId)}</code>
+          <button class="copy-btn" onclick="copyText('${escAttrJs(r.fileId)}')" aria-label="Copy fileId"><i class="ph ph-copy"></i></button>
+        </div>
+        <button class="btn-s btn-c btn-sm" style="margin-top:.5rem" onclick="copyText('${escAttrJs(r.fileId)}')"><i class="ph ph-copy"></i> Copy fileId</button>
       </div>`;
       ADMIN.toast('✅ Uploaded — paste the fileId into subjective-data.js');
     } catch(e) {
       ADMIN.hideLoading();
       ADMIN.toast('❌ ' + e.message);
     }
-  },
-  _copy(text) {
-    navigator.clipboard.writeText(text).then(
-      () => ADMIN.toast('📋 Copied'),
-      () => ADMIN.toast('Copy failed — select manually')
-    );
   }
 };
 
@@ -2741,10 +3235,17 @@ const IMPORT = {
     let payload;
     try { payload = JSON.parse(raw); } catch (e) { return ADMIN.toast('❌ That\u2019s not valid JSON'); }
 
-    if (mode !== 'preview' && !confirm(
-      mode === 'replace' ? 'REPLACE will overwrite existing progress (a backup is kept automatically). Continue?'
-                         : 'MERGE will combine this data into each user\u2019s existing progress. Continue?'
-    )) return;
+    if (mode !== 'preview') {
+      const ok = await CONFIRM.ask({
+        title: mode === 'replace' ? 'Replace progress?' : 'Merge progress?',
+        body: mode === 'replace'
+          ? 'REPLACE will overwrite existing progress (a backup is kept automatically). Continue?'
+          : 'MERGE will combine this data into each user\u2019s existing progress. Continue?',
+        confirmText: mode === 'replace' ? 'Replace' : 'Merge',
+        confirmStyle: 'danger'
+      });
+      if (!ok) return;
+    }
 
     ADMIN.showLoading(mode === 'preview' ? 'Validating…' : 'Importing…');
     try {
@@ -2908,9 +3409,10 @@ const LOGS = {
     }
     empty.style.display = 'none';
     el.innerHTML = pageRows.map(l => {
-      const time = l.timestamp ? new Date(l.timestamp).toLocaleString() : '—';
+      const time = fullTime(l.timestamp);
+      const timeRel = relTime(l.timestamp);
       return `<div class="log-item">
-        <div class="log-time">${time}</div>
+        <div class="log-time" title="${esc(time)}">${esc(timeRel)}</div>
         <div><span class="log-action">${esc(l.action)||'Action'}</span> by <strong>${esc(l.admin)||'Unknown'}</strong>
         ${l.target ? ' → <span class="mono">' + esc(l.target) + '</span>' : ''}
         ${l.details ? '<div style="color:var(--t3);font-size:.7rem;margin-top:.15rem">' + esc(l.details) + '</div>' : ''}</div>
@@ -2926,6 +3428,8 @@ const LOGS = {
    ═══════════════════════════════════════════════════════════════════════════ */
 const USERS = {
   selected: new Set(),
+  _lastIdx: null,
+  _rowsCache: [],
   debounceTimer: null,
   debouncedFilter() {
     clearTimeout(this.debounceTimer);
@@ -2933,6 +3437,7 @@ const USERS = {
   },
   filterBy(status) {
     document.getElementById('u-filter').value = status;
+    FSTATE.set('u-filter', status);
     UI.nav('users');
     this.filter();
   },
@@ -2949,15 +3454,29 @@ const USERS = {
     this.selected.clear();
     const allBox = document.getElementById('u-chk-all');
     if (allBox) allBox.checked = false;
-    this.renderPage(this._visibleRows());
+    FSTATE.set('u-filter', document.getElementById('u-filter').value);
+    FSTATE.set('u-search', document.getElementById('u-search').value);
+    this._lastIdx = null;
+    const rows = this._visibleRows();
+    this._rowsCache = rows;
+    this.renderPage(rows);
     this.updateBulkBar();
   },
   clearFilters() {
     document.getElementById('u-search').value = '';
     document.getElementById('u-filter').value = 'all';
+    FSTATE.set('u-search', '');
+    FSTATE.set('u-filter', 'all');
     this.filter();
   },
-  render() { this.filter(); },
+  render() {
+    // Restore filter from session storage first
+    const savedFilter = FSTATE.get('u-filter', 'all');
+    const savedSearch = FSTATE.get('u-search', '');
+    if (document.getElementById('u-filter').value !== savedFilter) document.getElementById('u-filter').value = savedFilter;
+    if (document.getElementById('u-search').value !== savedSearch) document.getElementById('u-search').value = savedSearch;
+    this.filter();
+  },
   renderPage(rows) {
     const truncEl = document.getElementById('u-trunc');
     if (truncEl) {
@@ -2974,27 +3493,35 @@ const USERS = {
     if (!pageRows.length) {
       const isFiltered = ADMIN.data.users.length > 0;
       tb.innerHTML = isFiltered
-        ? '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>No users match your filter</p><button class="btn-s btn-a btn-sm" onclick="USERS.clearFilters()">Clear filters</button></td></tr>'
+        ? '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>No users match your filter</p><button class="btn-s btn-a btn-sm" style="margin-top:.5rem" onclick="USERS.clearFilters()">Clear filters</button></td></tr>'
         : '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No users yet</p></td></tr>';
       document.getElementById('u-pg').innerHTML = '';
       return;
     }
     const canManage = ADMIN._hasFeature('users_manage');
     tb.innerHTML = pageRows.map(u => {
-      const badge = u.status==='trial'?'badge-trial':u.status==='active'?'badge-active':u.status==='expired'?'badge-expired':u.status==='payment_pending'?'badge-pending':'badge-rejected';
+      const st = u.status || 'trial';
       const access = USERS.accessLabel(u);
       const checked = this.selected.has(u.username) ? 'checked' : '';
       return `<tr>
-        <td><input type="checkbox" class="chk" ${checked} onchange="USERS.toggle('${escAttrJs(u.username)}')" aria-label="Select user ${escAttrJs(u.username)}"></td>
-        <td><div style="font-weight:600;color:var(--t1);cursor:pointer" onclick="USERS.view('${escAttrJs(u.username)}')">${esc(u.name)||esc(u.username)}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${esc(u.username)}</div></td>
-        <td><div style="font-size:.72rem">${esc(u.email)||'—'}</div><div style="font-size:.68rem;color:var(--t3)">${esc(u.mobile)||'—'}</div></td>
-        <td><span class="badge ${badge}">${u.status}</span></td>
-        <td class="mono" style="font-size:.68rem">${u.createdAt ? new Date(u.createdAt).toLocaleDateString() : '—'}</td>
-        <td style="font-size:.72rem">${access}</td>
-        <td style="text-align:right">
-          <button class="btn-s btn-c btn-sm" onclick="USERS.view('${escAttrJs(u.username)}')" title="View Details" aria-label="View details"><i class="ph ph-eye"></i></button>
-          ${canManage ? `<button class="btn-s btn-a btn-sm" onclick="USERS.edit('${escAttrJs(u.username)}')" title="Edit User" aria-label="Edit user"><i class="ph ph-pencil-simple"></i></button>` : ''}
-          ${canManage ? `<button class="btn-s btn-r btn-sm" onclick="USERS.del('${escAttrJs(u.username)}')" title="Delete" aria-label="Delete user"><i class="ph ph-trash"></i></button>` : ''}
+        <td class="td-check"><input type="checkbox" class="chk" ${checked} onclick="USERS.toggle('${escAttrJs(u.username)}', event)" aria-label="Select user ${escAttrJs(u.username)}"></td>
+        <td class="td-user">
+          <div class="cell-user">
+            <span class="avatar">${initials(u.name||u.username)}</span>
+            <div class="cell-user-info">
+              <div class="cell-user-name">${esc(u.name)||esc(u.username)}</div>
+              <div class="cell-user-sub">${esc(u.username)}</div>
+            </div>
+          </div>
+        </td>
+        <td data-label="Contact"><div style="font-size:.72rem">${esc(u.email)||'—'}</div><div style="font-size:.68rem;color:var(--t3)">${esc(u.mobile)||'—'}</div></td>
+        <td data-label="Status"><span class="st st-${st}">${st.replace('_',' ')}</span></td>
+        <td data-label="Created"><span title="${esc(fullTime(u.createdAt))}">${relTime(u.createdAt)}</span></td>
+        <td data-label="Access" style="font-size:.72rem">${access}</td>
+        <td class="td-actions" style="text-align:right">
+          <button class="btn-s btn-c btn-sm" onclick="USERS.view('${escAttrJs(u.username)}')" title="View"><i class="ph ph-eye"></i></button>
+          ${canManage ? `<button class="btn-s btn-a btn-sm" onclick="USERS.edit('${escAttrJs(u.username)}')" title="Edit"><i class="ph ph-pencil-simple"></i></button>` : ''}
+          ${canManage ? `<button class="btn-s btn-r btn-sm" onclick="USERS.del('${escAttrJs(u.username)}')" title="Delete"><i class="ph ph-trash"></i></button>` : ''}
         </td>
       </tr>`;
     }).join('');
@@ -3009,7 +3536,13 @@ const USERS = {
     return 'Permanent';
   },
   async grantAccess(username, duration) {
-    if (!confirm(`Grant ${duration==='year'?'1-YEAR':'PERMANENT'} access to "${username}"?`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Grant access',
+      body: `Grant <b>${duration==='year'?'1-YEAR':'PERMANENT'}</b> access to <b>${esc(username)}</b>?`,
+      confirmText: 'Grant',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Granting access…');
     try {
       const res = await ADMIN.post('adminGrantAccess', { username, duration });
@@ -3021,9 +3554,25 @@ const USERS = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
   },
-  toggle(username) {
-    if (this.selected.has(username)) this.selected.delete(username);
-    else this.selected.add(username);
+  toggle(username, event) {
+    if (event && event.shiftKey && this._lastIdx !== null) {
+      const rows = this._rowsCache;
+      const idx = rows.findIndex(r => r.username === username);
+      if (idx !== -1) {
+        const [lo, hi] = [Math.min(idx, this._lastIdx), Math.max(idx, this._lastIdx)];
+        const adding = !this.selected.has(username);
+        for (let i = lo; i <= hi; i++) {
+          if (adding) this.selected.add(rows[i].username);
+          else this.selected.delete(rows[i].username);
+        }
+      }
+    } else {
+      if (this.selected.has(username)) this.selected.delete(username);
+      else this.selected.add(username);
+    }
+    const rows = this._rowsCache;
+    this._lastIdx = rows.findIndex(r => r.username === username);
+    this.renderPage(rows);
     this.updateBulkBar();
   },
   toggleAll() {
@@ -3043,19 +3592,25 @@ const USERS = {
     const box = document.getElementById('u-chk-all');
     if (box) box.checked = false;
     this.updateBulkBar();
-    this.filter();
+    this.renderPage(this._visibleRows());
   },
   async bulkGrantAccess(duration) {
     if (!this.selected.size) return;
-    if (!confirm(`Grant ${duration==='year'?'1-YEAR':'PERMANENT'} access to ${this.selected.size} user(s)?`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Bulk grant access',
+      body: `Grant <b>${duration==='year'?'1-YEAR':'PERMANENT'}</b> access to <b>${this.selected.size}</b> user(s)?`,
+      confirmText: 'Grant to all',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     const usernames = [...this.selected];
     ADMIN.showLoading('Granting access to ' + usernames.length + ' user(s)…');
     try {
       const res = await ADMIN.post('adminGrantAccessBatch', { usernames: JSON.stringify(usernames), duration });
       if (!res.success) throw new Error(res.error || 'Batch grant failed');
-      const ok = res.results.filter(r => r.success).length;
-      const failed = res.results.length - ok;
-      ADMIN.toast('✅ Access granted to ' + ok + (failed ? ', ❌ ' + failed + ' failed' : ''));
+      const ok2 = res.results.filter(r => r.success).length;
+      const failed = res.results.length - ok2;
+      ADMIN.toast('✅ Access granted to ' + ok2 + (failed ? ', ❌ ' + failed + ' failed' : ''));
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
     this.clearSelection();
@@ -3063,15 +3618,22 @@ const USERS = {
   },
   async bulkDelete() {
     if (!this.selected.size) return;
-    if (!confirm(`Permanently delete ${this.selected.size} user account(s)?\n\nThis removes their progress, push tokens, payment record, weekly attempts, subjective submissions, and any backups. Cannot be undone.`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Delete users',
+      body: `Permanently delete <b>${this.selected.size}</b> user account(s)? This removes progress, push tokens, payments, weekly attempts, subjective submissions, and any backups. Cannot be undone.`,
+      confirmText: `Delete ${this.selected.size} users`,
+      confirmStyle: 'danger',
+      requireType: 'DELETE'
+    });
+    if (!ok) return;
     const usernames = [...this.selected];
     ADMIN.showLoading('Deleting ' + usernames.length + ' user(s)…');
     try {
       const res = await ADMIN.post('adminDeleteUsersBatch', { usernames: JSON.stringify(usernames) });
       if (!res.success) throw new Error(res.error || 'Batch delete failed');
-      const ok = res.results.filter(r => r.success).length;
-      const failed = res.results.length - ok;
-      ADMIN.toast('🗑 Deleted ' + ok + ' account(s)' + (failed ? ', ❌ ' + failed + ' failed' : ''));
+      const ok2 = res.results.filter(r => r.success).length;
+      const failed = res.results.length - ok2;
+      ADMIN.toast('🗑 Deleted ' + ok2 + ' account(s)' + (failed ? ', ❌ ' + failed + ' failed' : ''));
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
     ADMIN.hideLoading();
     this.clearSelection();
@@ -3080,28 +3642,36 @@ const USERS = {
   view(username) {
     const u = ADMIN.data.users.find(x => x.username === username);
     if (!u) return;
-    const badge = u.status==='trial'?'badge-trial':u.status==='active'?'badge-active':u.status==='expired'?'badge-expired':u.status==='payment_pending'?'badge-pending':'badge-rejected';
+    const st = u.status || 'trial';
     const access = USERS.accessLabel(u);
     const pay = ADMIN.data.payments.find(p => p.username === username);
     const canManage = ADMIN._hasFeature('users_manage');
     const isAdmin = (ADMIN.data.admins || []).some(a => a.username.toLowerCase() === username.toLowerCase());
     document.getElementById('mtitle-user').textContent = 'User: ' + (u.name || u.username);
     document.getElementById('mbody-user').innerHTML = `
+      <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.8rem">
+        <span class="avatar" style="width:44px;height:44px;font-size:.95rem">${initials(u.name||u.username)}</span>
+        <div>
+          <div style="font-weight:700;font-size:.95rem">${esc(u.name || u.username)}</div>
+          <div style="font-size:.72rem;color:var(--t3);display:flex;align-items:center;gap:.3rem">
+            <span class="mono">${esc(u.username)}</span>
+            <button class="copy-btn" onclick="copyText('${escAttrJs(u.username)}')" aria-label="Copy username"><i class="ph ph-copy"></i></button>
+          </div>
+        </div>
+      </div>
       <div class="dgrid" style="margin-bottom:.8rem">
-        <div class="ditem"><label>Username</label><val class="mono">${esc(u.username)}</val></div>
-        <div class="ditem"><label>Full Name</label><val>${esc(u.name) || '—'}</val></div>
         <div class="ditem"><label>Email</label><val>${esc(u.email) || '—'}</val></div>
         <div class="ditem"><label>Mobile</label><val>${esc(u.mobile) || '—'}</val></div>
-        <div class="ditem"><label>Status</label><val><span class="badge ${badge}">${u.status}</span></val></div>
-        <div class="ditem"><label>Access Type</label><val>${access}</val></div>
-        <div class="ditem"><label>Created</label><val>${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</val></div>
-        <div class="ditem"><label>Trial Expires</label><val>${u.trialExpiresAt ? new Date(u.trialExpiresAt).toLocaleString() : '—'}</val></div>
+        <div class="ditem"><label>Status</label><val><span class="st st-${st}">${st.replace('_',' ')}</span></val></div>
+        <div class="ditem"><label>Access</label><val>${access}</val></div>
+        <div class="ditem"><label>Created</label><val>${fullTime(u.createdAt)}</val></div>
+        <div class="ditem"><label>Trial Expires</label><val>${fullTime(u.trialExpiresAt)}</val></div>
       </div>
       ${isAdmin ? '<div style="background:var(--warn-bg);border:1px solid var(--warn-bd);border-radius:var(--r1);padding:.55rem .7rem;margin-bottom:.7rem;font-size:.76rem;color:var(--amb)"><i class="ph ph-shield-check"></i> This user also has admin access.</div>' : ''}
       ${pay ? `<div style="background:var(--b0);border-radius:var(--r1);padding:.6rem;border:1px solid var(--b1);margin-bottom:.8rem">
         <div style="font-size:.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:.8px;font-weight:700;margin-bottom:.3rem">Payment Info</div>
         <div style="font-size:.78rem">TXN ID: <span class="mono">${esc(pay.txId)}</span></div>
-        <div style="font-size:.78rem">Status: <span class="badge ${pay.status==='pending'?'badge-pending':pay.status==='verified'?'badge-verified':'badge-rejected'}">${pay.status}</span></div>
+        <div style="font-size:.78rem;margin-top:.2rem">Status: <span class="st st-${pay.status}">${pay.status}</span></div>
         ${pay.remarks ? `<div style="font-size:.76rem;color:var(--t3);margin-top:.2rem">Remarks: ${esc(pay.remarks)}</div>` : ''}
         ${pay.screenshotUrl && pay.screenshotUrl.startsWith('http') ? `<a href="#" onclick="event.preventDefault();ADMIN.downloadScreenshot('${escAttrJs(pay.screenshotUrl)}','${escAttrJs(pay.username)}_payment.png')" style="color:var(--sky);font-size:.76rem"><i class="ph ph-download-simple"></i> Download Screenshot</a>` : ''}
       </div>` : '<div style="font-size:.76rem;color:var(--t3);margin-bottom:.8rem">No payment record found.</div>'}
@@ -3112,10 +3682,10 @@ const USERS = {
           <button class="btn-s btn-a" style="flex:1" onclick="USERS.grantAccess('${escAttrJs(u.username)}','year')"><i class="ph ph-calendar-blank"></i> Grant 1 Year</button>
         </div>
       </div>` : ''}
-      <div style="display:flex;gap:.4rem">
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
         ${canManage ? `<button class="btn-s btn-a" onclick="MODAL.close('user'); USERS.edit('${escAttrJs(u.username)}')"><i class="ph ph-pencil-simple"></i> Edit User</button>` : ''}
         ${canManage ? `<button class="btn-s btn-r" onclick="MODAL.close('user'); USERS.del('${escAttrJs(u.username)}')"><i class="ph ph-trash"></i> Delete</button>` : ''}
-        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="MODAL.close('user')">Close</button>
+        <button class="btn-s" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2);margin-left:auto" onclick="MODAL.close('user')">Close</button>
       </div>`;
     document.getElementById('mbg-user').classList.add('show');
     FOCUS_TRAP.open('mbg-user');
@@ -3165,7 +3735,14 @@ const USERS = {
     } catch(e) { ADMIN.toast('❌ ' + e.message); }
   },
   async del(username) {
-    if (!confirm(`Delete user "${username}"?\n\nRemoves their progress, push tokens, payment record, weekly attempts, and subjective submissions. Cannot be undone.`)) return;
+    const ok = await CONFIRM.ask({
+      title: 'Delete user',
+      body: `Delete <b>${esc(username)}</b>? Removes their progress, push tokens, payment record, weekly attempts, and subjective submissions. Cannot be undone.`,
+      confirmText: 'Delete user',
+      confirmStyle: 'danger',
+      requireType: 'DELETE'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Deleting user…');
     try {
       const res = await ADMIN.post('adminDeleteUser', { username });
@@ -3183,6 +3760,8 @@ const USERS = {
    ═══════════════════════════════════════════════════════════════════════════ */
 const PAYMENTS = {
   selected: new Set(),
+  _lastIdx: null,
+  _rowsCache: [],
   debounceTimer: null,
   debouncedFilter() {
     clearTimeout(this.debounceTimer);
@@ -3190,6 +3769,7 @@ const PAYMENTS = {
   },
   filterBy(status) {
     document.getElementById('p-filter').value = status;
+    FSTATE.set('p-filter', status);
     UI.nav('payments');
     this.filter();
   },
@@ -3206,15 +3786,28 @@ const PAYMENTS = {
     this.selected.clear();
     const box = document.getElementById('p-chk-all');
     if (box) box.checked = false;
-    this.renderPage(this._visibleRows());
+    FSTATE.set('p-filter', document.getElementById('p-filter').value);
+    FSTATE.set('p-search', document.getElementById('p-search').value);
+    this._lastIdx = null;
+    const rows = this._visibleRows();
+    this._rowsCache = rows;
+    this.renderPage(rows);
     this.updateBulkBar();
   },
   clearFilters() {
     document.getElementById('p-search').value = '';
     document.getElementById('p-filter').value = 'all';
+    FSTATE.set('p-search', '');
+    FSTATE.set('p-filter', 'all');
     this.filter();
   },
-  render() { this.filter(); },
+  render() {
+    const savedFilter = FSTATE.get('p-filter', 'all');
+    const savedSearch = FSTATE.get('p-search', '');
+    if (document.getElementById('p-filter').value !== savedFilter) document.getElementById('p-filter').value = savedFilter;
+    if (document.getElementById('p-search').value !== savedSearch) document.getElementById('p-search').value = savedSearch;
+    this.filter();
+  },
   renderPage(rows) {
     const truncEl = document.getElementById('p-trunc');
     if (truncEl) {
@@ -3231,23 +3824,31 @@ const PAYMENTS = {
     if (!pageRows.length) {
       const isFiltered = ADMIN.data.payments.length > 0;
       tb.innerHTML = isFiltered
-        ? '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>No payments match</p><button class="btn-s btn-a btn-sm" onclick="PAYMENTS.clearFilters()">Clear filters</button></td></tr>'
+        ? '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>No payments match</p><button class="btn-s btn-a btn-sm" style="margin-top:.5rem" onclick="PAYMENTS.clearFilters()">Clear filters</button></td></tr>'
         : '<tr><td colspan="7" class="empty"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No payments yet</p></td></tr>';
       document.getElementById('p-pg').innerHTML = '';
       return;
     }
     const canReview = ADMIN._hasFeature('payments_review');
     tb.innerHTML = pageRows.map(p => {
-      const badge = p.status==='pending'?'badge-pending':p.status==='verified'?'badge-verified':'badge-rejected';
+      const st = p.status || 'pending';
       const checked = this.selected.has(p.username) ? 'checked' : '';
       return `<tr>
-        <td><input type="checkbox" class="chk" ${checked} onchange="PAYMENTS.toggle('${escAttrJs(p.username)}')" aria-label="Select payment from ${escAttrJs(p.username)}"></td>
-        <td><div style="font-weight:600;color:var(--t1)">${esc(p.name)||esc(p.username)}</div><div class="mono" style="font-size:.68rem;color:var(--t3)">${esc(p.username)}</div></td>
-        <td class="mono">${esc(p.txId)}${p.duplicateTxId ? ` <span title="Also submitted by: ${escAttrJs(p.duplicateTxIdUsers.join(', '))}" style="color:var(--warn);cursor:help"><i class="ph ph-warning"></i></span>` : ''}</td>
-        <td style="font-size:.72rem">Rs ${ADMIN.data.settings.paymentAmount||'100'}</td>
-        <td><span class="badge ${badge}">${p.status}</span></td>
-        <td class="mono" style="font-size:.68rem">${p.submittedAt ? new Date(p.submittedAt).toLocaleDateString() : '—'}</td>
-        <td style="text-align:right">
+        <td class="td-check"><input type="checkbox" class="chk" ${checked} onclick="PAYMENTS.toggle('${escAttrJs(p.username)}', event)" aria-label="Select payment from ${escAttrJs(p.username)}"></td>
+        <td class="td-user">
+          <div class="cell-user">
+            <span class="avatar">${initials(p.name||p.username)}</span>
+            <div class="cell-user-info">
+              <div class="cell-user-name">${esc(p.name)||esc(p.username)}</div>
+              <div class="cell-user-sub">${esc(p.username)}</div>
+            </div>
+          </div>
+        </td>
+        <td data-label="TXN ID" class="mono">${esc(p.txId)}${p.duplicateTxId ? ` <span title="Also submitted by: ${escAttrJs(p.duplicateTxIdUsers.join(', '))}" style="color:var(--wrn);cursor:help"><i class="ph ph-warning"></i></span>` : ''}</td>
+        <td data-label="Amount" style="font-size:.72rem">Rs ${ADMIN.data.settings.paymentAmount||'100'}</td>
+        <td data-label="Status"><span class="st st-${st}">${st}</span></td>
+        <td data-label="Submitted"><span title="${esc(fullTime(p.submittedAt))}">${relTime(p.submittedAt)}</span></td>
+        <td class="td-actions" style="text-align:right">
           ${p.status==='pending' && canReview ? `<button class="btn-s btn-g btn-sm" onclick="PAYMENTS.review('${escAttrJs(p.username)}')"><i class="ph ph-check"></i> Verify</button> <button class="btn-s btn-r btn-sm" onclick="PAYMENTS.reject('${escAttrJs(p.username)}')"><i class="ph ph-x"></i> Reject</button>` : '<span style="font-size:.68rem;color:var(--t3)">Reviewed</span>'}
           ${canReview ? `<button class="btn-s btn-r btn-sm" style="margin-left:.2rem" onclick="PAYMENTS.del('${escAttrJs(p.username)}')"><i class="ph ph-trash"></i></button>` : ''}
         </td>
@@ -3256,9 +3857,24 @@ const PAYMENTS = {
     PAGINATION.render('p-pg', ADMIN.state.pPage, totalPages, 'PAYMENTS.goPage');
   },
   goPage(p) { ADMIN.state.pPage = p; this.filter(); },
-  toggle(username) {
-    if (this.selected.has(username)) this.selected.delete(username);
-    else this.selected.add(username);
+  toggle(username, event) {
+    if (event && event.shiftKey && this._lastIdx !== null) {
+      const rows = this._rowsCache;
+      const idx = rows.findIndex(r => r.username === username);
+      if (idx !== -1) {
+        const [lo, hi] = [Math.min(idx, this._lastIdx), Math.max(idx, this._lastIdx)];
+        const adding = !this.selected.has(username);
+        for (let i = lo; i <= hi; i++) {
+          if (adding) this.selected.add(rows[i].username);
+          else this.selected.delete(rows[i].username);
+        }
+      }
+    } else {
+      if (this.selected.has(username)) this.selected.delete(username);
+      else this.selected.add(username);
+    }
+    this._lastIdx = this._rowsCache.findIndex(r => r.username === username);
+    this.renderPage(this._rowsCache);
     this.updateBulkBar();
   },
   toggleAll() {
@@ -3278,11 +3894,17 @@ const PAYMENTS = {
     const box = document.getElementById('p-chk-all');
     if (box) box.checked = false;
     this.updateBulkBar();
-    this.filter();
+    this.renderPage(this._visibleRows());
   },
   async bulkVerify() {
     if (!this.selected.size) return;
-    if (!confirm('Verify ' + this.selected.size + ' payment(s)?')) return;
+    const ok = await CONFIRM.ask({
+      title: 'Verify payments',
+      body: `Verify <b>${this.selected.size}</b> payment(s)?`,
+      confirmText: 'Verify all',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     await this._bulkReview('verified');
   },
   async bulkReject() {
@@ -3312,7 +3934,13 @@ const PAYMENTS = {
   review(username) { MODAL.openReview(username, 'verified'); },
   reject(username) { MODAL.openReview(username, 'rejected'); },
   async del(username) {
-    if (!confirm('Delete payment record for "' + username + '"?')) return;
+    const ok = await CONFIRM.ask({
+      title: 'Delete payment record',
+      body: `Delete the payment record for <b>${esc(username)}</b>?`,
+      confirmText: 'Delete',
+      confirmStyle: 'danger'
+    });
+    if (!ok) return;
     ADMIN.showLoading('Deleting…');
     try {
       const res = await ADMIN.post('adminDeletePayment', { username });
@@ -3337,7 +3965,7 @@ const MODAL = {
     document.getElementById('mbody-review').innerHTML = `
       ${p.duplicateTxId ? `<div style="background:rgba(46,139,87,.12);border:1px solid rgba(46,139,87,.4);border-radius:var(--r1);padding:.6rem;margin-bottom:.8rem;font-size:.78rem;color:var(--warn)"><i class="ph ph-warning"></i> This transaction ID was also submitted by: <strong>${esc(p.duplicateTxIdUsers.join(', '))}</strong>. Double-check before approving.</div>` : ''}
       <div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">User</div>
-        <div style="font-weight:600">${esc(p.name)||esc(p.username)} <span class="mono" style="font-size:.72rem;color:var(--t3)">(${esc(p.username)})</span></div>
+        <div style="font-weight:600;display:flex;align-items:center;gap:.5rem"><span class="avatar">${initials(p.name||p.username)}</span>${esc(p.name)||esc(p.username)} <span class="mono" style="font-size:.72rem;color:var(--t3)">(${esc(p.username)})</span></div>
       </div>
       <div style="margin-bottom:.8rem"><div style="font-size:.78rem;color:var(--t3);margin-bottom:.15rem">Transaction ID</div>
         <div class="mono" style="font-weight:600">${esc(p.txId)}</div>
@@ -3364,7 +3992,15 @@ const MODAL = {
     const duration = document.getElementById('grant-duration')?.value || 'permanent';
     if (status === 'verified') {
       const p = ADMIN.data.payments.find(x => x.username === username);
-      if (p && p.duplicateTxId && !confirm(`This transaction ID was also submitted by: ${p.duplicateTxIdUsers.join(', ')}.\n\nVerify anyway?`)) return;
+      if (p && p.duplicateTxId) {
+        const ok = await CONFIRM.ask({
+          title: 'Duplicate TXN ID',
+          body: `This transaction ID was also submitted by: <b>${esc(p.duplicateTxIdUsers.join(', '))}</b>.<br><br>Verify anyway?`,
+          confirmText: 'Verify anyway',
+          confirmStyle: 'danger'
+        });
+        if (!ok) return;
+      }
     }
     ADMIN.showLoading(status==='verified'?'Verifying…':'Rejecting…');
     try {
@@ -3448,11 +4084,18 @@ const FOCUS_TRAP = {
    ═══════════════════════════════════════════════════════════════════════════ */
 const UI = {
   nav(id) {
+    // Map "subj-qotd", "subj-exam", "subj-add" → "subjective" tab
+    const subjMap = { 'subj-qotd': 'qotd', 'subj-exam': 'exam', 'subj-add': 'add' };
+    if (subjMap[id]) {
+      const tab = subjMap[id];
+      id = 'subjective';
+      setTimeout(() => SUBJ_TABS.go(tab), 80);
+    }
     const featMap = {
       users:'users_view', payments:'payments_view', admins:'admins_view',
       weeklysets:'weeklysets_view', qreports:'qreports_view',
-      'subj-qotd':'subjective_view', 'subj-exam':'subjective_view', 'subj-add':'subjective_view',
-      logs:'logs_view', settings:'settings_view', dashboard:'dashboard',
+      subjective:'subjective_view',
+      logs:'logs_view', settings:'settings_view', today:'dashboard', dashboard:'dashboard',
       data: ['imports','maintenance']
     };
     const feat = featMap[id];
@@ -3472,17 +4115,14 @@ const UI = {
     const el = document.getElementById('nav-' + id);
     if (el) el.classList.add('active');
 
-    if (id === 'dashboard' && typeof EXPIRING !== 'undefined') EXPIRING.load();
+    if (id === 'today' || id === 'dashboard') EXPIRING.load();
     if (id === 'admins') {
-      // Auto-scan freshly-loaded user list for promote picker
       setTimeout(() => {
         const inp = document.getElementById('promote-search');
         if (inp && !inp.value) ADMINS._searchPromote('');
       }, 100);
     }
-    if (id === 'subj-qotd') SUBJ_QOTD.load(false);
-    if (id === 'subj-exam') SUBJ_EXAM.load(false);
-    if (id === 'subj-add') SUBJADMIN._populateFilters();
+    if (id === 'subjective') SUBJ_TABS.go(SUBJ_TABS.current);
 
     this.sidebarClose();
   },
@@ -3501,7 +4141,7 @@ const UI = {
    ═══════════════════════════════════════════════════════════════════════════ */
 ADMIN.init();
 
-/* Rename "User Portal" to "Switch to User" for dual-role accounts. */
+/* Rename "User Portal" for dual-role accounts. */
 (function(){
   try {
     const raw = localStorage.getItem(LS_USER);
@@ -3522,6 +4162,7 @@ setInterval(() => {
   if (document.querySelector('.mbg.show')) return;
   const visible = document.querySelector('.view.on')?.id;
   const scope = ({
+    'view-today':      ['stats'],
     'view-dashboard':  ['stats'],
     'view-users':      ['users'],
     'view-payments':   ['payments'],
@@ -3537,19 +4178,19 @@ setInterval(() => {
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey) {
     if (e.key === 'r') { e.preventDefault(); ADMIN.refresh(); }
-    if (e.key === '1') { e.preventDefault(); UI.nav('dashboard'); }
-    if (e.key === '2') { e.preventDefault(); UI.nav('users'); }
-    if (e.key === '3') { e.preventDefault(); UI.nav('payments'); }
-    if (e.key === '4') { e.preventDefault(); UI.nav('weeklysets'); }
-    if (e.key === '5') { e.preventDefault(); UI.nav('qreports'); }
-    if (e.key === '6') { e.preventDefault(); UI.nav('subj-qotd'); }
-    if (e.key === '7') { e.preventDefault(); UI.nav('logs'); }
-    if (e.key === '8') { e.preventDefault(); UI.nav('settings'); }
-    if (e.key === '9') { e.preventDefault(); UI.nav('admins'); }
+    if (e.key === '1') { e.preventDefault(); UI.nav('today'); }
+    if (e.key === '2') { e.preventDefault(); UI.nav('dashboard'); }
+    if (e.key === '3') { e.preventDefault(); UI.nav('users'); }
+    if (e.key === '4') { e.preventDefault(); UI.nav('payments'); }
+    if (e.key === '5') { e.preventDefault(); UI.nav('admins'); }
+    if (e.key === '6') { e.preventDefault(); UI.nav('weeklysets'); }
+    if (e.key === '7') { e.preventDefault(); UI.nav('qreports'); }
+    if (e.key === '8') { e.preventDefault(); UI.nav('subjective'); }
+    if (e.key === '9') { e.preventDefault(); UI.nav('logs'); }
   }
   if (e.key === 'Escape') {
     MODAL.close('review'); MODAL.close('user'); MODAL.close('pwd'); MODAL.close('wspreview');
-    // Close any open user picker
+    CONFIRM._no();
     const picker = document.getElementById('promote-results');
     if (picker) picker.classList.remove('show');
   }
@@ -3564,6 +4205,35 @@ document.addEventListener('click', e => {
   if (picker.contains(e.target) || e.target === input) return;
   picker.classList.remove('show');
 });
+
+/* Global helper for opening PDFs in a new tab. */
+async function openPdfInNewTab(pdfUrl) {
+  if (!pdfUrl) { ADMIN.toast('No PDF available'); return; }
+  const tab = window.open('about:blank', '_blank');
+  if (!tab) { ADMIN.toast('❌ Popup blocked — allow popups for this site'); return; }
+  try {
+    tab.document.open();
+    tab.document.write('<!doctype html><title>Loading…</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading PDF…</p></body>');
+    tab.document.close();
+  } catch(e) {}
+  try {
+    const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl });
+    if (!res.success) throw new Error(res.error || 'Could not fetch PDF');
+    const byteChars = atob(res.base64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: res.mimeType || 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    tab.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 300000);
+  } catch (e) {
+    try {
+      tab.document.open();
+      tab.document.write('<!doctype html><body style="font-family:system-ui;padding:2rem;color:#b33"><h2>Could not load PDF</h2><p>' + (e.message || 'Unknown error') + '</p></body>');
+      tab.document.close();
+    } catch(_) {}
+  }
+}
 </script>
 </body>
 </html>
