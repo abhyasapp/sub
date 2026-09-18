@@ -20,6 +20,17 @@
     }
   } catch(e) {}
 })();</script>
+<!-- ─── Session bridge: hide the password form on first paint if a
+     student session exists. ADMIN.init() will try to exchange it for
+     an admin token via adminSwitchFromUser before showing the gate. -->
+<script>(function(){
+  try{
+    var s = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
+    if (s && s.type === 'user' && s.username && (s.token || s.sessionToken || s.authToken)) {
+      document.documentElement.classList.add('session-bridge');
+    }
+  }catch(e){}
+})();</script>
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <title>Abhyas Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -543,6 +554,20 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
   border-radius:var(--r-input);padding:var(--sp-3);font-size:var(--fs-foot);margin-bottom:var(--sp-4);line-height:1.45}
 .gate-err.show{display:flex}
 .gate-alt{text-align:center;margin-top:var(--sp-5);font-size:var(--fs-foot);color:var(--ink-3)}
+
+/* ─── Session bridge: shown when a student session is being exchanged
+   for an admin token. The password form stays hidden until the
+   exchange fails, so an admin coming from the user app never sees
+   the gate at all. */
+.gate-busy{display:none;justify-content:center;padding:var(--sp-6) 0}
+html.session-bridge .gate-busy,#gate.busy .gate-busy{display:flex}
+html.session-bridge #gate-form,
+html.session-bridge .gsub,
+html.session-bridge .gate-alt,
+#gate.busy #gate-form,
+#gate.busy .gsub,
+#gate.busy .gate-alt{visibility:hidden}
+
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:var(--sp-4)}
 .perm-group-t{font-size:var(--fs-cap);font-weight:650;color:var(--ink-3);margin-bottom:var(--sp-1)}
 .perm-row{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-2);
@@ -672,6 +697,10 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
     <p class="gsub">Sign in to manage students, payments and grading.</p>
 
     <div class="gate-err" id="gate-err" role="alert" aria-live="assertive"><i class="ph ph-warning-circle"></i><span id="gate-err-text"></span></div>
+
+    <div class="gate-busy" id="gate-busy" role="status" aria-live="polite">
+      <span class="inline-loader">Checking your access…</span>
+    </div>
 
     <form id="gate-form" autocomplete="on" novalidate>
       <div class="field">
@@ -1324,6 +1353,7 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 </script>
+<script>
 'use strict';
 
 const GAS_URL  = ABHYAS_CONFIG.GAS_URL;
@@ -1410,6 +1440,23 @@ function copyText(text, label){
 const FSTATE = {
   get(k, fb){ try { return sessionStorage.getItem('abhyas_f_' + k) ?? fb; } catch(e){ return fb; } },
   set(k, v){ try { sessionStorage.setItem('abhyas_f_' + k, v); } catch(e){} }
+};
+
+/* Read the student session from localStorage. Used only by the
+   session bridge, to exchange a user token for an admin token via
+   adminSwitchFromUser when no admin token is stored yet. */
+const USER_SESSION = {
+  read(){
+    try {
+      const s = JSON.parse(localStorage.getItem(LS_USER) || 'null');
+      return (s && s.type === 'user' && s.username) ? s : null;
+    } catch(e){ return null; }
+  },
+  token(s){
+    s = s || this.read();
+    if (!s) return '';
+    return s.token || s.sessionToken || s.authToken || s.userToken || '';
+  }
 };
 
 const TOAST = {
@@ -1548,15 +1595,78 @@ const ADMIN = {
   state: { uPage:1, pPage:1, lPage:1, qrPage:1, uPerPage:15, pPerPage:15, lPerPage:20, qrPerPage:10 },
 
   init(){
-    const saved = localStorage.getItem(LS_ADMIN);
-    if (!saved) { if (matchMedia('(pointer:fine)').matches) $('ad-user').focus(); return; }
-    try {
-      this.creds = JSON.parse(saved);
-      if (this.creds.expires && Date.now() > this.creds.expires) {
-        localStorage.removeItem(LS_ADMIN); this.creds = null; return;
-      }
-      this.unlock();
-    } catch(e){ localStorage.removeItem(LS_ADMIN); }
+    /* 1. Try a stored admin token (fresh + unexpired). */
+    let saved = null;
+    try { saved = localStorage.getItem(LS_ADMIN); } catch(e){}
+
+    if (saved) {
+      try {
+        const c = JSON.parse(saved);
+        if (c && c.token && (!c.expires || Date.now() < c.expires)) {
+          this.creds = c;
+          this.unlock();
+          return;
+        }
+      } catch(e){}
+      try { localStorage.removeItem(LS_ADMIN); } catch(e){}
+    }
+
+    /* 2. No admin token — try to exchange the student session for one. */
+    if (this._trySessionUnlock()) return;
+
+    /* 3. Fall through to the password gate. */
+    document.documentElement.classList.remove('session-bridge');
+    if (matchMedia('(pointer:fine)').matches) $('ad-user').focus();
+  },
+
+  /* Called by init() when a user session exists but no admin token does.
+     Posts adminSwitchFromUser with the user session token. The backend
+     validates the token, confirms the account is an admin, and returns
+     a fresh admin token. On any failure we drop the session-bridge class
+     so the password form becomes visible. */
+  _trySessionUnlock(){
+    const s = USER_SESSION.read();
+    if (!s) return false;
+    const userToken = USER_SESSION.token(s);
+    if (!userToken) return false;
+
+    this._gateBusy(true);
+    document.documentElement.classList.add('session-bridge');
+
+    this.post('adminSwitchFromUser',
+              { username: s.username, token: userToken },
+              { skipTokenCheck: true })
+      .then(res => {
+        if (!res || !res.success || !res.adminToken) {
+          throw new Error((res && res.error) || 'Not an admin account.');
+        }
+        this.creds = {
+          user: res.username || s.username,
+          token: res.adminToken,
+          expires: Date.now() + (res.expiresInMs || 86400000)
+        };
+        try { localStorage.setItem(LS_ADMIN, JSON.stringify(this.creds)); } catch(e){}
+        this._gateBusy(false);
+        this.unlock();
+      })
+      .catch(err => {
+        /* Any failure — expired user session, not an admin, endpoint
+           missing, network hiccup — falls back to the password gate.
+           We keep the reason in the console for debugging but do not
+           surface it in the UI. */
+        try { console.info('Session bridge declined:', err && err.message); } catch(e){}
+        this._gateBusy(false);
+        document.documentElement.classList.remove('session-bridge');
+        if (matchMedia('(pointer:fine)').matches) $('ad-user').focus();
+      });
+
+    return true;
+  },
+
+  _gateBusy(on){
+    const g = $('gate'), b = $('gate-busy');
+    if (g) g.classList.toggle('busy', on);
+    if (b) b.hidden = !on;
   },
 
   async login(){
@@ -1570,6 +1680,8 @@ const ADMIN = {
       if (!res.success) throw new Error(res.error || 'Those credentials did not work.');
       this.creds = { user:u, token:res.adminToken, expires: Date.now() + 86400000 };
       localStorage.setItem(LS_ADMIN, JSON.stringify(this.creds));
+      document.documentElement.classList.remove('session-bridge');
+      this._gateBusy(false);
       this.unlock();
       if (res.mustChangePassword) {
         this._forcedPwChange = true;
