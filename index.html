@@ -2,17 +2,11 @@
 <html lang="en-NP">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F2F4F3">
 <script src="config.js"></script>
 <!-- Pre-apply the dark-mode preference BEFORE design-system.css is
-     evaluated, so there's no flash of the wrong theme on load. Reads
-     the SAME 'abhyas_theme' key app.js / shared.js use, and applies
-     the SAME .dark class — on <html> here, since <body> doesn't exist
-     yet this early in <head>. See shared.js's getStoredTheme() for the
-     canonical read; this inline copy exists only to run before the
-     stylesheet, and the toggle button calls shared.js's version once
-     the page is interactive. -->
+     evaluated, so there's no flash of the wrong theme on load. -->
 <script>(function(){
   try{
     var raw = localStorage.getItem('abhyas_theme');
@@ -25,14 +19,14 @@
       var m = document.querySelector('meta[name="theme-color"]');
       if (m) m.setAttribute('content', '#181B19');
     }
-  } catch(e) { /* localStorage unavailable — default light applies */ }
+  } catch(e) {}
 })();</script>
-<!-- Clickjacking mitigation — GitHub Pages has no custom headers, so
-     this client-side frame-bust is the best available option. Same
-     guard is on user.html and admin.html. -->
+<!-- Clickjacking mitigation -->
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<!-- NEW: PWA manifest so "Install App" appears from the login screen too -->
+<link rel="manifest" href="manifest.json">
 
 <title>Abhyas — Loksewa Civil Engineering Exam Prep (Online &amp; Offline)</title>
 <meta name="description" content="Abhyas is a free-to-start Loksewa Civil Engineering exam prep app for Nepal — practice thousands of Level 7 Engineering, General Knowledge, and IQ questions online or fully offline, track your progress, and build toward Lok Sewa Aayog exam success.">
@@ -65,15 +59,15 @@
 }
 </script>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- NEW: preconnect to fonts.gstatic.com too — that's where the actual WOFF2 files come from.
+     Also dropped the 800 weight since nothing in this file uses it. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="design-system.css">
-<!-- Google Identity Services. Loaded async/defer so it never blocks
-     first paint; APP.initGoogleSignIn() polls for it to be ready. -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
-  /* Local aliases onto the shared design-system tokens, so the rest of
-     this file's rules read from one place if the palette shifts later. */
   --c0:var(--c-bg);--c1:var(--c-surface);--c2:var(--c-surface);--c3:var(--c-primary-light);--c4:var(--c-divider);
   --amb:var(--c-primary);--amb2:var(--c-primary-dark);--amb-glow:rgba(46,139,87,.18);
   --teal:var(--c-primary);--vio:var(--c-primary);--sky:var(--c-info);--grn:var(--c-primary);--ros:var(--c-danger);
@@ -86,35 +80,28 @@
 html{height:100%}
 body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;min-height:100vh;overflow-x:hidden}
 
-/* Ambient background — two soft, low-opacity blurred blobs for quiet
-   depth. Deliberately restrained: this sits behind a login form, not a
-   marketing hero. */
+/* Screen-reader-only utility — used for live password-toggle announcements */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
 .bg-motif{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
 .bg-motif::before,.bg-motif::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);background:var(--c-primary)}
 .bg-motif::before{width:340px;height:340px;top:-90px;left:-110px;opacity:.06}
 .bg-motif::after{width:280px;height:280px;bottom:-70px;right:-90px;opacity:.05}
 
-/* Card */
 .card{position:relative;z-index:1;width:100%;max-width:440px;margin:1.2rem auto 3rem;background:var(--c-surface);border-radius:var(--r-xl);padding:2.25rem 2rem;box-shadow:var(--ne-lg);max-height:none;overflow:visible;animation:enter .35s var(--ease-spring)}
 @keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
-/* Intro/FAQ sections sit below the login card, wider than it so the
-   explanatory content has room to breathe (760px caps line length). */
 .wide-section{position:relative;z-index:1;max-width:760px;width:calc(100% - 2rem);margin:0 auto 2.5rem}
 .about-card{background:var(--c-surface);border-radius:var(--r-sm);padding:.9rem 1.1rem;box-shadow:var(--ne-sm);margin-bottom:.6rem}
 .about-card h3{font-size:.82rem;color:var(--c-text);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
 .about-card p{font-size:.78rem;color:var(--c-text-soft);line-height:1.55}
 .section-heading{font-size:1rem;color:var(--c-text);margin-bottom:.9rem;text-align:center;font-weight:700}
 
-/* Logo */
 .logo{text-align:center;margin-bottom:1.5rem}
 .l-icon{width:60px;height:60px;margin:0 auto .8rem}
 .logo h1{font-size:var(--fs-page-title);font-weight:var(--fw-bold);letter-spacing:-.3px;color:var(--c-text)}
 .logo p{font-size:var(--fs-caption);color:var(--c-text-soft);margin-top:.25rem;font-weight:var(--fw-medium)}
 
-/* "Your path to mastery" made literal: a small ascending trail of
-   waypoints under the wordmark, the last one styled as the destination.
-   Kept deliberately small and quiet. */
 .path-motif{display:block;width:148px;height:auto;margin:.55rem auto .05rem}
 .path-motif-peak{animation:path-peak-pulse 2.8s ease-in-out infinite}
 @keyframes path-peak-pulse{
@@ -123,29 +110,54 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 }
 @media(prefers-reduced-motion:reduce){.path-motif-peak{animation:none}}
 
-/* Net status */
 .net{display:flex;align-items:center;justify-content:center;gap:.45rem;font-size:var(--fs-caption);color:var(--c-text-soft);font-weight:var(--fw-medium);margin-bottom:1.25rem;background:var(--c-bg);border-radius:var(--r-full);padding:.32rem .9rem;box-shadow:var(--ne-in-sm)}
 .ndot{width:7px;height:7px;border-radius:50%;background:var(--c-primary);animation:npulse 2s ease-in-out infinite;flex-shrink:0}
 .ndot.off{background:var(--c-danger);animation:none}
 .ndot.warn{background:var(--c-warning);animation:npulse 2s ease-in-out infinite}
 @keyframes npulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
 
-/* Tabs */
 .tabs{display:flex;gap:.25rem;background:var(--c-bg);border-radius:var(--r-md);padding:.3rem;margin-bottom:1.25rem;box-shadow:var(--ne-in-sm)}
 .tab{flex:1;padding:.55rem .2rem;border:none;border-radius:calc(var(--r-md) - 4px);background:transparent;color:var(--c-text-soft);font-family:var(--ff);font-size:var(--fs-caption);font-weight:var(--fw-semibold);cursor:pointer;transition:all var(--ease);text-align:center}
 .tab.active{background:var(--c-surface);color:var(--c-primary);box-shadow:var(--ne-sm)}
 .tab:hover:not(.active){color:var(--c-text)}
+.tab:focus-visible{outline:2px solid var(--c-primary);outline-offset:2px}
 
-/* Forms */
 .fld{margin-bottom:.85rem}
 .fld label{display:block;font-size:var(--fs-caption);font-weight:var(--fw-semibold);color:var(--c-text-soft);margin-bottom:.35rem}
 .fld input,.fld select{width:100%;background:var(--c-bg);border:none;border-radius:var(--r-sm);padding:.75rem .9rem;color:var(--t1);font-size:var(--fs-body);font-family:var(--ff);outline:none;box-shadow:var(--ne-in-sm);transition:box-shadow var(--ease)}
 .fld input:focus,.fld select:focus{box-shadow:var(--ne-in-sm),0 0 0 3px rgba(46,139,87,.16)}
 .fld input::placeholder{color:var(--c-text-faint)}
+.fld input.invalid{box-shadow:var(--ne-in-sm),0 0 0 2px rgba(193,67,60,.35)}
+.fld-hint{font-size:.68rem;color:var(--c-text-faint);margin-top:.25rem;display:none}
+.fld-hint.show{display:block}
+.fld-hint.err{color:var(--c-danger)}
 .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
 
-/* Custom file-upload control — native <input type=file> can't be
-   restyled, so it's hidden behind a themed button + filename. */
+/* NEW: password field wrapper — positions the toggle button and hosts
+   the strength meter for the signup form. */
+.pw-field{position:relative}
+.pw-field input{padding-right:2.6rem}
+.pw-toggle{position:absolute;top:50%;right:.55rem;transform:translateY(-50%);background:none;border:none;padding:.35rem;cursor:pointer;color:var(--c-text-soft);font-size:.95rem;line-height:1;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color var(--ease),background var(--ease)}
+.pw-toggle:hover{color:var(--c-text);background:rgba(0,0,0,.04)}
+.pw-toggle:focus-visible{outline:2px solid var(--c-primary);outline-offset:2px}
+.pw-toggle .ph-eye-slash{display:none}
+.pw-toggle.on .ph-eye{display:none}
+.pw-toggle.on .ph-eye-slash{display:inline-flex}
+
+/* NEW: strength meter — shown only on the signup password field. */
+.pw-strength{margin-top:.35rem;display:flex;gap:.2rem;align-items:center}
+.pw-strength-bars{display:flex;gap:.2rem;flex:1}
+.pw-strength-bars span{height:4px;flex:1;background:var(--c-divider);border-radius:3px;transition:background .2s ease}
+.pw-strength.s1 .pw-strength-bars span:nth-child(1){background:var(--c-danger)}
+.pw-strength.s2 .pw-strength-bars span:nth-child(-n+2){background:var(--c-warning)}
+.pw-strength.s3 .pw-strength-bars span:nth-child(-n+3){background:#d4b83a}
+.pw-strength.s4 .pw-strength-bars span:nth-child(-n+4){background:var(--c-primary)}
+.pw-strength.s5 .pw-strength-bars span{background:var(--c-primary-dark)}
+.pw-strength-label{font-size:.66rem;font-weight:600;min-width:3.4rem;text-align:right;color:var(--c-text-soft)}
+.pw-strength.s1 .pw-strength-label{color:var(--c-danger)}
+.pw-strength.s2 .pw-strength-label{color:var(--c-warning)}
+.pw-strength.s4 .pw-strength-label,.pw-strength.s5 .pw-strength-label{color:var(--c-primary-dark)}
+
 .file-up{position:relative;display:flex;align-items:center;gap:.6rem;background:var(--c-bg);border-radius:var(--r-sm);padding:.6rem .9rem;cursor:pointer;box-shadow:var(--ne-in-sm)}
 .file-up input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .file-up .file-up-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:.3rem;background:var(--c-surface);border:1px solid rgba(0,0,0,.08);border-radius:7px;padding:.3rem .6rem;font-size:.72rem;font-weight:700;color:var(--t2)}
@@ -155,7 +167,6 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .err::before{content:"";width:16px;height:16px;flex-shrink:0;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat}
 .err.show{display:flex}
 
-/* Buttons */
 .btn{width:100%;padding:.85rem;background:linear-gradient(150deg,var(--c-primary),var(--c-primary-dark));border:none;border-radius:var(--r-sm);color:#0F1410;font-size:var(--fs-body);font-weight:var(--fw-semibold);font-family:var(--fd);cursor:pointer;transition:all var(--ease);box-shadow:var(--ne-sm);letter-spacing:.1px}
 .btn:hover:not(:disabled){box-shadow:var(--ne-md)}
 .btn:active:not(:disabled){transform:scale(.98);box-shadow:var(--ne-in-md)}
@@ -168,14 +179,12 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite;vertical-align:middle;margin-right:.4rem}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* Links */
 .link-row{text-align:center;margin-top:1.1rem;font-size:var(--fs-caption);color:var(--c-text-soft)}
 .link-row button{background:none;border:none;color:var(--c-primary);font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--ff);font-size:var(--fs-caption);padding:0;margin-left:.3rem}
 .link-row button:hover{text-decoration:underline}
 .link-btn-r{text-align:right;margin:-.4rem 0 .7rem}
 .link-btn-r button{background:none;border:none;color:var(--c-primary);font-size:.8rem;font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--ff);padding:0}
 
-/* Payment / Trial / Status panels */
 .pay-box{display:none}
 .pay-box.on{display:block;animation:enter .3s var(--ease-spring)}
 .qr-wrap{text-align:center;margin:1rem 0;padding:1.1rem;background:var(--c-bg);border-radius:var(--r-lg);position:relative;box-shadow:var(--ne-in-sm)}
@@ -204,33 +213,22 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .status-card h2{font-size:var(--fs-section-title);font-weight:var(--fw-bold);margin-bottom:.35rem;color:var(--c-text)}
 .status-card p{font-size:var(--fs-caption);color:var(--t3);line-height:var(--lh-normal);margin-bottom:1.1rem}
 
-/* Auto-redirect screen (permanent user handoff) — deliberately the
-   lightest screen in the whole file: a spinner and one line. */
 .redirect-card{text-align:center;padding:2.2rem .5rem 1rem}
 .redirect-card .spin-lg{width:34px;height:34px;border:3px solid var(--c-divider);border-top-color:var(--c-primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}
 .redirect-card p{font-size:var(--fs-body);color:var(--t2);margin-bottom:1.1rem}
 
-/* Mobile-number prompt — shown on trial/payment screens only, when the
-   account has no mobile on file (typical for Google Sign-In accounts). */
 .mobile-prompt{background:var(--c-info-bg);border:1px solid rgba(43,108,176,.18);border-radius:var(--r-sm);padding:.7rem .85rem;margin-bottom:1rem}
 .mobile-prompt p{font-size:.76rem;color:var(--c-info);margin-bottom:.55rem;line-height:1.4}
 .mobile-prompt .row{display:flex;gap:.5rem}
 .mobile-prompt input{flex:1;background:var(--c-surface);border:none;border-radius:var(--r-sm);padding:.55rem .75rem;font-size:.85rem;font-family:var(--ff);outline:none;box-shadow:var(--ne-in-sm)}
 .mobile-prompt.saved{display:none}
 
-/* ═══ TOASTS ═══
-   FIXED PANEL — always dark, always light text. Using var(--c-text) as
-   the background made the toast invisible in dark mode (white on white).
-   The toast panel is intentionally theme-independent. */
 #toasts{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.4rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
 .toast{background:#111417;border:1px solid rgba(255,255,255,.10);border-radius:var(--r-sm);padding:.65rem 1.1rem;font-size:var(--fs-caption);font-weight:var(--fw-medium);color:#FFFFFF;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tin .18s var(--ease-spring);pointer-events:auto;max-width:100%;text-align:center}
 .toast.out{animation:tout .2s ease forwards}
 @keyframes tin{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:none}}
 @keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
 
-/* Google Sign-In block. hidden via visibility+height, NEVER
-   display:none — Google's renderButton() measures its container at
-   render time, and a display:none parent gives it 0×0 to measure. */
 #g-signin-wrap{margin:.7rem 0;visibility:visible;height:auto;overflow:visible;transition:opacity .15s ease}
 #g-signin-wrap.g-hidden{visibility:hidden;height:0;margin:0;overflow:hidden;pointer-events:none}
 #g-signin-wrap.g-busy{opacity:.55;pointer-events:none}
@@ -238,31 +236,25 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .g-or-div{display:flex;align-items:center;gap:.6rem;margin:.75rem 0;color:var(--t3);font-size:var(--fs-caption);font-weight:var(--fw-medium)}
 .g-or-div::before,.g-or-div::after{content:"";flex:1;height:1px;background:var(--c-divider)}
 
-/* Offline badge */
 .offline-badge{display:none;background:var(--c-bg);border-radius:var(--r-sm);padding:.45rem .8rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-warning);font-weight:var(--fw-medium);box-shadow:var(--ne-in-sm)}
 .offline-badge.show{display:block}
 
-/* ═══ Vertical snap paging (login / about / faq) ═══ */
 html,body{height:100%}
 .snap-container{height:100vh;height:100svh;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
 .snap-post{min-height:100vh;min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always;position:relative;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem 0;overflow-y:auto}
 .snap-post.top-aligned{justify-content:flex-start;padding-top:2.2rem}
 
-/* Page dots — small "you are 1 of 3" indicator, fixed to the viewport
-   so it reflects whichever post is currently snapped. */
 .page-dots{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:.55rem}
 .page-dots button{width:8px;height:8px;border-radius:50%;border:none;background:var(--c-divider);padding:0;cursor:pointer;transition:all var(--ease);box-shadow:none}
 .page-dots button.active{background:var(--c-primary);height:22px;border-radius:5px}
+.page-dots button:focus-visible{outline:2px solid var(--c-primary);outline-offset:3px}
 
-/* Bottom-of-first-post scroll hint — quiet, self-dismissing nudge. */
 .scroll-hint{position:absolute;left:0;right:0;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:.3rem;color:var(--c-text-faint);font-size:.72rem;font-weight:var(--fw-medium);z-index:2;transition:opacity .25s ease;pointer-events:none}
 .scroll-hint.hide{opacity:0}
 .scroll-hint svg{width:18px;height:18px;animation:hint-bounce 1.6s ease-in-out infinite}
 @keyframes hint-bounce{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(5px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.scroll-hint svg{animation:none}}
 
-/* Responsive — same card on phone-sized and full-width viewports, only
-   the outer margins/padding shrink below 480px. */
 @media(max-width:480px){.card{padding:1.75rem 1.35rem;margin:.8rem;border-radius:var(--r-lg)}.fld-row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -276,6 +268,9 @@ html,body{height:100%}
 
 <div class="bg-motif" aria-hidden="true"></div>
 
+<!-- NEW: SR live region for password visibility + other polite announcements -->
+<div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
 <div class="page-dots" id="page-dots" role="tablist" aria-label="Page navigation">
   <button class="active" data-target="post-login" aria-label="Login" role="tab" aria-selected="true"></button>
   <button data-target="post-about" aria-label="About Abhyas" role="tab" aria-selected="false"></button>
@@ -283,7 +278,7 @@ html,body{height:100%}
 </div>
 
 <main class="snap-container" id="snap-container">
-<section class="snap-post" id="post-login">
+<section class="snap-post" id="post-login" role="tabpanel" aria-label="Login and signup">
 <div class="card" id="main-card">
   <div class="logo">
     <div class="l-icon brand-mark"><img src="icon-192.png" alt="Abhyas"></div>
@@ -302,9 +297,6 @@ html,body{height:100%}
   <div class="net"><div class="ndot" id="ndot"></div><span id="nstat">Checking connection…</span></div>
   <div class="offline-badge" id="offline-badge">Offline mode — using cached session</div>
 
-  <!-- AUTO-REDIRECT — shown ONLY for an already-permanent session while
-       it hands off to user.html. Everything else stays hidden so a
-       returning user never has to read or tap anything here. -->
   <div id="form-redirecting" class="pay-box" style="display:none">
     <div class="redirect-card">
       <div class="spin-lg"></div>
@@ -313,62 +305,124 @@ html,body{height:100%}
     </div>
   </div>
 
-  <div class="tabs" id="auth-tabs">
-    <button class="tab active" onclick="APP.setMode('login')">Sign In</button>
-    <button class="tab" onclick="APP.setMode('signup')">Create Account</button>
+  <div class="tabs" id="auth-tabs" role="tablist" aria-label="Sign in or create account">
+    <button class="tab active" onclick="APP.setMode('login')" role="tab" aria-selected="true">Sign In</button>
+    <button class="tab" onclick="APP.setMode('signup')" role="tab" aria-selected="false">Create Account</button>
   </div>
 
   <div class="err" id="err" role="alert" aria-live="assertive"></div>
 
-  <!-- Google Sign-In — works for both "Sign In" and "Create Account",
-       since Google login on an unrecognized email creates a new trial
-       server-side. Hidden entirely if the client ID is never configured. -->
   <div id="g-signin-wrap" class="g-hidden">
     <div id="g-signin-btn"></div>
     <div class="g-or-div">OR</div>
   </div>
 
-  <!-- UNIFIED LOGIN — routes to admin OR user world -->
-  <div id="form-login">
-    <div class="fld"><label for="in-user">Username</label><input type="text" id="in-user" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-    <div class="fld"><label for="in-pass">Password</label><div class="pw-field"><input type="password" id="in-pass" placeholder="Enter password" autocomplete="current-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
+  <!-- LOGIN -->
+  <form id="form-login" onsubmit="event.preventDefault();APP.login()">
+    <div class="fld">
+      <label for="in-user">Username</label>
+      <input type="text" id="in-user" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
+    </div>
+    <div class="fld">
+      <label for="in-pass">Password</label>
+      <div class="pw-field">
+        <input type="password" id="in-pass" placeholder="Enter password" autocomplete="current-password" aria-describedby="err" required>
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
+          <i class="ph ph-eye" aria-hidden="true"></i>
+          <i class="ph ph-eye-slash" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
     <div class="link-btn-r"><button type="button" onclick="APP.setMode('forgot')">Forgot password?</button></div>
-    <button class="btn" id="btn-login" onclick="APP.login()">Sign In →</button>
-    <div class="link-row"><span>New here?</span><button onclick="APP.setMode('signup')">Create Account</button></div>
-  </div>
+    <button class="btn" id="btn-login" type="submit">Sign In →</button>
+    <div class="link-row"><span>New here?</span><button type="button" onclick="APP.setMode('signup')">Create Account</button></div>
+  </form>
 
   <!-- FORGOT PASSWORD -->
-  <div id="form-forgot" style="display:none">
+  <form id="form-forgot" style="display:none" onsubmit="event.preventDefault();APP.requestReset()">
     <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Enter your username or the email on your account. If it matches, we'll email a reset code.</p>
-    <div class="fld"><label for="fg-id">Username or Email</label><input type="text" id="fg-id" placeholder="Your username or email" autocapitalize="none" spellcheck="false"></div>
-    <button class="btn" id="btn-forgot" onclick="APP.requestReset()">Send Reset Code →</button>
-    <div class="link-row"><button onclick="APP.setMode('login')">Back to Sign In</button></div>
-  </div>
+    <div class="fld">
+      <label for="fg-id">Username or Email</label>
+      <input type="text" id="fg-id" placeholder="Your username or email" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
+    </div>
+    <button class="btn" id="btn-forgot" type="submit">Send Reset Code →</button>
+    <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to Sign In</button></div>
+  </form>
 
   <!-- RESET PASSWORD -->
-  <div id="form-reset" style="display:none">
+  <form id="form-reset" style="display:none" onsubmit="event.preventDefault();APP.confirmReset()">
     <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Paste the reset code from your email, then choose a new password.</p>
-    <div class="fld"><label for="rs-code">Reset Code</label><input type="text" id="rs-code" placeholder="Paste the code from your email" autocapitalize="none" spellcheck="false"></div>
-    <div class="fld"><label for="rs-pass">New Password</label><div class="pw-field"><input type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
-    <button class="btn" id="btn-reset" onclick="APP.confirmReset()">Reset Password →</button>
-    <div class="link-row"><button onclick="APP.setMode('login')">Back to Sign In</button></div>
-  </div>
+    <div class="fld">
+      <label for="rs-code">Reset Code</label>
+      <!-- NEW: one-time-code autocomplete so mobile offers the code from email -->
+      <input type="text" id="rs-code" placeholder="Paste the code from your email" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
+    </div>
+    <div class="fld">
+      <label for="rs-pass">New Password</label>
+      <div class="pw-field">
+        <input type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password" aria-describedby="err" required minlength="6">
+        <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
+          <i class="ph ph-eye" aria-hidden="true"></i>
+          <i class="ph ph-eye-slash" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+    <button class="btn" id="btn-reset" type="submit">Reset Password →</button>
+    <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to Sign In</button></div>
+  </form>
 
   <!-- SIGNUP -->
-  <div id="form-signup" style="display:none">
+  <form id="form-signup" style="display:none" onsubmit="event.preventDefault();APP.signup()">
     <div class="fld-row">
-      <div class="fld"><label for="su-name">Full Name</label><input type="text" id="su-name" placeholder="Your name"></div>
-      <div class="fld"><label for="su-mobile">Mobile</label><input type="tel" id="su-mobile" placeholder="98XXXXXXXX"></div>
+      <div class="fld">
+        <label for="su-name">Full Name</label>
+        <input type="text" id="su-name" placeholder="Your name" autocomplete="name" required>
+      </div>
+      <div class="fld">
+        <label for="su-mobile">Mobile</label>
+        <!-- NEW: inputmode + pattern so iOS/Android show the numeric pad -->
+        <input type="tel" id="su-mobile" placeholder="98XXXXXXXX" autocomplete="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" required>
+      </div>
     </div>
-    <div class="fld"><label for="su-email">Email Address</label><input type="email" id="su-email" placeholder="you@example.com"></div>
-    <div class="fld"><label for="su-user">Username</label><input type="text" id="su-user" placeholder="Choose username" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+    <div class="fld">
+      <label for="su-email">Email Address</label>
+      <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" required>
+    </div>
+    <div class="fld">
+      <label for="su-user">Username</label>
+      <input type="text" id="su-user" placeholder="Choose username" autocomplete="username" autocapitalize="none" spellcheck="false" required onblur="APP.validateUsernameField()">
+      <div class="fld-hint" id="su-user-hint">3–30 characters: letters, numbers, dots, dashes, underscores.</div>
+    </div>
     <div class="fld-row">
-      <div class="fld"><label for="su-pass">Password</label><div class="pw-field"><input type="password" id="su-pass" placeholder="Min 6 chars" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
-      <div class="fld"><label for="su-cpass">Confirm</label><div class="pw-field"><input type="password" id="su-cpass" placeholder="Repeat password" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
+      <div class="fld">
+        <label for="su-pass">Password</label>
+        <div class="pw-field">
+          <input type="password" id="su-pass" placeholder="Min 6 chars" autocomplete="new-password" required minlength="6" oninput="APP.updateStrength()">
+          <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
+            <i class="ph ph-eye" aria-hidden="true"></i>
+            <i class="ph ph-eye-slash" aria-hidden="true"></i>
+          </button>
+        </div>
+        <!-- NEW: strength meter -->
+        <div class="pw-strength" id="pw-strength" aria-live="polite">
+          <div class="pw-strength-bars"><span></span><span></span><span></span><span></span><span></span></div>
+          <span class="pw-strength-label" id="pw-strength-label"></span>
+        </div>
+      </div>
+      <div class="fld">
+        <label for="su-cpass">Confirm</label>
+        <div class="pw-field">
+          <input type="password" id="su-cpass" placeholder="Repeat password" autocomplete="new-password" required minlength="6">
+          <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
+            <i class="ph ph-eye" aria-hidden="true"></i>
+            <i class="ph ph-eye-slash" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </div>
-    <button class="btn" id="btn-signup" onclick="APP.signup()">Create Account →</button>
-    <div class="link-row"><span>Have an account?</span><button onclick="APP.setMode('login')">Sign In</button></div>
-  </div>
+    <button class="btn" id="btn-signup" type="submit">Create Account →</button>
+    <div class="link-row"><span>Have an account?</span><button type="button" onclick="APP.setMode('login')">Sign In</button></div>
+  </form>
 
   <!-- TRIAL ACTIVE -->
   <div id="form-trial" class="pay-box" style="display:none">
@@ -379,7 +433,10 @@ html,body{height:100%}
     </div>
     <div class="mobile-prompt" id="mobile-prompt-trial" style="display:none">
       <p>Add a mobile number so admin can reach you about payment review.</p>
-      <div class="row"><input type="tel" id="mp-trial-mobile" placeholder="98XXXXXXXX"><button class="btn-sm" onclick="APP.saveMobile('mp-trial-mobile')">Save</button></div>
+      <div class="row">
+        <input type="tel" id="mp-trial-mobile" placeholder="98XXXXXXXX" inputmode="numeric" pattern="[0-9]*" maxlength="10">
+        <button class="btn-sm" type="button" onclick="APP.saveMobile('mp-trial-mobile')">Save</button>
+      </div>
     </div>
     <button class="btn" onclick="APP.goUser()">Enter Study Dashboard →</button>
     <button class="btn-sec" onclick="APP.setMode('payment')">Pay Now (Permanent)</button>
@@ -396,7 +453,10 @@ html,body{height:100%}
     </div>
     <div class="mobile-prompt" id="mobile-prompt-pay" style="display:none">
       <p>Add a mobile number so admin can reach you if there's an issue with your payment.</p>
-      <div class="row"><input type="tel" id="mp-pay-mobile" placeholder="98XXXXXXXX"><button class="btn-sm" onclick="APP.saveMobile('mp-pay-mobile')">Save</button></div>
+      <div class="row">
+        <input type="tel" id="mp-pay-mobile" placeholder="98XXXXXXXX" inputmode="numeric" pattern="[0-9]*" maxlength="10">
+        <button class="btn-sm" type="button" onclick="APP.saveMobile('mp-pay-mobile')">Save</button>
+      </div>
     </div>
     <div class="qr-wrap">
       <div class="qr-fallback" id="qr-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
@@ -437,7 +497,7 @@ html,body{height:100%}
 </div>
 </section>
 
-<section class="snap-post top-aligned wide-section intro-section" id="post-about" aria-labelledby="about-heading">
+<section class="snap-post top-aligned wide-section intro-section" id="post-about" aria-labelledby="about-heading" role="tabpanel">
   <h2 id="about-heading" class="section-heading">About Abhyas</h2>
 
   <div class="about-card">
@@ -470,7 +530,7 @@ html,body{height:100%}
   </div>
 </section>
 
-<section class="snap-post top-aligned wide-section faq-section" id="post-faq" aria-labelledby="faq-heading" style="font-size:.78rem;color:var(--c-text-soft);line-height:1.5">
+<section class="snap-post top-aligned wide-section faq-section" id="post-faq" aria-labelledby="faq-heading" role="tabpanel" style="font-size:.78rem;color:var(--c-text-soft);line-height:1.5">
   <h2 id="faq-heading" class="section-heading">Frequently Asked Questions</h2>
 
   <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
@@ -536,55 +596,110 @@ html,body{height:100%}
 
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
-<!-- Cookie/tracking notice — this page loads Google Identity Services,
-     which sets its own cookies. Accepting only dismisses the notice. -->
+<!-- Cookie banner — hidden by default; the inline check below reveals it
+     only when the user hasn't yet acknowledged. Runs before paint to
+     avoid a flash. -->
 <div class="cookie-banner" id="cookie-banner" hidden role="region" aria-label="Cookie notice">
-  <p>Abhyas uses cookies for sign-in and to show ads that help keep the app free. Continuing to use the site means you're okay with that.</p>
+  <p>Abhyas uses cookies for sign-in and to keep the service secure. Continuing to use the site means you're okay with that.</p>
   <button class="btn-accept" onclick="COOKIE_NOTICE.accept()">Got it</button>
 </div>
+<script>(function(){
+  try{
+    if (localStorage.getItem('abhyas_cookie_ack') !== '1') {
+      document.getElementById('cookie-banner').hidden = false;
+    }
+  }catch(e){}
+})();</script>
 
 <script src="version.js"></script>
 <script src="shared.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    ABHYAS — UNIFIED GATEWAY
-   One login → Admin (admin.html) OR User (user.html), and dual-role
-   accounts (username present in BOTH Users and Admins sheets with the
-   same password) get BOTH sessions written so the panel and the study
-   app are one click apart in either direction.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const GAS_URL = ABHYAS_CONFIG.GAS_URL; // single source of truth — see config.js
+const GAS_URL = ABHYAS_CONFIG.GAS_URL;
+const GOOGLE_CLIENT_ID = ABHYAS_CONFIG.GOOGLE_CLIENT_ID ||
+  "242226857075-hpkbjoqhlem95fu6vkf712e8ijs33sng.apps.googleusercontent.com";
 
-// ⚠️ Replace with the SAME OAuth 2.0 Web Client ID configured as
-// GOOGLE_CLIENT_ID in code.gs. Public half — client IDs are not secret.
-const GOOGLE_CLIENT_ID = "242226857075-hpkbjoqhlem95fu6vkf712e8ijs33sng.apps.googleusercontent.com";
-
-/* ── STORAGE KEYS ──
-   'abhyas_session' — this page's unified user OR admin-only session.
-   'abhyas_admin'   — admin panel's own session (read by admin.html on
-                      boot to skip its login gate). A dual-role login
-                      writes BOTH so the switcher works without a second
-                      round-trip. */
 const LS_USER = 'abhyas_session';
 const LS_ADMIN = 'abhyas_admin';
 
+/* ═══════════════════════════════════════════════════════════════════════
+   PASSWORD VISIBILITY TOGGLE  (NEW — improved)
+   ─────────────────────────────────────────────────────────────────────
+   • Two icons already in the DOM; CSS toggles which is visible. No
+     innerHTML swap — that would drop focus and, on iOS, close the
+     keyboard.
+   • Preserves caret selection (Safari sometimes moves it on type change).
+   • Updates aria-pressed + aria-label so screen readers know the state.
+   • Auto-hides after 30s of being shown, so a shared device doesn't
+     stay in "password visible" mode.
+   • Announces the change via the #sr-status live region.
+   ═══════════════════════════════════════════════════════════════════════ */
+function togglePwVisibility(btn){
+  const wrap = btn.closest('.pw-field');
+  const input = wrap && wrap.querySelector('input');
+  if (!input) return;
+
+  const show = input.type === 'password';
+
+  // Preserve caret/selection across the type flip.
+  let selStart = null, selEnd = null;
+  try { selStart = input.selectionStart; selEnd = input.selectionEnd; } catch(e){}
+
+  input.type = show ? 'text' : 'password';
+
+  if (selStart !== null) {
+    try { input.setSelectionRange(selStart, selEnd); } catch(e){}
+  }
+
+  btn.classList.toggle('on', show);
+  btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+  btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+
+  const sr = document.getElementById('sr-status');
+  if (sr) sr.textContent = show ? 'Password visible' : 'Password hidden';
+
+  // Auto-hide the toggle after 30 seconds of visibility.
+  if (btn._hideTimer) { clearTimeout(btn._hideTimer); btn._hideTimer = null; }
+  if (show) {
+    btn._hideTimer = setTimeout(() => {
+      if (btn.classList.contains('on')) togglePwVisibility(btn);
+    }, 30000);
+  }
+}
+// Expose globally — the inline onclick handlers call it directly.
+window.togglePwVisibility = togglePwVisibility;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   APP
+   ═══════════════════════════════════════════════════════════════════════ */
 const APP = {
   mode: 'login',
   online: false,
   trialTimerId: null,
   fileData: null,
   session: null,
+  _netTimer: null,
+  _netRetryMs: 15000,     // NEW — backoff state
+  _netMaxRetryMs: 120000,
+  _payRefreshTimer: null,
 
   async init() {
-    this.checkNet(); // fire in background — don't block rendering
-    setInterval(() => this.checkNet(), 15000);
+    this.checkNet();
+    this.scheduleNetLoop();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        this.checkNet();
+        this.scheduleNetLoop();
+      } else {
+        this.stopNetLoop();
+      }
+    });
     this.initGoogleSignIn();
     this.initPaging();
 
-    // Password-reset email link lands here with ?resetToken=... or
-    // ?reset=... — accept both so older links still work. Takes priority
-    // over resuming any saved session.
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('resetToken') || params.get('reset');
     if (urlToken) {
@@ -595,7 +710,6 @@ const APP = {
       return;
     }
 
-    // Resume saved session if there is one.
     const saved = this.getSession();
     if (saved) {
       this.session = saved;
@@ -612,7 +726,22 @@ const APP = {
     this.setMode('login');
   },
 
-  /* ── Network ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     NETWORK — NEW: pauses when tab is hidden, exponential backoff
+     ═══════════════════════════════════════════════════════════════════ */
+  scheduleNetLoop() {
+    this.stopNetLoop();
+    this._netTimer = setTimeout(async () => {
+      await this.checkNet();
+      // Increase backoff on failure, reset on success.
+      this._netRetryMs = this.online ? 15000 : Math.min(this._netRetryMs * 2, this._netMaxRetryMs);
+      if (document.visibilityState === 'visible') this.scheduleNetLoop();
+    }, this._netRetryMs);
+  },
+  stopNetLoop() {
+    if (this._netTimer) { clearTimeout(this._netTimer); this._netTimer = null; }
+  },
+
   async checkNet() {
     const wasOnline = this.online;
     const dot = document.getElementById('ndot');
@@ -627,9 +756,12 @@ const APP = {
       dot.className = slow ? 'ndot warn' : 'ndot';
       txt.textContent = slow ? 'Connected — slow response' : 'Backend connected';
       badge.classList.remove('show');
-      if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
-      if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_STALE_IF_ONLINE' });
+      if (!wasOnline) {
+        this._netRetryMs = 15000;
+        if (this.mode === 'payment') this.loadPaymentUI();
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_STALE_IF_ONLINE' });
+        }
       }
     } else {
       dot.className = 'ndot off';
@@ -646,7 +778,9 @@ const APP = {
     btn.textContent = this.online ? 'Submit Payment →' : 'Offline — reconnect to pay';
   },
 
-  /* ── Vertical snap paging (login / about / faq) ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     SNAP PAGING
+     ═══════════════════════════════════════════════════════════════════ */
   initPaging() {
     const container = document.getElementById('snap-container');
     const dots = Array.from(document.querySelectorAll('#page-dots button'));
@@ -664,9 +798,6 @@ const APP = {
       .map(id => document.getElementById(id)).filter(Boolean);
 
     const observer = new IntersectionObserver((entries) => {
-      // Pick whichever post is most visible — during a smooth-scroll
-      // transition, more than one entry can cross the threshold in the
-      // same callback, so "most visible" is steadier than "first seen".
       let best = null;
       entries.forEach(entry => {
         if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
@@ -683,14 +814,14 @@ const APP = {
 
     posts.forEach(post => observer.observe(post));
 
-    // Also dismiss the hint on the very first manual scroll, in case a
-    // fast swipe outruns the observer's threshold.
     container.addEventListener('scroll', () => {
       if (container.scrollTop > 40 && hint) hint.classList.add('hide');
     }, { passive: true });
   },
 
-  /* ── Session helpers ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     SESSION
+     ═══════════════════════════════════════════════════════════════════ */
   getSession() {
     try {
       const raw = localStorage.getItem(LS_USER);
@@ -708,10 +839,6 @@ const APP = {
     this.session = null;
     try { localStorage.removeItem(LS_USER); } catch (e) {}
   },
-
-  /* Persist the admin token where admin.html reads it on boot. Without
-     this, an admin who logs in here would have to log in again on the
-     admin panel — the two pages keep separate localStorage keys. */
   saveAdminToken(username, adminToken, ttlMs) {
     try {
       localStorage.setItem(LS_ADMIN, JSON.stringify({
@@ -719,17 +846,21 @@ const APP = {
         token: adminToken,
         expires: Date.now() + (ttlMs || 24 * 60 * 60 * 1000)
       }));
-    } catch (e) { /* non-fatal; admin.html will fall back to its gate */ }
+    } catch (e) {}
   },
 
-  /* ── UI Mode Switcher ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     MODE SWITCHER  — NEW: autofocus on the first field of each form
+     ═══════════════════════════════════════════════════════════════════ */
   setMode(m) {
     this.mode = m;
     const tabs = document.getElementById('auth-tabs');
     if (tabs) {
       tabs.style.display = (m === 'login' || m === 'signup') ? 'flex' : 'none';
       document.querySelectorAll('.tab').forEach((t, i) => {
-        t.classList.toggle('active', (m === 'login' && i === 0) || (m === 'signup' && i === 1));
+        const active = (m === 'login' && i === 0) || (m === 'signup' && i === 1);
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
       });
     }
     const ids = ['form-redirecting','form-login','form-signup','form-forgot','form-reset','form-payment','form-trial','form-status'];
@@ -741,7 +872,6 @@ const APP = {
       if (show) el.classList.add('on'); else el.classList.remove('on');
     });
 
-    // Google Sign-In only makes sense on login/signup tabs.
     const gWrap = document.getElementById('g-signin-wrap');
     if (gWrap) gWrap.classList.toggle('g-hidden', !(this._gReady && (m === 'login' || m === 'signup')));
 
@@ -752,7 +882,9 @@ const APP = {
       this.loadPaymentUI();
       if (!this._payRefreshTimer) {
         this._payRefreshTimer = setInterval(() => {
-          if (this.mode === 'payment' && this.online) this.loadPaymentUI();
+          if (document.visibilityState === 'visible' && this.mode === 'payment' && this.online) {
+            this.loadPaymentUI();
+          }
         }, 20000);
       }
     } else if (this._payRefreshTimer) {
@@ -762,6 +894,21 @@ const APP = {
 
     if (m === 'trial') this.renderMobilePrompt('mobile-prompt-trial');
     if (m === 'payment') this.renderMobilePrompt('mobile-prompt-pay');
+
+    // NEW: autofocus the first meaningful field.
+    const focusMap = {
+      login: 'in-user',
+      signup: 'su-name',
+      forgot: 'fg-id',
+      reset: 'rs-code'
+    };
+    const target = focusMap[m];
+    if (target) {
+      setTimeout(() => {
+        const el = document.getElementById(target);
+        if (el && !el.disabled) el.focus({ preventScroll: true });
+      }, 60);
+    }
   },
 
   showErr(msg) {
@@ -773,7 +920,9 @@ const APP = {
     document.getElementById('err').classList.remove('show');
   },
 
-  /* ── API ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     API
+     ═══════════════════════════════════════════════════════════════════ */
   async api(action, params = {}, method = 'GET') {
     const qs = new URLSearchParams(params).toString();
     if (method === 'GET') {
@@ -804,8 +953,6 @@ const APP = {
     let attempts = 0;
     const tryInit = () => {
       if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-        // Capped at ~20s — if the GSI script never arrives (blocked CDN,
-        // offline, origin not whitelisted), stop polling.
         if (++attempts > 100) {
           console.warn('[APP] Google Identity Services unavailable — hiding Sign in with Google.');
           return;
@@ -816,7 +963,7 @@ const APP = {
       google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response) => this.onGoogleCredential(response),
-        itp_support: true // Safari ITP needs this to keep the flow working
+        itp_support: true
       });
       const btnHost = document.getElementById('g-signin-btn');
       google.accounts.id.renderButton(btnHost, {
@@ -826,9 +973,6 @@ const APP = {
       if (this.mode === 'login' || this.mode === 'signup') {
         document.getElementById('g-signin-wrap').classList.remove('g-hidden');
       }
-      // If Google's SDK declined to render (most often because this
-      // origin isn't in the OAuth client's Authorized JavaScript
-      // origins), replace the empty container with an honest note.
       setTimeout(() => {
         if (!btnHost.hasChildNodes()) {
           console.warn('[APP] Google rendered nothing into #g-signin-btn — check origin whitelist. Origin: ' + window.location.origin);
@@ -854,7 +998,6 @@ const APP = {
 
   /* ═══════════════════════════════════════════════════════════════════
      UNIFIED LOGIN
-     Routes to admin world, user world, or BOTH for dual-role accounts.
      ═══════════════════════════════════════════════════════════════════ */
   async login() {
     const u = document.getElementById('in-user').value.trim();
@@ -869,15 +1012,8 @@ const APP = {
     if (!res.success) return this.showErr(res.error || 'Login failed.');
 
     if (res.isAdmin) {
-      // v1.07 — persist the admin token where admin.html reads it on
-      // boot, so a fresh admin login from this page opens the panel
-      // straight to the dashboard, no second login.
       this.saveAdminToken(u, res.adminToken, res.expiresInMs);
 
-      // Dual-role: same username is ALSO in Users, and its password was
-      // verified by the backend. Save the user session too, then go to
-      // user.html — the "Switch to Admin" button lives there and reads
-      // the admin token we just saved. No round-trip needed.
       if (res.user && res.token) {
         const access = computeAccessLevel(res, res.user);
         this.saveSession({
@@ -897,7 +1033,6 @@ const APP = {
         return;
       }
 
-      // Admin-only account — go straight to the admin panel.
       this.toast('🛡️ Welcome, Administrator!');
       setTimeout(() => { window.location.href = 'admin.html'; }, 400);
       return;
@@ -917,8 +1052,6 @@ const APP = {
     const res = await this.api('requestPasswordReset', { identifier: id }, 'POST');
     this.setLoading('btn-forgot', false);
 
-    // Backend always returns success:true here (would otherwise leak
-    // which usernames exist). Client can't be more specific either.
     if (!res.success) return this.showErr(res.error || 'Something went wrong — try again.');
     this.toast('📧 ' + (res.message || 'If that account exists, a reset code has been emailed to it.'), 6000);
     this.setMode('reset');
@@ -942,8 +1075,45 @@ const APP = {
   },
 
   /* ═══════════════════════════════════════════════════════════════════
-     SIGNUP
+     SIGNUP — NEW: on-blur username validation + strength meter gate
      ═══════════════════════════════════════════════════════════════════ */
+  validateUsernameField() {
+    const el = document.getElementById('su-user');
+    const hint = document.getElementById('su-user-hint');
+    if (!el || !hint) return true;
+    const v = el.value.trim();
+    if (!v) { el.classList.remove('invalid'); hint.classList.remove('err','show'); return true; }
+    const ok = /^[a-zA-Z0-9_.-]{3,30}$/.test(v);
+    el.classList.toggle('invalid', !ok);
+    hint.classList.toggle('err', !ok);
+    hint.classList.add('show');
+    return ok;
+  },
+
+  _strengthScore(p) {
+    let s = 0;
+    if (p.length >= 8) s++;
+    if (p.length >= 12) s++;
+    if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
+    if (/\d/.test(p)) s++;
+    if (/[^A-Za-z0-9]/.test(p)) s++;
+    return s;
+  },
+
+  updateStrength() {
+    const input = document.getElementById('su-pass');
+    const wrap = document.getElementById('pw-strength');
+    const label = document.getElementById('pw-strength-label');
+    if (!input || !wrap || !label) return;
+    const p = input.value;
+    wrap.classList.remove('s1','s2','s3','s4','s5');
+    if (!p) { label.textContent = ''; return; }
+    const s = this._strengthScore(p);
+    const cls = 's' + Math.max(1, Math.min(5, s));
+    wrap.classList.add(cls);
+    label.textContent = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'][Math.max(1, Math.min(5, s))];
+  },
+
   async signup() {
     const name = document.getElementById('su-name').value.trim();
     const email = document.getElementById('su-email').value.trim();
@@ -953,7 +1123,7 @@ const APP = {
     const cpass = document.getElementById('su-cpass').value;
 
     if (!name || !email || !mobile || !user || !pass) return this.showErr('All fields are required.');
-    if (user.length < 3) return this.showErr('Username must be at least 3 characters.');
+    if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(user)) return this.showErr('Username: 3–30 characters, letters/numbers/._- only.');
     if (pass.length < 6) return this.showErr('Password must be at least 6 characters.');
     if (pass !== cpass) return this.showErr('Passwords do not match.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return this.showErr('Invalid email address.');
@@ -987,8 +1157,6 @@ const APP = {
      ═══════════════════════════════════════════════════════════════════ */
   handleUserAuth(res) {
     const user = res.user || {};
-    // Access-level computation lives in one place — shared.js's
-    // computeAccessLevel() — so index.html and app.js never drift.
     const access = computeAccessLevel(res, user);
 
     const session = {
@@ -1005,9 +1173,6 @@ const APP = {
     };
     this.saveSession(session);
 
-    // Fresh login/signup/Google-signin that already resolves to
-    // permanent access gets the same zero-friction handoff a resumed
-    // session gets.
     if (access.level === 'permanent') {
       this.enterDashboard();
     } else if (access.level === 'trial') {
@@ -1038,14 +1203,10 @@ const APP = {
     } catch (e) { console.warn('[APP] getPaymentStatus poll failed:', e); }
   },
 
-  /* Resume a saved session with the LEAST work possible for the common
-     cases. Permanent and active-trial both resolve entirely from the
-     cached session, online or offline, no network round trip. Only a
-     genuinely ambiguous state falls through to an online checkSession(). */
   async resumeUserSession(saved) {
     if (saved.access && saved.access.level === 'permanent') {
       this.enterDashboard(saved.name || saved.username);
-      this.syncSessionQuietly(saved); // background reconciliation
+      this.syncSessionQuietly(saved);
       return;
     }
     if (saved.access && saved.access.level === 'trial' && saved.access.trialExpiresAt) {
@@ -1090,7 +1251,7 @@ const APP = {
     if (!this.online) return;
     try {
       const res = await this.api('checkSession', { token: saved.token, username: saved.username });
-      if (!res.success) return; // let the next foreground action discover this
+      if (!res.success) return;
       if (res.user) {
         const updated = { ...saved, access: { ...saved.access }, mobile: res.user.mobile || saved.mobile, lastVerified: Date.now() };
         if ((res.permanentAccess || res.user.status === 'active') && saved.access.level !== 'permanent') {
@@ -1104,12 +1265,9 @@ const APP = {
           this.saveSession(updated);
         }
       }
-    } catch (e) { /* silent */ }
+    } catch (e) {}
   },
 
-  /* Zero-friction handoff for permanent access. Spinner for a beat, then
-     user.html. Works fully offline — it only needs the cached session
-     already proven valid. */
   enterDashboard(displayName) {
     const nameEl = document.getElementById('redir-name');
     if (nameEl) nameEl.textContent = displayName ? ', ' + displayName : '';
@@ -1117,7 +1275,9 @@ const APP = {
     setTimeout(() => { window.location.href = 'user.html'; }, 350);
   },
 
-  /* ── Trial Timer ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     TRIAL TIMER  — NEW: friendlier format when hours remaining
+     ═══════════════════════════════════════════════════════════════════ */
   startTrialTimer(end) {
     this.clearTrialTimer();
     const el = document.getElementById('trial-timer');
@@ -1146,7 +1306,9 @@ const APP = {
     if (this.trialTimerId) { clearInterval(this.trialTimerId); this.trialTimerId = null; }
   },
 
-  /* ── Mobile-number prompt ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     MOBILE-NUMBER PROMPT
+     ═══════════════════════════════════════════════════════════════════ */
   renderMobilePrompt(elId) {
     const el = document.getElementById(elId);
     if (!el) return;
@@ -1169,7 +1331,9 @@ const APP = {
     this.toast('✅ Mobile number saved.');
   },
 
-  /* ── Payment UI ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     PAYMENT UI
+     ═══════════════════════════════════════════════════════════════════ */
   async loadPaymentUI() {
     this.updatePayButtonState();
     let s = this.settings || {};
@@ -1256,7 +1420,9 @@ const APP = {
     this.setMode('status');
   },
 
-  /* ── Navigation ── */
+  /* ═══════════════════════════════════════════════════════════════════
+     NAVIGATION
+     ═══════════════════════════════════════════════════════════════════ */
   goUser() {
     if (!this.session || this.session.type !== 'user') {
       this.showErr('Please login first.');
@@ -1278,9 +1444,6 @@ const APP = {
   },
 
   goAdmin() {
-    // The 'abhyas_session' with type=admin exists for the resume path;
-    // the actual admin token lives under 'abhyas_admin' — which we wrote
-    // at login time in login()/saveAdminToken().
     if (!this.session || this.session.type !== 'admin') {
       this.showErr('Admin session invalid.');
       return;
@@ -1291,14 +1454,17 @@ const APP = {
   logout() {
     this.clearTrialTimer();
     this.clearSession();
-    // Also drop the admin token — a fresh login should not resume
-    // silently into the admin panel.
     try { localStorage.removeItem(LS_ADMIN); } catch (e) {}
     this.fileData = null;
     ['in-user','in-pass','su-name','su-mobile','su-email','su-user','su-pass','su-cpass','pay-txn','pay-rem','pay-file','fg-id','rs-code','rs-pass','mp-trial-mobile','mp-pay-mobile'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = '';
     });
+    // Clear strength meter state too.
+    const strength = document.getElementById('pw-strength');
+    if (strength) strength.className = 'pw-strength';
+    const strengthLabel = document.getElementById('pw-strength-label');
+    if (strengthLabel) strengthLabel.textContent = '';
     this.setMode('login');
     this.toast('👋 Logged out.');
   },
@@ -1312,12 +1478,14 @@ const APP = {
       'btn-forgot': 'Send Reset Code →',
       'btn-reset': 'Reset Password →'
     };
+    if (!b) return;
     if (on) {
       b.disabled = true;
       b.innerHTML = '<span class="spin"></span>Processing…';
     } else {
       b.disabled = false;
       b.innerHTML = labels[id] || 'Submit';
+      if (id === 'btn-pay') this.updatePayButtonState();
     }
   },
 
@@ -1331,21 +1499,16 @@ const APP = {
   }
 };
 
-/* Notice-only cookie banner — this page loads Google Identity Services,
-   which sets its own cookies. Persisted so it only shows once. */
+/* ═══════════════════════════════════════════════════════════════════════
+   COOKIE NOTICE — visibility handled by the inline script near the banner
+   ═══════════════════════════════════════════════════════════════════════ */
 const COOKIE_NOTICE = {
   KEY: 'abhyas_cookie_ack',
-  init() {
-    try { if (localStorage.getItem(this.KEY) === '1') return; }
-    catch (e) { return; /* can't persist — don't nag every load */ }
-    document.getElementById('cookie-banner').hidden = false;
-  },
   accept() {
     try { localStorage.setItem(this.KEY, '1'); } catch (e) {}
     document.getElementById('cookie-banner').hidden = true;
   }
 };
-COOKIE_NOTICE.init();
 
 APP.init();
 </script>
