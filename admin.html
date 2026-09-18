@@ -1597,6 +1597,20 @@ function escAttrJs(s){
   return js.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+/* Pull a Drive file ID out of anything a submission might carry:
+   a /file/d/<ID>/view URL, a ?id=<ID> link, a bare ID, or a data: URI
+   (which we reject — those never resolve server-side). */
+function driveFileId(u){
+  const s = String(u == null ? '' : u).trim();
+  if (!s) return '';
+  if (/^data:/i.test(s)) return '';
+  if (/^[-\w]{25,}$/.test(s)) return s;
+  const m = s.match(/\/d\/([-\w]{25,})/) ||
+            s.match(/[?&]id=([-\w]{25,})/) ||
+            s.match(/\/([-\w]{25,})(?:\/|$)/);
+  return m ? m[1] : '';
+}
+
 /* ── Formatting ─────────────────────────────────────────────────────── */
 function relTime(ts){
   if (!ts) return '—';
@@ -2093,17 +2107,24 @@ const ADMIN = {
     TOAST.show('Preparing download', 'info', 2000);
     BUSY.start();
     try {
-      const res = await this.post('adminDownloadScreenshot', { url });
+      const fileId = driveFileId(url);
+      if (!fileId) throw new Error('That record does not point to a readable Drive file.');
+      const res = await this.post('adminDownloadScreenshot', { url, fileId });
       if (!res.success) throw new Error(res.error || 'Could not fetch that file.');
+
       const chars = atob(res.base64);
       const bytes = new Uint8Array(chars.length);
       for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
-      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'image/png' }));
+      const mime = res.mimeType || 'image/png';
+      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: mime }));
+
+      const ext = /pdf/i.test(mime) ? '.pdf' : /jpe?g/i.test(mime) ? '.jpg' : '.png';
       const a = document.createElement('a');
-      a.href = blobUrl; a.download = filename || res.filename || 'payment_screenshot.png';
+      a.href = blobUrl;
+      a.download = filename || res.filename || ('download' + ext);
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
-      TOAST.show('Screenshot downloaded', 'success');
+      TOAST.show('Downloaded', 'success');
     } catch(e){ TOAST.show(e.message || 'Download failed', 'error'); }
     BUSY.stop();
   },
@@ -3322,19 +3343,35 @@ const SUBJ_EXAM = {
 
 async function openPdf(pdfUrl){
   if (!pdfUrl) return TOAST.show('No PDF was attached to this submission', 'warning');
+
+  const fileId = driveFileId(pdfUrl);
+  if (!fileId) {
+    return TOAST.show(
+      /^data:/i.test(String(pdfUrl))
+        ? 'That submission stored a local data URL — it was never uploaded to Drive'
+        : 'That submission does not point to a readable Drive file',
+      'error', 6000
+    );
+  }
+
   const tab = window.open('about:blank', '_blank');
   if (!tab) return TOAST.show('Your browser blocked the pop-up — allow pop-ups for this site', 'error', 6000);
   try {
     tab.document.write('<!doctype html><title>Loading</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading the answer PDF…</p></body>');
     tab.document.close();
   } catch(e){}
+
   try {
-    const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl });
+    /* Send both keys: the backend accepts either, and passing fileId
+       takes the fragile URL-regex branch out of the path. */
+    const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl, fileId });
     if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
+
     const chars = atob(res.base64);
     const bytes = new Uint8Array(chars.length);
     for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'application/pdf' }));
+    const mime = res.mimeType || 'application/pdf';
+    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
     tab.location.href = url;
     setTimeout(() => URL.revokeObjectURL(url), 300000);
   } catch(e){
