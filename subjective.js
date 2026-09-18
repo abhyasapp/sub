@@ -4,12 +4,14 @@
    Loaded via <script src="subjective.js"> AFTER app.js and objective.js
    in user.html. Classic global, no modules.
 
-   Depends on globals from app.js:
-     S, LS, APP_CONFIG, APPS, _save, _load, toast, esc, QDB, netFetch,
-     qs, pluralize, today
+   Depends on globals from app.js / config.js (bare identifiers, not
+   window.X — top-level `const` doesn't attach to window):
+     S, LS, APP_CONFIG, APPS, ABHYAS_CONFIG, _save, _load, toast, esc,
+     QDB, netFetch, qs, pluralize, today
 
    Reads window.SUBJECTIVE_DATA / window.SUBJECTIVE_FILE_REFS /
-   window.SUBJECTIVE_CHAPTERS from sibling files.
+   window.SUBJECTIVE_CHAPTERS from sibling files (those DO assign to
+   window explicitly).
 
    Question-bank file shape (per chapter, one Drive file each):
      { "group": "...", "sections": [
@@ -31,17 +33,46 @@
 const $   = id => document.getElementById(id);
 const esc = (typeof window.esc === 'function') ? window.esc : (s => String(s == null ? '' : s));
 
-/* ── Backend URL ── */
+/* ── Backend URL ──
+   Bare identifiers, not window.X — top-level `const` in a classic
+   script lives in the page's shared lexical scope, not on window.
+   config.js and app.js are loaded before this file, so ABHYAS_CONFIG
+   and APPS resolve correctly here even though window.ABHYAS_CONFIG
+   and window.APPS are undefined. */
 function _backendUrl(){
-  if(typeof window.ABHYAS_CONFIG !== 'undefined' && window.ABHYAS_CONFIG.GAS_URL) return window.ABHYAS_CONFIG.GAS_URL;
-  if(typeof window.APPS !== 'undefined') return window.APPS;
+  try{
+    if(typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG && ABHYAS_CONFIG.GAS_URL){
+      return ABHYAS_CONFIG.GAS_URL;
+    }
+  }catch(e){}
+  try{
+    if(typeof APPS !== 'undefined' && APPS) return APPS;
+  }catch(e){}
+  // Belt-and-suspenders: some pages may only set window.ABHYAS_CONFIG.
+  try{
+    if(typeof window !== 'undefined' && window.ABHYAS_CONFIG && window.ABHYAS_CONFIG.GAS_URL){
+      return window.ABHYAS_CONFIG.GAS_URL;
+    }
+  }catch(e){}
   return '';
 }
 
-/* ── Auth params ── */
+/* ── Auth params ──
+   Reads the S state object by bare identifier for the same reason
+   as _backendUrl() — window.S is undefined even though S itself is
+   reachable in this file's lexical scope. */
 function _authParams(){
-  const u = (window.S && S.user) || {};
-  return { username: u.username || '', token: u.token || '' };
+  try{
+    if(typeof S !== 'undefined' && S && S.user){
+      return { username: S.user.username || '', token: S.user.token || '' };
+    }
+  }catch(e){}
+  try{
+    if(typeof window !== 'undefined' && window.S && window.S.user){
+      return { username: window.S.user.username || '', token: window.S.user.token || '' };
+    }
+  }catch(e){}
+  return { username: '', token: '' };
 }
 
 async function _api(action, params, method){
@@ -81,13 +112,11 @@ const TIMERS = {
    hours per user. The cooldown timestamp is stored in localStorage
    under a per-user key so switching accounts on a shared device doesn't
    leak the timer.
-
-   Change CUSTOM_EXAM_COOLDOWN_MS to adjust — the UI reads it directly.
    ═══════════════════════════════════════════════════════════════════════ */
 const CUSTOM_EXAM_COOLDOWN_MS = 6 * 60 * 60 * 1000;   // 6 hours
 
 function _customExamKey(){
-  const u = (window.S && S.user && S.user.username) || 'anon';
+  const u = (typeof S !== 'undefined' && S && S.user && S.user.username) || 'anon';
   return 'abhyas_subj_custom_last_' + String(u).toLowerCase();
 }
 function _getCustomExamLast(){
@@ -133,8 +162,7 @@ const SUBJ_FILE_REFS = window.SUBJECTIVE_FILE_REFS || [];
 let BANK = { byChapter: {}, loaded: false, loading: false, error: null };
 const _fetchPromises = {};
 
-/* Marks arrive as: 5 | "5" | "5+5=10" | "3+3.5+3.5=10".
-   Anything that doesn't resolve to 5 or 10 collapses to 10. */
+/* Marks arrive as: 5 | "5" | "5+5=10" | "3+3.5+3.5=10". */
 function _parseMarks(raw){
   if (typeof raw === 'number' && isFinite(raw)) {
     return (raw === 5 || raw === 10) ? raw : 10;
@@ -243,7 +271,8 @@ async function _fetchSubjFile(ref){
         }
       }catch(e){ /* fall through */ }
     }
-    if(typeof S !== 'undefined' && (!S.online || S.forcedOffline)) return [];
+    const off = (typeof S !== 'undefined' && (!S.online || S.forcedOffline));
+    if(off) return [];
     try{
       return await _fetchSubjFileFromNetwork(ref, cacheKey);
     }catch(e){
@@ -948,7 +977,6 @@ async function _examSubmit(){
    ═══════════════════════════════════════════════════════════════════════ */
 
 function _buildCustomExam(chapterIds, targetMarks, markFilter){
-  // ── Cooldown gate ──
   const cdMs = _customExamCooldownRemainingMs();
   if(cdMs > 0){
     toast(`⏳ Custom paper is on cooldown — available again in ${_fmtCooldown(cdMs)}`, 5000);
@@ -997,7 +1025,6 @@ function _buildCustomExam(chapterIds, targetMarks, markFilter){
 
 function _markCustomExamUsed(){
   _setCustomExamLast(Date.now());
-  // Refresh the UI so the cooldown note appears
   setTimeout(() => {
     if(document.getElementById('view-subj-exam')?.classList.contains('on')) _renderExam();
     if(typeof window.SUBJ_BUILDER !== 'undefined' && typeof window.SUBJ_BUILDER._updateCooldownUI === 'function'){
@@ -1126,10 +1153,8 @@ const SUBJ = {
   _renderExam,
   _renderList,
 
-  /* ── Custom exam builder with 6h cooldown ── */
   _buildCustomExam,
 
-  /* ── Public cooldown helpers (user.html can call these) ── */
   customExamCooldownRemainingMs: _customExamCooldownRemainingMs,
   customExamIsLocked: _customExamIsLocked,
   customExamCooldownLabel(){
@@ -1137,7 +1162,6 @@ const SUBJ = {
     return ms > 0 ? _fmtCooldown(ms) : '';
   },
 
-  /* ── Question list filter ── */
   _listFilter: { query: '', chapter: '' },
 
   _filterList(query){
