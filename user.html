@@ -1498,23 +1498,36 @@ function _setAdminVisible(v){
    ═══════════════════════════════════════════════════════════════════ */
 window.APP_SWITCH = {
   _capable: false,
+
   async refresh(){
-    // Fixed: S is a top-level const in app.js — NOT on window.
-    // Also handle the case where S isn't defined yet.
+    // NOTE: S is a top-level const in app.js — it lives in the shared
+    // lexical scope, NOT as a property of window. Reading window.S here
+    // would silently fail and hide the admin button.
     let user = null;
     try { user = (typeof S !== 'undefined' && S.user) ? S.user : null; } catch(e){}
     if(!user){ _setAdminVisible(false); return; }
 
+    // PRIMARY: trust the cached session flag immediately. This makes the
+    // Admin pill appear the instant the app boots, before any network
+    // round-trip completes.
     const cached = !!user.adminCapable;
     if(cached){ this._capable = true; _setAdminVisible(true); }
 
-    // Optional server confirmation — never hides the button on failure.
+    // SECONDARY: verify with the server — only UPGRADES visibility,
+    // never hides on failure. If the cached value says capable, we keep
+    // the button visible even if the check errors or times out.
     let online = false, token = '';
-    try { online = (typeof S !== 'undefined' && S.online && !S.forcedOffline); token = user.token || ''; } catch(e){}
+    try {
+      online = (typeof S !== 'undefined' && S.online && !S.forcedOffline);
+      token = user.token || '';
+    } catch(e){}
     if(!online || !token) return;
 
     let url = '';
-    try { url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || (typeof APPS !== 'undefined' ? APPS : ''); } catch(e){}
+    try {
+      url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL)
+         || (typeof APPS !== 'undefined' ? APPS : '');
+    } catch(e){}
     if(!url) return;
 
     try {
@@ -1538,19 +1551,31 @@ window.APP_SWITCH = {
   async toAdmin(){
     let user = null;
     try { user = (typeof S !== 'undefined' && S.user) ? S.user : null; } catch(e){}
-    if(!user || !user.token){ if(typeof toast === 'function') toast('❌ Please log in again'); return; }
+    if(!user || !user.token){
+      if(typeof toast === 'function') toast('❌ Please log in again');
+      return;
+    }
 
     let online = true;
     try { online = (typeof S !== 'undefined' && S.online && !S.forcedOffline); } catch(e){}
-    if(!online){ if(typeof toast === 'function') toast('❌ You need internet to switch'); return; }
+    if(!online){
+      if(typeof toast === 'function') toast('❌ You need internet to switch');
+      return;
+    }
 
     const btn = $('tb-admin-btn');
     const orig = btn ? btn.innerHTML : '';
-    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin" style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite"></span>'; }
+    if(btn){
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite"></span>';
+    }
 
     let url = '';
     try { url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || ''; } catch(e){}
-    if(!url){ if(btn){ btn.disabled = false; btn.innerHTML = orig; } return; }
+    if(!url){
+      if(btn){ btn.disabled = false; btn.innerHTML = orig; }
+      return;
+    }
 
     try {
       const r = await fetch(url, {
@@ -1563,11 +1588,45 @@ window.APP_SWITCH = {
         })
       });
       const data = await r.json();
+
+      /* ═══════════════════════════════════════════════════════════════
+         Failure paths
+         ═══════════════════════════════════════════════════════════════ */
       if(!data || !data.success){
         if(btn){ btn.disabled = false; btn.innerHTML = orig; }
+
+        // ── Stale session ──
+        // Typical cause: this account was logged in on another device or
+        // tab since this browser last authenticated. The backend keeps
+        // ONE user token per account, so the previous login invalidated
+        // this one. Fix is a clean re-login, which writes fresh user +
+        // admin sessions via index.html.
+        if(data && data.sessionInvalid){
+          if(typeof toast === 'function') toast('🔒 Session expired — please log in again', 4500);
+          // Clear both stored sessions so the next login starts fresh.
+          try { localStorage.removeItem('abhyas_session'); } catch(e){}
+          try { localStorage.removeItem('abhyas_admin'); } catch(e){}
+          // Return to the login gateway. A fresh dual-role login writes
+          // BOTH sessions, so the Admin pill will work on the next click.
+          setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+          return;
+        }
+
+        // ── Not actually an admin ──
+        // The user row exists but the username isn't in the Admins sheet.
+        if(data && data.error && /does not have admin access/i.test(data.error)){
+          if(typeof toast === 'function') toast('❌ This account isn\'t an admin', 4000);
+          return;
+        }
+
+        // ── Anything else ──
         if(typeof toast === 'function') toast('❌ ' + ((data && data.error) || 'Switch failed'));
         return;
       }
+
+      /* ═══════════════════════════════════════════════════════════════
+         Success — write the admin token where admin.html reads it
+         ═══════════════════════════════════════════════════════════════ */
       localStorage.setItem('abhyas_admin', JSON.stringify({
         user: data.username || user.username,
         token: data.adminToken,
@@ -1576,13 +1635,13 @@ window.APP_SWITCH = {
       try { if(typeof PSYNC !== 'undefined' && PSYNC._timer) PSYNC._beaconSync(); } catch(e){}
       if(typeof toast === 'function') toast('🛡️ Opening Admin Portal…');
       setTimeout(() => { window.location.href = 'admin.html'; }, 200);
+
     } catch(e){
       if(btn){ btn.disabled = false; btn.innerHTML = orig; }
       if(typeof toast === 'function') toast('❌ ' + (e.message || 'Network error'));
     }
   }
 };
-
 /* ═══════════════════════════════════════════════════════════════════
    8. CONSOLIDATED UI._goRaw wrapper (previously 3 chained)
    ═══════════════════════════════════════════════════════════════════ */
