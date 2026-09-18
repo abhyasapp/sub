@@ -4,9 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F2F4F3">
+<meta name="color-scheme" content="light dark">
 <script src="config.js"></script>
-<!-- Pre-apply the dark-mode preference BEFORE design-system.css is
-     evaluated, so there's no flash of the wrong theme on load. -->
 <script>(function(){
   try{
     var raw = localStorage.getItem('abhyas_theme');
@@ -17,30 +16,27 @@
     if (t === 'dark') {
       document.documentElement.classList.add('dark');
       var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', '#181B19');
+      if (m) m.setAttribute('content', '#080B14');
     }
   } catch(e) {}
 })();</script>
-<!-- Clickjacking mitigation -->
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
-<!-- NEW: PWA manifest so "Install App" appears from the login screen too -->
-<link rel="manifest" href="manifest.json">
 
-<title>Abhyas — Loksewa Civil Engineering Exam Prep (Online &amp; Offline)</title>
-<meta name="description" content="Abhyas is a free-to-start Loksewa Civil Engineering exam prep app for Nepal — practice thousands of Level 7 Engineering, General Knowledge, and IQ questions online or fully offline, track your progress, and build toward Lok Sewa Aayog exam success.">
-<meta name="keywords" content="abhyas app, loksewa, lok sewa aayog, loksewa civil engineering, loksewa engineering, civil engineering exam prep nepal, level 7 engineering, PSC nepal, loksewa online offline, engineering exam questions nepal">
+<title>Abhyas — Loksewa Civil Engineering practice, online and offline</title>
+<meta name="description" content="Practice Loksewa Civil Engineering, General Knowledge and IQ questions for Nepal's Lok Sewa Aayog exams. Works fully offline once a chapter is downloaded. Free trial to start.">
+<meta name="keywords" content="abhyas app, loksewa, lok sewa aayog, loksewa civil engineering, civil engineering exam prep nepal, level 7 engineering, PSC nepal, loksewa offline">
 <link rel="canonical" href="https://app.mku.name.np/">
 
 <meta property="og:type" content="website">
-<meta property="og:title" content="Abhyas — Loksewa Civil Engineering Exam Prep (Online &amp; Offline)">
-<meta property="og:description" content="Practice thousands of Loksewa Civil Engineering, GK, and IQ questions — online or fully offline. Free trial, track your progress, built for Lok Sewa Aayog exam success.">
+<meta property="og:title" content="Abhyas — Loksewa Civil Engineering practice, online and offline">
+<meta property="og:description" content="Thousands of Loksewa Civil Engineering, GK and IQ questions. Study offline during load-shedding. Free trial to start.">
 <meta property="og:url" content="https://app.mku.name.np/">
 <meta property="og:image" content="https://app.mku.name.np/icon-512.png">
 <meta property="og:locale" content="en_NP">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Abhyas — Loksewa Civil Engineering Exam Prep">
+<meta name="twitter:title" content="Abhyas — Loksewa Civil Engineering practice">
 <meta name="twitter:description" content="Practice Loksewa Civil Engineering questions online or offline. Free trial available.">
 <meta name="twitter:image" content="https://app.mku.name.np/icon-512.png">
 
@@ -50,7 +46,7 @@
   "@type": "WebApplication",
   "name": "Abhyas",
   "alternateName": "Abhyas Loksewa Civil Engineering",
-  "description": "Loksewa Civil Engineering exam prep app for Nepal — practice Level 7 Engineering, General Knowledge, and IQ questions online or fully offline.",
+  "description": "Loksewa Civil Engineering exam practice for Nepal — Level 7 Engineering, General Knowledge and IQ questions, online or fully offline.",
   "url": "https://app.mku.name.np/",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Any (Progressive Web App)",
@@ -59,653 +55,808 @@
 }
 </script>
 
-<!-- NEW: preconnect to fonts.gstatic.com too — that's where the actual WOFF2 files come from.
-     Also dropped the 800 weight since nothing in this file uses it. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="design-system.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/phosphor/phosphor-regular.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+/* ═══════════════════════════════════════════════════════════════════════
+   Abhyas — front door. Self-contained; shares the student app's palette
+   and scale so signing in and studying feel like one product.
+
+   This page has one job: get a returning student into the app in as few
+   taps as possible, and get a new one signed up. Everything else — what
+   Abhyas is, what it covers, the FAQ — sits below the fold for the
+   people who arrive from search and need convincing first.
+
+   The previous version was a full-height scroll-snap carousel with page
+   dots. That fought the browser on mobile (snap plus an inner scroll
+   region traps the address bar), and it hid the FAQ from anyone who
+   didn't realise the page paged. It is now an ordinary scrolling page.
+   ═══════════════════════════════════════════════════════════════════════ */
+
 :root{
-  --c0:var(--c-bg);--c1:var(--c-surface);--c2:var(--c-surface);--c3:var(--c-primary-light);--c4:var(--c-divider);
-  --amb:var(--c-primary);--amb2:var(--c-primary-dark);--amb-glow:rgba(46,139,87,.18);
-  --teal:var(--c-primary);--vio:var(--c-primary);--sky:var(--c-info);--grn:var(--c-primary);--ros:var(--c-danger);
-  --t1:var(--c-text);--t2:var(--c-text-soft);--t3:var(--c-text-faint);
-  --ff:var(--font-body);--fd:var(--font-body);
-  --r2:var(--r-sm);--r3:var(--r-md);--r4:var(--r-xl);
-  --ease:.15s cubic-bezier(.4,0,.2,1);--spring:.22s cubic-bezier(.34,1.56,.64,1)
+  color-scheme:light;
+
+  --bg:#F2F4F3;
+  --bg-sunken:#E9ECEA;
+  --surface:#FFFFFF;
+  --surface-alt:#F7F9F8;
+  --scrim:rgba(14,22,18,.46);
+
+  --sep:#E3E7E4;
+  --sep-strong:#D2D8D4;
+  --hairline:rgba(20,30,24,.06);
+
+  --ink:#15201A;
+  --ink-2:#556059;
+  --ink-3:#7F8A84;
+  --ink-4:#AAB3AE;
+  --on-accent:#FFFFFF;
+
+  --accent:#1E7A4C;
+  --accent-hover:#196741;
+  --accent-pressed:#145536;
+  --accent-soft:#E2F0E8;
+  --accent-line:rgba(30,122,76,.24);
+  --accent-rgb:30,122,76;
+
+  --success:#1E7A4C; --success-soft:#E2F0E8; --success-line:rgba(30,122,76,.26);
+  --warning:#8F5407; --warning-soft:#FAEEDF; --warning-line:rgba(143,84,7,.24);
+  --danger:#B23029;  --danger-soft:#FBE7E5;  --danger-line:rgba(178,48,41,.24);
+  --info:#215C99;    --info-soft:#E6EFF9;    --info-line:rgba(33,92,153,.24);
+
+  --focus:#1E7A4C;
+  --selection:rgba(30,122,76,.18);
+
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+
+  --fs-display:1.75rem;
+  --fs-t1:1.1875rem;
+  --fs-t2:1.0625rem;
+  --fs-t3:.9375rem;
+  --fs-body:.875rem;
+  --fs-callout:.8125rem;
+  --fs-foot:.75rem;
+  --fs-cap:.6875rem;
+
+  --sp-1:.25rem; --sp-2:.5rem;  --sp-3:.75rem; --sp-4:1rem;
+  --sp-5:1.25rem;--sp-6:1.5rem; --sp-8:2rem;   --sp-10:2.5rem;
+  --sp-12:3rem;  --sp-16:4rem;
+
+  --r-control:8px; --r-input:10px; --r-card:14px; --r-panel:18px; --r-sheet:22px; --r-full:999px;
+
+  --sh-1:0 1px 2px rgba(18,28,22,.05),0 1px 1px rgba(18,28,22,.03);
+  --sh-2:0 4px 16px rgba(18,28,22,.07),0 1px 2px rgba(18,28,22,.05);
+  --sh-3:0 12px 32px rgba(18,28,22,.10),0 2px 6px rgba(18,28,22,.05);
+
+  --dur-fast:150ms; --dur-base:220ms; --dur-slow:320ms;
+  --ease:cubic-bezier(.4,0,.2,1);
+  --ease-out:cubic-bezier(0,0,.2,1);
+  --ease-spring:cubic-bezier(.32,1.35,.5,1);
+
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
 }
+
+.dark{
+  color-scheme:dark;
+
+  --bg:#080B14;
+  --bg-sunken:#0C111C;
+  --surface:#121829;
+  --surface-alt:#0F1524;
+  --scrim:rgba(0,0,0,.62);
+
+  --sep:rgba(255,255,255,.08);
+  --sep-strong:rgba(255,255,255,.16);
+  --hairline:rgba(255,255,255,.05);
+
+  --ink:#EDF2EF;
+  --ink-2:#9AA6B8;
+  --ink-3:#77839A;
+  --ink-4:#4E5870;
+  --on-accent:#04140C;
+
+  --accent:#46C46E;
+  --accent-hover:#5FD183;
+  --accent-pressed:#35A95C;
+  --accent-soft:rgba(70,196,110,.14);
+  --accent-line:rgba(70,196,110,.32);
+  --accent-rgb:70,196,110;
+
+  --success:#46C46E; --success-soft:rgba(70,196,110,.14); --success-line:rgba(70,196,110,.32);
+  --warning:#E0A048; --warning-soft:rgba(224,160,72,.14); --warning-line:rgba(224,160,72,.32);
+  --danger:#F4606D;  --danger-soft:rgba(244,96,109,.14);  --danger-line:rgba(244,96,109,.32);
+  --info:#54B9F0;    --info-soft:rgba(84,185,240,.13);    --info-line:rgba(84,185,240,.30);
+
+  --focus:#46C46E;
+  --selection:rgba(70,196,110,.24);
+
+  --sh-1:0 1px 2px rgba(0,0,0,.45);
+  --sh-2:0 4px 18px rgba(0,0,0,.50);
+  --sh-3:0 12px 34px rgba(0,0,0,.60);
+}
+
+/* ── Reset + base ─────────────────────────────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{height:100%}
-body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;min-height:100vh;overflow-x:hidden}
-
-/* Screen-reader-only utility — used for live password-toggle announcements */
-.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-
-.bg-motif{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.bg-motif::before,.bg-motif::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);background:var(--c-primary)}
-.bg-motif::before{width:340px;height:340px;top:-90px;left:-110px;opacity:.06}
-.bg-motif::after{width:280px;height:280px;bottom:-70px;right:-90px;opacity:.05}
-
-.card{position:relative;z-index:1;width:100%;max-width:440px;margin:1.2rem auto 3rem;background:var(--c-surface);border-radius:var(--r-xl);padding:2.25rem 2rem;box-shadow:var(--ne-lg);max-height:none;overflow:visible;animation:enter .35s var(--ease-spring)}
-@keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-
-.wide-section{position:relative;z-index:1;max-width:760px;width:calc(100% - 2rem);margin:0 auto 2.5rem}
-.about-card{background:var(--c-surface);border-radius:var(--r-sm);padding:.9rem 1.1rem;box-shadow:var(--ne-sm);margin-bottom:.6rem}
-.about-card h3{font-size:.82rem;color:var(--c-text);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
-.about-card p{font-size:.78rem;color:var(--c-text-soft);line-height:1.55}
-.section-heading{font-size:1rem;color:var(--c-text);margin-bottom:.9rem;text-align:center;font-weight:700}
-
-.logo{text-align:center;margin-bottom:1.5rem}
-.l-icon{width:60px;height:60px;margin:0 auto .8rem}
-.logo h1{font-size:var(--fs-page-title);font-weight:var(--fw-bold);letter-spacing:-.3px;color:var(--c-text)}
-.logo p{font-size:var(--fs-caption);color:var(--c-text-soft);margin-top:.25rem;font-weight:var(--fw-medium)}
-
-.path-motif{display:block;width:148px;height:auto;margin:.55rem auto .05rem}
-.path-motif-peak{animation:path-peak-pulse 2.8s ease-in-out infinite}
-@keyframes path-peak-pulse{
-  0%,100%{filter:drop-shadow(0 0 0 var(--c-primary))}
-  50%{filter:drop-shadow(0 0 3px var(--c-primary))}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  font-family:var(--font);font-size:var(--fs-body);line-height:1.5;
+  background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale
 }
-@media(prefers-reduced-motion:reduce){.path-motif-peak{animation:none}}
+:focus{outline:none}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r-control)}
+img,svg{display:block;max-width:100%}
+h1,h2,h3{color:var(--ink);line-height:1.25;font-weight:650}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+::selection{background:var(--selection)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip-link{
+  position:absolute;top:-100px;left:var(--sp-4);z-index:900;
+  background:var(--accent);color:var(--on-accent);padding:var(--sp-2) var(--sp-4);
+  border-radius:var(--r-input);font-weight:600;font-size:var(--fs-callout);
+  transition:top var(--dur-fast) var(--ease)
+}
+.skip-link:focus{top:var(--sp-2);text-decoration:none}
+.t-callout{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.6}
+.t-foot{font-size:var(--fs-foot);color:var(--ink-3);line-height:1.5}
+.t-cap{font-size:var(--fs-cap);color:var(--ink-3)}
+[hidden]{display:none!important}
 
-.net{display:flex;align-items:center;justify-content:center;gap:.45rem;font-size:var(--fs-caption);color:var(--c-text-soft);font-weight:var(--fw-medium);margin-bottom:1.25rem;background:var(--c-bg);border-radius:var(--r-full);padding:.32rem .9rem;box-shadow:var(--ne-in-sm)}
-.ndot{width:7px;height:7px;border-radius:50%;background:var(--c-primary);animation:npulse 2s ease-in-out infinite;flex-shrink:0}
-.ndot.off{background:var(--c-danger);animation:none}
-.ndot.warn{background:var(--c-warning);animation:npulse 2s ease-in-out infinite}
-@keyframes npulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.7)}}
+/* ── Page frame ───────────────────────────────────────────────────── */
+.page{max-width:460px;margin:0 auto;padding:var(--sp-6) var(--sp-4) var(--sp-16)}
+.wide{max-width:680px;margin:0 auto;padding:0 var(--sp-4)}
 
-.tabs{display:flex;gap:.25rem;background:var(--c-bg);border-radius:var(--r-md);padding:.3rem;margin-bottom:1.25rem;box-shadow:var(--ne-in-sm)}
-.tab{flex:1;padding:.55rem .2rem;border:none;border-radius:calc(var(--r-md) - 4px);background:transparent;color:var(--c-text-soft);font-family:var(--ff);font-size:var(--fs-caption);font-weight:var(--fw-semibold);cursor:pointer;transition:all var(--ease);text-align:center}
-.tab.active{background:var(--c-surface);color:var(--c-primary);box-shadow:var(--ne-sm)}
-.tab:hover:not(.active){color:var(--c-text)}
-.tab:focus-visible{outline:2px solid var(--c-primary);outline-offset:2px}
+.theme-toggle{
+  position:fixed;top:calc(var(--sp-3) + var(--safe-t));right:var(--sp-3);z-index:50;
+  width:38px;height:38px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r-input);background:var(--surface);border:1px solid var(--sep);
+  color:var(--ink-2);font-size:1rem;box-shadow:var(--sh-1);
+  transition:color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
+}
+.theme-toggle:hover{color:var(--ink);background:var(--bg-sunken)}
 
-.fld{margin-bottom:.85rem}
-.fld label{display:block;font-size:var(--fs-caption);font-weight:var(--fw-semibold);color:var(--c-text-soft);margin-bottom:.35rem}
-.fld input,.fld select{width:100%;background:var(--c-bg);border:none;border-radius:var(--r-sm);padding:.75rem .9rem;color:var(--t1);font-size:var(--fs-body);font-family:var(--ff);outline:none;box-shadow:var(--ne-in-sm);transition:box-shadow var(--ease)}
-.fld input:focus,.fld select:focus{box-shadow:var(--ne-in-sm),0 0 0 3px rgba(46,139,87,.16)}
-.fld input::placeholder{color:var(--c-text-faint)}
-.fld input.invalid{box-shadow:var(--ne-in-sm),0 0 0 2px rgba(193,67,60,.35)}
-.fld-hint{font-size:.68rem;color:var(--c-text-faint);margin-top:.25rem;display:none}
-.fld-hint.show{display:block}
-.fld-hint.err{color:var(--c-danger)}
-.fld-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+/* ── Masthead ─────────────────────────────────────────────────────── */
+.mast{text-align:center;margin-bottom:var(--sp-6)}
+.mast img{width:56px;height:56px;margin:0 auto var(--sp-3);border-radius:14px}
+.mast h1{font-size:var(--fs-display);font-weight:700;letter-spacing:-.022em}
+.mast .tag{font-size:var(--fs-callout);color:var(--ink-2);margin-top:var(--sp-1)}
+.mast .what{font-size:var(--fs-foot);color:var(--ink-3);margin-top:var(--sp-1)}
 
-/* NEW: password field wrapper — positions the toggle button and hosts
-   the strength meter for the signup form. */
-.pw-field{position:relative}
-.pw-field input{padding-right:2.6rem}
-.pw-toggle{position:absolute;top:50%;right:.55rem;transform:translateY(-50%);background:none;border:none;padding:.35rem;cursor:pointer;color:var(--c-text-soft);font-size:.95rem;line-height:1;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:color var(--ease),background var(--ease)}
-.pw-toggle:hover{color:var(--c-text);background:rgba(0,0,0,.04)}
-.pw-toggle:focus-visible{outline:2px solid var(--c-primary);outline-offset:2px}
-.pw-toggle .ph-eye-slash{display:none}
-.pw-toggle.on .ph-eye{display:none}
-.pw-toggle.on .ph-eye-slash{display:inline-flex}
+/* Connection strip. On a Nepali connection this is genuinely useful
+   information, not chrome — if the backend is unreachable the sign-in
+   button cannot work, and saying so up front beats a failed tap. */
+.net{
+  display:inline-flex;align-items:center;gap:var(--sp-2);
+  margin:var(--sp-4) auto 0;padding:.3rem var(--sp-3);
+  border-radius:var(--r-full);background:var(--bg-sunken);
+  font-size:var(--fs-cap);color:var(--ink-2);font-weight:550
+}
+.ndot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0;animation:npulse 2.4s ease-in-out infinite}
+.ndot.off{background:var(--danger);animation:none}
+.ndot.warn{background:var(--warning)}
+@keyframes npulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-/* NEW: strength meter — shown only on the signup password field. */
-.pw-strength{margin-top:.35rem;display:flex;gap:.2rem;align-items:center}
-.pw-strength-bars{display:flex;gap:.2rem;flex:1}
-.pw-strength-bars span{height:4px;flex:1;background:var(--c-divider);border-radius:3px;transition:background .2s ease}
-.pw-strength.s1 .pw-strength-bars span:nth-child(1){background:var(--c-danger)}
-.pw-strength.s2 .pw-strength-bars span:nth-child(-n+2){background:var(--c-warning)}
-.pw-strength.s3 .pw-strength-bars span:nth-child(-n+3){background:#d4b83a}
-.pw-strength.s4 .pw-strength-bars span:nth-child(-n+4){background:var(--c-primary)}
-.pw-strength.s5 .pw-strength-bars span{background:var(--c-primary-dark)}
-.pw-strength-label{font-size:.66rem;font-weight:600;min-width:3.4rem;text-align:right;color:var(--c-text-soft)}
-.pw-strength.s1 .pw-strength-label{color:var(--c-danger)}
-.pw-strength.s2 .pw-strength-label{color:var(--c-warning)}
-.pw-strength.s4 .pw-strength-label,.pw-strength.s5 .pw-strength-label{color:var(--c-primary-dark)}
+/* ── The card ─────────────────────────────────────────────────────── */
+.card{
+  background:var(--surface);border:1px solid var(--sep);
+  border-radius:var(--r-sheet);padding:var(--sp-6);box-shadow:var(--sh-2)
+}
+@media (max-width:420px){.card{padding:var(--sp-5) var(--sp-4);border-radius:var(--r-panel)}}
 
-.file-up{position:relative;display:flex;align-items:center;gap:.6rem;background:var(--c-bg);border-radius:var(--r-sm);padding:.6rem .9rem;cursor:pointer;box-shadow:var(--ne-in-sm)}
-.file-up input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.file-up .file-up-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:.3rem;background:var(--c-surface);border:1px solid rgba(0,0,0,.08);border-radius:7px;padding:.3rem .6rem;font-size:.72rem;font-weight:700;color:var(--t2)}
-.file-up .file-up-name{font-size:.78rem;color:var(--c-text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tabs{
+  display:flex;gap:2px;padding:3px;margin-bottom:var(--sp-5);
+  background:var(--bg-sunken);border-radius:var(--r-input)
+}
+.tab{
+  flex:1;min-height:40px;border-radius:calc(var(--r-input) - 3px);
+  font-size:var(--fs-callout);font-weight:600;color:var(--ink-2);
+  font-family:var(--font);
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
+}
+.tab:hover:not(.active){color:var(--ink)}
+.tab.active{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1)}
 
-.err{background:var(--c-danger-bg);border:1px solid rgba(193,67,60,.25);border-radius:var(--r-sm);padding:.6rem .9rem;color:var(--c-danger);font-size:var(--fs-caption);margin-bottom:.85rem;display:none;align-items:center;gap:.5rem;font-weight:var(--fw-medium)}
-.err::before{content:"";width:16px;height:16px;flex-shrink:0;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat}
-.err.show{display:flex}
+.field{display:flex;flex-direction:column;gap:var(--sp-1);margin-bottom:var(--sp-4)}
+.field > label{font-size:var(--fs-foot);font-weight:600;color:var(--ink-2)}
+.input{
+  width:100%;min-height:44px;padding:var(--sp-2) var(--sp-3);
+  background:var(--surface-alt);border:1px solid var(--sep-strong);
+  border-radius:var(--r-input);color:var(--ink);font-size:var(--fs-body);outline:none;
+  transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)
+}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.input::placeholder{color:var(--ink-4)}
+.input.invalid{border-color:var(--danger)}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
+@media (max-width:420px){.field-row{grid-template-columns:1fr}}
+.field-hint{font-size:var(--fs-cap);color:var(--ink-3);line-height:1.45}
 
-.btn{width:100%;padding:.85rem;background:linear-gradient(150deg,var(--c-primary),var(--c-primary-dark));border:none;border-radius:var(--r-sm);color:#0F1410;font-size:var(--fs-body);font-weight:var(--fw-semibold);font-family:var(--fd);cursor:pointer;transition:all var(--ease);box-shadow:var(--ne-sm);letter-spacing:.1px}
-.btn:hover:not(:disabled){box-shadow:var(--ne-md)}
-.btn:active:not(:disabled){transform:scale(.98);box-shadow:var(--ne-in-md)}
+.pw-field{position:relative;display:flex}
+.pw-field .input{padding-right:2.75rem}
+.pw-field button{
+  position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r-control);color:var(--ink-3);font-size:1rem
+}
+.pw-field button:hover{background:var(--bg-sunken);color:var(--ink)}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:44px;padding:0 var(--sp-4);width:100%;
+  border-radius:var(--r-input);border:1px solid transparent;
+  font-size:var(--fs-body);font-weight:650;line-height:1.2;
+  background:var(--accent);color:var(--on-accent);
+  transition:background var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease)
+}
+.btn:hover:not(:disabled){background:var(--accent-hover)}
+.btn:active:not(:disabled){transform:scale(.985);background:var(--accent-pressed)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn-sec{width:100%;padding:.7rem;background:var(--c-bg);border:none;border-radius:var(--r-sm);color:var(--c-text-soft);font-size:var(--fs-caption);font-weight:var(--fw-semibold);font-family:var(--ff);cursor:pointer;transition:all var(--ease);margin-top:.6rem;box-shadow:var(--ne-sm)}
-.btn-sec:hover{color:var(--c-primary-dark);box-shadow:var(--ne-in-sm)}
-.btn-sm{padding:.55rem .8rem;background:var(--c-primary);border:none;border-radius:var(--r-sm);color:#0F1410;font-size:.78rem;font-weight:var(--fw-semibold);font-family:var(--ff);cursor:pointer;white-space:nowrap;flex-shrink:0}
-.btn-sm:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{
+  background:var(--bg-sunken);color:var(--ink-2);border-color:transparent;
+  font-weight:600;margin-top:var(--sp-2)
+}
+.btn-sec:hover:not(:disabled){background:var(--sep);color:var(--ink)}
+.btn-sm{min-height:36px;width:auto;padding:0 var(--sp-3);font-size:var(--fs-foot)}
 
-.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .65s linear infinite;vertical-align:middle;margin-right:.4rem}
-@keyframes spin{to{transform:rotate(360deg)}}
-
-.link-row{text-align:center;margin-top:1.1rem;font-size:var(--fs-caption);color:var(--c-text-soft)}
-.link-row button{background:none;border:none;color:var(--c-primary);font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--ff);font-size:var(--fs-caption);padding:0;margin-left:.3rem}
+.link-row{text-align:center;margin-top:var(--sp-5);font-size:var(--fs-foot);color:var(--ink-3)}
+.link-row button{
+  color:var(--accent);font-weight:650;font-family:var(--font);
+  font-size:var(--fs-foot);padding:0;margin-left:var(--sp-1)
+}
 .link-row button:hover{text-decoration:underline}
-.link-btn-r{text-align:right;margin:-.4rem 0 .7rem}
-.link-btn-r button{background:none;border:none;color:var(--c-primary);font-size:.8rem;font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--ff);padding:0}
+.link-right{text-align:right;margin:-.35rem 0 var(--sp-4)}
+.link-right button{color:var(--accent);font-weight:600;font-family:var(--font);font-size:var(--fs-foot);padding:0}
+.link-right button:hover{text-decoration:underline}
 
-.pay-box{display:none}
-.pay-box.on{display:block;animation:enter .3s var(--ease-spring)}
-.qr-wrap{text-align:center;margin:1rem 0;padding:1.1rem;background:var(--c-bg);border-radius:var(--r-lg);position:relative;box-shadow:var(--ne-in-sm)}
-.qr-wrap img{max-width:200px;width:100%;border-radius:var(--r-md);display:block;margin:0 auto .6rem}
-.qr-fallback{width:180px;height:180px;margin:0 auto .6rem;background:var(--c-surface);border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;color:var(--c-text-faint);box-shadow:var(--ne-sm)}
-.qr-fallback svg{width:48px;height:48px}
-.pay-info{text-align:center;margin-bottom:1rem}
-.pay-info .amt{font-size:1.7rem;font-weight:var(--fw-bold);color:var(--c-primary-dark)}
-.pay-info .amt span{font-size:.9rem;opacity:.7;font-weight:var(--fw-medium)}
-.pay-info .phone{font-size:var(--fs-body);color:var(--t2);margin-top:.25rem}
-.pay-info .inst{font-size:var(--fs-caption);color:var(--t3);margin-top:.45rem;line-height:var(--lh-normal);padding:0 .5rem}
+.err{
+  display:none;align-items:flex-start;gap:var(--sp-2);
+  background:var(--danger-soft);color:var(--danger);
+  border-radius:var(--r-input);padding:var(--sp-3);
+  font-size:var(--fs-foot);line-height:1.45;margin-bottom:var(--sp-4)
+}
+.err.show{display:flex}
+.err i{flex-shrink:0;margin-top:1px;font-size:1rem}
 
-.trial-banner{background:var(--c-info-bg);border:1px solid rgba(43,108,176,.18);border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-info)}
-.trial-banner strong{color:var(--c-text);font-size:var(--fs-body)}
-.trial-banner .timer{font-size:1.15rem;font-weight:var(--fw-bold);color:var(--c-primary-dark);margin-top:.25rem;font-variant-numeric:tabular-nums}
-
-.expired-banner{background:var(--c-danger-bg);border:1px solid rgba(193,67,60,.2);border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-danger)}
-.expired-banner strong{color:var(--c-text)}
-
-.perm-banner{background:var(--c-success-bg);border:1px solid rgba(54,139,79,.2);border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-primary-dark)}
-.perm-banner strong{color:var(--c-text);font-size:var(--fs-body)}
-
-.status-card{text-align:center;padding:1.3rem .5rem}
-.status-card .big-icon{width:56px;height:56px;margin:0 auto .8rem;color:var(--c-primary);background:var(--c-bg);border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;box-shadow:var(--ne-sm)}
-.status-card .big-icon svg{width:28px;height:28px}
-.status-card h2{font-size:var(--fs-section-title);font-weight:var(--fw-bold);margin-bottom:.35rem;color:var(--c-text)}
-.status-card p{font-size:var(--fs-caption);color:var(--t3);line-height:var(--lh-normal);margin-bottom:1.1rem}
-
-.redirect-card{text-align:center;padding:2.2rem .5rem 1rem}
-.redirect-card .spin-lg{width:34px;height:34px;border:3px solid var(--c-divider);border-top-color:var(--c-primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}
-.redirect-card p{font-size:var(--fs-body);color:var(--t2);margin-bottom:1.1rem}
-
-.mobile-prompt{background:var(--c-info-bg);border:1px solid rgba(43,108,176,.18);border-radius:var(--r-sm);padding:.7rem .85rem;margin-bottom:1rem}
-.mobile-prompt p{font-size:.76rem;color:var(--c-info);margin-bottom:.55rem;line-height:1.4}
-.mobile-prompt .row{display:flex;gap:.5rem}
-.mobile-prompt input{flex:1;background:var(--c-surface);border:none;border-radius:var(--r-sm);padding:.55rem .75rem;font-size:.85rem;font-family:var(--ff);outline:none;box-shadow:var(--ne-in-sm)}
-.mobile-prompt.saved{display:none}
-
-#toasts{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.4rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
-.toast{background:#111417;border:1px solid rgba(255,255,255,.10);border-radius:var(--r-sm);padding:.65rem 1.1rem;font-size:var(--fs-caption);font-weight:var(--fw-medium);color:#FFFFFF;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tin .18s var(--ease-spring);pointer-events:auto;max-width:100%;text-align:center}
-.toast.out{animation:tout .2s ease forwards}
-@keyframes tin{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:none}}
-@keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
-
-#g-signin-wrap{margin:.7rem 0;visibility:visible;height:auto;overflow:visible;transition:opacity .15s ease}
+/* Google's button measures its own container at render time, so this
+   block can never be display:none — it would be handed a 0×0 box. */
+#g-signin-wrap{margin:0 0 var(--sp-4);visibility:visible;height:auto;overflow:visible;transition:opacity var(--dur-fast) var(--ease)}
 #g-signin-wrap.g-hidden{visibility:hidden;height:0;margin:0;overflow:hidden;pointer-events:none}
-#g-signin-wrap.g-busy{opacity:.55;pointer-events:none}
+#g-signin-wrap.g-busy{opacity:.5;pointer-events:none}
 #g-signin-btn{display:flex;justify-content:center;min-height:44px}
-.g-or-div{display:flex;align-items:center;gap:.6rem;margin:.75rem 0;color:var(--t3);font-size:var(--fs-caption);font-weight:var(--fw-medium)}
-.g-or-div::before,.g-or-div::after{content:"";flex:1;height:1px;background:var(--c-divider)}
+.g-or{
+  display:flex;align-items:center;gap:var(--sp-3);
+  margin:var(--sp-4) 0;color:var(--ink-4);font-size:var(--fs-cap);font-weight:600
+}
+.g-or::before,.g-or::after{content:'';flex:1;height:1px;background:var(--sep)}
 
-.offline-badge{display:none;background:var(--c-bg);border-radius:var(--r-sm);padding:.45rem .8rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-warning);font-weight:var(--fw-medium);box-shadow:var(--ne-in-sm)}
-.offline-badge.show{display:block}
+/* ── Banners: trial, expired, permanent ───────────────────────────── */
+.banner{
+  display:flex;align-items:flex-start;gap:var(--sp-2);
+  padding:var(--sp-3) var(--sp-4);border-radius:var(--r-input);
+  font-size:var(--fs-foot);line-height:1.5;margin-bottom:var(--sp-4)
+}
+.banner i{flex-shrink:0;margin-top:1px;font-size:1rem}
+.banner-info{background:var(--info-soft);color:var(--info)}
+.banner-warning{background:var(--warning-soft);color:var(--warning)}
+.banner-danger{background:var(--danger-soft);color:var(--danger)}
+.banner-accent{background:var(--accent-soft);color:var(--accent)}
 
-html,body{height:100%}
-.snap-container{height:100vh;height:100svh;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
-.snap-post{min-height:100vh;min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always;position:relative;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem 0;overflow-y:auto}
-.snap-post.top-aligned{justify-content:flex-start;padding-top:2.2rem}
+.trial-panel{
+  text-align:center;padding:var(--sp-5) var(--sp-4);margin-bottom:var(--sp-4);
+  background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-card)
+}
+.trial-panel .lbl{font-size:var(--fs-foot);font-weight:650;color:var(--accent)}
+/* The countdown is the largest thing on the screen while a trial runs,
+   because it is the only number that matters at that moment. */
+.trial-panel .timer{
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:2.25rem;font-weight:700;color:var(--ink);
+  letter-spacing:-.02em;line-height:1.1;margin:var(--sp-2) 0 var(--sp-1)
+}
+.trial-panel .note{font-size:var(--fs-cap);color:var(--ink-2)}
 
-.page-dots{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:.55rem}
-.page-dots button{width:8px;height:8px;border-radius:50%;border:none;background:var(--c-divider);padding:0;cursor:pointer;transition:all var(--ease);box-shadow:none}
-.page-dots button.active{background:var(--c-primary);height:22px;border-radius:5px}
-.page-dots button:focus-visible{outline:2px solid var(--c-primary);outline-offset:3px}
+/* ── Payment ──────────────────────────────────────────────────────── */
+.qr-wrap{
+  text-align:center;padding:var(--sp-5);margin-bottom:var(--sp-4);
+  background:var(--surface-alt);border:1px solid var(--sep);border-radius:var(--r-card)
+}
+.qr-wrap img{width:200px;max-width:100%;margin:0 auto;border-radius:var(--r-input);background:#fff}
+.qr-fallback{
+  width:180px;height:180px;margin:0 auto;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1px solid var(--sep);
+  border-radius:var(--r-input);color:var(--ink-4)
+}
+.qr-fallback i{font-size:2rem}
+.pay-amt{
+  font-family:var(--mono);font-variant-numeric:tabular-nums;
+  font-size:2rem;font-weight:700;color:var(--ink);text-align:center;line-height:1.1
+}
+.pay-amt .cur{font-size:1rem;font-weight:600;color:var(--ink-3)}
+.pay-phone{text-align:center;font-size:var(--fs-body);color:var(--ink-2);margin-top:var(--sp-1)}
+.pay-inst{text-align:center;font-size:var(--fs-foot);color:var(--ink-3);margin:var(--sp-2) 0 var(--sp-5);line-height:1.5}
 
-.scroll-hint{position:absolute;left:0;right:0;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:.3rem;color:var(--c-text-faint);font-size:.72rem;font-weight:var(--fw-medium);z-index:2;transition:opacity .25s ease;pointer-events:none}
-.scroll-hint.hide{opacity:0}
-.scroll-hint svg{width:18px;height:18px;animation:hint-bounce 1.6s ease-in-out infinite}
-@keyframes hint-bounce{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(5px);opacity:1}}
-@media(prefers-reduced-motion:reduce){.scroll-hint svg{animation:none}}
+.file-drop{
+  position:relative;display:flex;align-items:center;gap:var(--sp-3);
+  background:var(--surface-alt);border:1px solid var(--sep-strong);
+  border-radius:var(--r-input);padding:var(--sp-3);cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
+}
+.file-drop:hover,.file-drop:focus-within{border-color:var(--accent);background:var(--accent-soft)}
+.file-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.file-drop .fd-btn{
+  flex-shrink:0;display:inline-flex;align-items:center;gap:var(--sp-1);
+  background:var(--surface);border:1px solid var(--sep-strong);border-radius:var(--r-control);
+  padding:.3rem .6rem;font-size:var(--fs-foot);font-weight:600;color:var(--ink-2)
+}
+.file-drop .fd-name{font-size:var(--fs-foot);color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-@media(max-width:480px){.card{padding:1.75rem 1.35rem;margin:.8rem;border-radius:var(--r-lg)}.fld-row{grid-template-columns:1fr}}
+/* ── Status + redirect ────────────────────────────────────────────── */
+.status-card{text-align:center;padding:var(--sp-6) var(--sp-2)}
+.status-card .big{
+  width:56px;height:56px;margin:0 auto var(--sp-4);
+  display:flex;align-items:center;justify-content:center;
+  border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent);font-size:1.6rem
+}
+.status-card h2{font-size:var(--fs-t2);font-weight:650;margin-bottom:var(--sp-2)}
+.status-card p{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.6;margin-bottom:var(--sp-5)}
+.redirect-card{text-align:center;padding:var(--sp-10) var(--sp-2) var(--sp-4)}
+.redirect-card .spin-lg{
+  width:32px;height:32px;margin:0 auto var(--sp-4);
+  border:3px solid var(--sep-strong);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.redirect-card p{font-size:var(--fs-callout);color:var(--ink-2);margin-bottom:var(--sp-4)}
+.spin{
+  display:inline-block;width:14px;height:14px;
+  border:2px solid rgba(255,255,255,.35);border-top-color:currentColor;
+  border-radius:50%;animation:spin .7s linear infinite;margin-right:var(--sp-2)
+}
+
+/* ── Below the fold ───────────────────────────────────────────────── */
+.section{margin-top:var(--sp-16)}
+.section h2{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em;margin-bottom:var(--sp-2)}
+.section > p.lede{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.7;margin-bottom:var(--sp-5);max-width:62ch}
+
+/* Coverage is a list of subjects, so it renders as a list of subjects
+   rather than a grid of identical cards. */
+.subject-list{display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-bottom:var(--sp-5)}
+.subject-list li{
+  padding:.3rem var(--sp-3);border-radius:var(--r-full);
+  background:var(--surface);border:1px solid var(--sep);
+  font-size:var(--fs-foot);color:var(--ink-2);list-style:none
+}
+
+.point{padding:var(--sp-4) 0;border-top:1px solid var(--sep)}
+.point:first-of-type{border-top:none;padding-top:0}
+.point h3{font-size:var(--fs-t3);font-weight:650;margin-bottom:var(--sp-1)}
+.point p{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.65;max-width:62ch}
+
+details.faq{
+  background:var(--surface);border:1px solid var(--sep);
+  border-radius:var(--r-card);margin-bottom:var(--sp-2);overflow:hidden
+}
+details.faq summary{
+  padding:var(--sp-3) var(--sp-4);cursor:pointer;list-style:none;
+  font-size:var(--fs-callout);font-weight:600;color:var(--ink);
+  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3)
+}
+details.faq summary::-webkit-details-marker{display:none}
+details.faq summary::after{
+  content:'\203A';color:var(--ink-4);font-size:1.2rem;flex-shrink:0;
+  transition:transform var(--dur-base) var(--ease)
+}
+details.faq[open] summary::after{transform:rotate(90deg)}
+details.faq p{
+  padding:0 var(--sp-4) var(--sp-4);font-size:var(--fs-callout);
+  color:var(--ink-2);line-height:1.7
+}
+
+.foot{
+  margin-top:var(--sp-16);padding-top:var(--sp-5);border-top:1px solid var(--sep);
+  text-align:center;font-size:var(--fs-cap);color:var(--ink-4)
+}
+
+/* ── Toasts ───────────────────────────────────────────────────────── */
+#toasts{
+  position:fixed;left:50%;bottom:calc(var(--sp-5) + var(--safe-b));transform:translateX(-50%);
+  z-index:800;display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);
+  pointer-events:none;width:calc(100vw - 2rem);max-width:380px
+}
+.toast{
+  width:100%;background:var(--ink);color:var(--bg);
+  border-radius:var(--r-input);padding:var(--sp-3) var(--sp-4);
+  font-size:var(--fs-callout);font-weight:500;line-height:1.45;
+  box-shadow:var(--sh-3);pointer-events:auto;text-align:center;
+  animation:toast-in var(--dur-base) var(--ease-spring)
+}
+.dark .toast{background:var(--surface);border:1px solid var(--sep-strong);color:var(--ink)}
+.toast.out{animation:toast-out var(--dur-fast) var(--ease) forwards}
+@keyframes toast-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes toast-out{to{opacity:0;transform:translateY(-6px)}}
+
+/* ── Cookie notice ────────────────────────────────────────────────── */
+.cookie-banner{
+  position:fixed;left:var(--sp-3);right:var(--sp-3);bottom:calc(var(--sp-3) + var(--safe-b));
+  z-index:700;display:flex;align-items:center;gap:var(--sp-3);flex-wrap:wrap;
+  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
+  padding:var(--sp-3) var(--sp-4);box-shadow:var(--sh-3);max-width:520px;margin:0 auto
+}
+.cookie-banner p{flex:1;min-width:200px;font-size:var(--fs-foot);color:var(--ink-2);line-height:1.5}
+.cookie-banner .btn{width:auto;min-height:36px;padding:0 var(--sp-4);font-size:var(--fs-foot)}
 </style>
 </head>
 <body>
 
-<a href="#snap-container" class="skip-link">Skip to content</a>
+<a href="#main-card" class="skip-link">Skip to sign in</a>
 
-<button class="theme-toggle" style="position:fixed;top:14px;right:14px;z-index:21" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
-  <i class="ph ph-moon" aria-hidden="true"></i><i class="ph ph-sun" aria-hidden="true"></i>
+<button class="theme-toggle" onclick="toggleTheme()" aria-label="Switch theme" title="Switch theme">
+  <i class="ph ph-circle-half" aria-hidden="true"></i>
 </button>
 
-<div class="bg-motif" aria-hidden="true"></div>
-
-<!-- NEW: SR live region for password visibility + other polite announcements -->
-<div id="sr-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
-
-<div class="page-dots" id="page-dots" role="tablist" aria-label="Page navigation">
-  <button class="active" data-target="post-login" aria-label="Login" role="tab" aria-selected="true"></button>
-  <button data-target="post-about" aria-label="About Abhyas" role="tab" aria-selected="false"></button>
-  <button data-target="post-faq" aria-label="FAQ" role="tab" aria-selected="false"></button>
-</div>
-
-<main class="snap-container" id="snap-container">
-<section class="snap-post" id="post-login" role="tabpanel" aria-label="Login and signup">
-<div class="card" id="main-card">
-  <div class="logo">
-    <div class="l-icon brand-mark"><img src="icon-192.png" alt="Abhyas"></div>
+<main class="page">
+  <header class="mast">
+    <img src="icon-192.png" alt="">
     <h1>Abhyas</h1>
-    <svg class="path-motif" viewBox="0 0 180 44" fill="none" aria-hidden="true">
-      <path d="M14,36 C55,34 75,20 110,16 C130,14 150,10 166,8" stroke="var(--c-text-faint)" stroke-width="1.5" stroke-dasharray="3 4" stroke-linecap="round"/>
-      <circle cx="14" cy="36" r="3" fill="var(--c-surface)" stroke="var(--c-text-faint)" stroke-width="1.5"/>
-      <circle cx="62" cy="27" r="3" fill="var(--c-surface)" stroke="var(--c-text-faint)" stroke-width="1.5"/>
-      <circle cx="110" cy="16" r="3" fill="var(--c-surface)" stroke="var(--c-text-faint)" stroke-width="1.5"/>
-      <circle class="path-motif-peak" cx="166" cy="8" r="5" fill="var(--c-primary)"/>
-    </svg>
-    <p>Your path to mastery</p>
-    <p style="font-size:.72rem;color:var(--c-text-faint);margin-top:.15rem">Loksewa Civil Engineering exam prep — practice online or offline</p>
-  </div>
+    <p class="tag">Your path to mastery</p>
+    <p class="what">Loksewa Civil Engineering practice — online or offline</p>
+    <div class="net"><span class="ndot" id="ndot"></span><span id="nstat">Checking the connection…</span></div>
+  </header>
 
-  <div class="net"><div class="ndot" id="ndot"></div><span id="nstat">Checking connection…</span></div>
-  <div class="offline-badge" id="offline-badge">Offline mode — using cached session</div>
+  <div class="card" id="main-card">
 
-  <div id="form-redirecting" class="pay-box" style="display:none">
-    <div class="redirect-card">
-      <div class="spin-lg"></div>
-      <p>Welcome back<span id="redir-name"></span> — opening your dashboard…</p>
-      <button class="btn-sec" onclick="APP.logout()">Not you? Logout</button>
-    </div>
-  </div>
-
-  <div class="tabs" id="auth-tabs" role="tablist" aria-label="Sign in or create account">
-    <button class="tab active" onclick="APP.setMode('login')" role="tab" aria-selected="true">Sign In</button>
-    <button class="tab" onclick="APP.setMode('signup')" role="tab" aria-selected="false">Create Account</button>
-  </div>
-
-  <div class="err" id="err" role="alert" aria-live="assertive"></div>
-
-  <div id="g-signin-wrap" class="g-hidden">
-    <div id="g-signin-btn"></div>
-    <div class="g-or-div">OR</div>
-  </div>
-
-  <!-- LOGIN -->
-  <form id="form-login" onsubmit="event.preventDefault();APP.login()">
-    <div class="fld">
-      <label for="in-user">Username</label>
-      <input type="text" id="in-user" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
-    </div>
-    <div class="fld">
-      <label for="in-pass">Password</label>
-      <div class="pw-field">
-        <input type="password" id="in-pass" placeholder="Enter password" autocomplete="current-password" aria-describedby="err" required>
-        <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
-          <i class="ph ph-eye" aria-hidden="true"></i>
-          <i class="ph ph-eye-slash" aria-hidden="true"></i>
-        </button>
+    <!-- Returning student with permanent access: straight through. -->
+    <div id="form-redirecting" style="display:none">
+      <div class="redirect-card">
+        <div class="spin-lg"></div>
+        <p>Welcome back<span id="redir-name"></span> — opening your dashboard.</p>
+        <button class="btn btn-sec" onclick="APP.logout()">Not you? Log out</button>
       </div>
     </div>
-    <div class="link-btn-r"><button type="button" onclick="APP.setMode('forgot')">Forgot password?</button></div>
-    <button class="btn" id="btn-login" type="submit">Sign In →</button>
-    <div class="link-row"><span>New here?</span><button type="button" onclick="APP.setMode('signup')">Create Account</button></div>
-  </form>
 
-  <!-- FORGOT PASSWORD -->
-  <form id="form-forgot" style="display:none" onsubmit="event.preventDefault();APP.requestReset()">
-    <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Enter your username or the email on your account. If it matches, we'll email a reset code.</p>
-    <div class="fld">
-      <label for="fg-id">Username or Email</label>
-      <input type="text" id="fg-id" placeholder="Your username or email" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
+    <div class="tabs" id="auth-tabs">
+      <button class="tab active" type="button" aria-pressed="true" onclick="APP.setMode('login')">Sign in</button>
+      <button class="tab" type="button" aria-pressed="false" onclick="APP.setMode('signup')">Create account</button>
     </div>
-    <button class="btn" id="btn-forgot" type="submit">Send Reset Code →</button>
-    <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to Sign In</button></div>
-  </form>
 
-  <!-- RESET PASSWORD -->
-  <form id="form-reset" style="display:none" onsubmit="event.preventDefault();APP.confirmReset()">
-    <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Paste the reset code from your email, then choose a new password.</p>
-    <div class="fld">
-      <label for="rs-code">Reset Code</label>
-      <!-- NEW: one-time-code autocomplete so mobile offers the code from email -->
-      <input type="text" id="rs-code" placeholder="Paste the code from your email" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" aria-describedby="err" required>
-    </div>
-    <div class="fld">
-      <label for="rs-pass">New Password</label>
-      <div class="pw-field">
-        <input type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password" aria-describedby="err" required minlength="6">
-        <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
-          <i class="ph ph-eye" aria-hidden="true"></i>
-          <i class="ph ph-eye-slash" aria-hidden="true"></i>
-        </button>
-      </div>
-    </div>
-    <button class="btn" id="btn-reset" type="submit">Reset Password →</button>
-    <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to Sign In</button></div>
-  </form>
+    <div class="err" id="err" role="alert" aria-live="assertive"><i class="ph ph-warning-circle"></i><span id="err-text"></span></div>
 
-  <!-- SIGNUP -->
-  <form id="form-signup" style="display:none" onsubmit="event.preventDefault();APP.signup()">
-    <div class="fld-row">
-      <div class="fld">
-        <label for="su-name">Full Name</label>
-        <input type="text" id="su-name" placeholder="Your name" autocomplete="name" required>
+    <div id="g-signin-wrap" class="g-hidden">
+      <div id="g-signin-btn"></div>
+      <div class="g-or">or</div>
+    </div>
+
+    <!-- ── Sign in ── -->
+    <form id="form-login" autocomplete="on" novalidate>
+      <div class="field">
+        <label for="in-user">Username</label>
+        <input class="input" type="text" id="in-user" placeholder="Your username" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next">
       </div>
-      <div class="fld">
-        <label for="su-mobile">Mobile</label>
-        <!-- NEW: inputmode + pattern so iOS/Android show the numeric pad -->
-        <input type="tel" id="su-mobile" placeholder="98XXXXXXXX" autocomplete="tel" inputmode="numeric" pattern="[0-9]*" maxlength="10" required>
-      </div>
-    </div>
-    <div class="fld">
-      <label for="su-email">Email Address</label>
-      <input type="email" id="su-email" placeholder="you@example.com" autocomplete="email" required>
-    </div>
-    <div class="fld">
-      <label for="su-user">Username</label>
-      <input type="text" id="su-user" placeholder="Choose username" autocomplete="username" autocapitalize="none" spellcheck="false" required onblur="APP.validateUsernameField()">
-      <div class="fld-hint" id="su-user-hint">3–30 characters: letters, numbers, dots, dashes, underscores.</div>
-    </div>
-    <div class="fld-row">
-      <div class="fld">
-        <label for="su-pass">Password</label>
+      <div class="field">
+        <label for="in-pass">Password</label>
         <div class="pw-field">
-          <input type="password" id="su-pass" placeholder="Min 6 chars" autocomplete="new-password" required minlength="6" oninput="APP.updateStrength()">
-          <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
-            <i class="ph ph-eye" aria-hidden="true"></i>
-            <i class="ph ph-eye-slash" aria-hidden="true"></i>
-          </button>
-        </div>
-        <!-- NEW: strength meter -->
-        <div class="pw-strength" id="pw-strength" aria-live="polite">
-          <div class="pw-strength-bars"><span></span><span></span><span></span><span></span><span></span></div>
-          <span class="pw-strength-label" id="pw-strength-label"></span>
+          <input class="input" type="password" id="in-pass" placeholder="Your password" autocomplete="current-password" enterkeyhint="go">
+          <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
         </div>
       </div>
-      <div class="fld">
-        <label for="su-cpass">Confirm</label>
+      <div class="link-right"><button type="button" onclick="APP.setMode('forgot')">Forgot your password?</button></div>
+      <button class="btn" id="btn-login" type="submit">Sign in</button>
+      <div class="link-row"><span>New to Abhyas?</span><button type="button" onclick="APP.setMode('signup')">Create an account</button></div>
+    </form>
+
+    <!-- ── Forgot ── -->
+    <form id="form-forgot" style="display:none" novalidate>
+      <p class="t-callout" style="margin-bottom:var(--sp-4)">Enter your username or the email on your account. If it matches, we'll email you a reset code.</p>
+      <div class="field">
+        <label for="fg-id">Username or email</label>
+        <input class="input" type="text" id="fg-id" placeholder="Username or email" autocapitalize="none" spellcheck="false" enterkeyhint="go">
+      </div>
+      <button class="btn" id="btn-forgot" type="submit">Email me a code</button>
+      <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to sign in</button></div>
+    </form>
+
+    <!-- ── Reset ── -->
+    <form id="form-reset" style="display:none" novalidate>
+      <p class="t-callout" style="margin-bottom:var(--sp-4)">Paste the code from your email, then choose a new password.</p>
+      <div class="field">
+        <label for="rs-code">Reset code</label>
+        <input class="input mono" type="text" id="rs-code" placeholder="Paste the code" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="rs-pass">New password</label>
         <div class="pw-field">
-          <input type="password" id="su-cpass" placeholder="Repeat password" autocomplete="new-password" required minlength="6">
-          <button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false">
-            <i class="ph ph-eye" aria-hidden="true"></i>
-            <i class="ph ph-eye-slash" aria-hidden="true"></i>
-          </button>
+          <input class="input" type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password" enterkeyhint="go">
+          <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
         </div>
       </div>
-    </div>
-    <button class="btn" id="btn-signup" type="submit">Create Account →</button>
-    <div class="link-row"><span>Have an account?</span><button type="button" onclick="APP.setMode('login')">Sign In</button></div>
-  </form>
+      <button class="btn" id="btn-reset" type="submit">Set the new password</button>
+      <div class="link-row"><button type="button" onclick="APP.setMode('login')">Back to sign in</button></div>
+    </form>
 
-  <!-- TRIAL ACTIVE -->
-  <div id="form-trial" class="pay-box" style="display:none">
-    <div class="trial-banner">
-      <strong>Welcome! Trial Active</strong>
-      <div class="timer" id="trial-timer">23:59:59</div>
-      <div style="font-size:.72rem;margin-top:.3rem;color:var(--t3)">Pay anytime to unlock permanent access.</div>
+    <!-- ── Sign up ── -->
+    <form id="form-signup" style="display:none" autocomplete="on" novalidate>
+      <div class="field-row">
+        <div class="field">
+          <label for="su-name">Full name</label>
+          <input class="input" type="text" id="su-name" placeholder="Your name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="su-mobile">Mobile</label>
+          <input class="input" type="tel" id="su-mobile" placeholder="98XXXXXXXX" inputmode="numeric" autocomplete="tel">
+        </div>
+      </div>
+      <div class="field">
+        <label for="su-email">Email</label>
+        <input class="input" type="email" id="su-email" placeholder="you@example.com" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="su-user">Username</label>
+        <input class="input" type="text" id="su-user" placeholder="Pick a username" autocomplete="username" autocapitalize="none" spellcheck="false">
+        <span class="field-hint">Letters, numbers, dots, dashes and underscores. At least 3 characters.</span>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="su-pass">Password</label>
+          <div class="pw-field">
+            <input class="input" type="password" id="su-pass" placeholder="At least 6 characters" autocomplete="new-password">
+            <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="su-cpass">Repeat password</label>
+          <div class="pw-field">
+            <input class="input" type="password" id="su-cpass" placeholder="Type it again" autocomplete="new-password" enterkeyhint="go">
+            <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
+          </div>
+        </div>
+      </div>
+      <button class="btn" id="btn-signup" type="submit">Create my account</button>
+      <div class="link-row"><span>Already registered?</span><button type="button" onclick="APP.setMode('login')">Sign in</button></div>
+    </form>
+
+    <!-- ── Trial ── -->
+    <div id="form-trial" style="display:none">
+      <div class="trial-panel">
+        <div class="lbl">Free trial running</div>
+        <div class="timer" id="trial-timer">23:59:59</div>
+        <div class="note">Pay any time to keep your access permanently.</div>
+      </div>
+      <div class="banner banner-info" id="mobile-prompt-trial" style="display:none">
+        <i class="ph ph-phone"></i>
+        <div style="flex:1">
+          <div style="margin-bottom:var(--sp-2)">Add a mobile number so we can reach you about your payment.</div>
+          <div style="display:flex;gap:var(--sp-2)">
+            <input class="input" type="tel" id="mp-trial-mobile" placeholder="98XXXXXXXX" inputmode="numeric" style="min-height:36px">
+            <button class="btn btn-sm" onclick="APP.saveMobile('mp-trial-mobile')">Save</button>
+          </div>
+        </div>
+      </div>
+      <button class="btn" onclick="APP.goUser()">Start studying</button>
+      <button class="btn btn-sec" onclick="APP.setMode('payment')">Pay now for permanent access</button>
+      <button class="btn btn-sec" onclick="APP.logout()">Log out</button>
     </div>
-    <div class="mobile-prompt" id="mobile-prompt-trial" style="display:none">
-      <p>Add a mobile number so admin can reach you about payment review.</p>
-      <div class="row">
-        <input type="tel" id="mp-trial-mobile" placeholder="98XXXXXXXX" inputmode="numeric" pattern="[0-9]*" maxlength="10">
-        <button class="btn-sm" type="button" onclick="APP.saveMobile('mp-trial-mobile')">Save</button>
+
+    <!-- ── Payment ── -->
+    <div id="form-payment" style="display:none">
+      <div class="banner banner-danger" id="pay-banner" style="display:none">
+        <i class="ph ph-hourglass"></i>
+        <span><strong>Your trial has ended.</strong> Complete the payment below to get permanent access.</span>
+      </div>
+      <div class="banner banner-warning" id="pay-settings-warn" style="display:none">
+        <i class="ph ph-warning"></i>
+        <span>Couldn't refresh the payment details. These are the last known ones — reload once you're back online.</span>
+      </div>
+      <div class="banner banner-info" id="mobile-prompt-pay" style="display:none">
+        <i class="ph ph-phone"></i>
+        <div style="flex:1">
+          <div style="margin-bottom:var(--sp-2)">Add a mobile number so we can reach you if there's a problem with the payment.</div>
+          <div style="display:flex;gap:var(--sp-2)">
+            <input class="input" type="tel" id="mp-pay-mobile" placeholder="98XXXXXXXX" inputmode="numeric" style="min-height:36px">
+            <button class="btn btn-sm" onclick="APP.saveMobile('mp-pay-mobile')">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="qr-wrap">
+        <div class="qr-fallback" id="qr-fallback"><i class="ph ph-qr-code"></i></div>
+        <img id="qr-img" style="display:none" alt="Payment QR code" onerror="APP.onQrError()">
+      </div>
+      <div class="pay-amt"><span class="cur">Rs</span> <span id="pay-amt">100</span></div>
+      <div class="pay-phone mono" id="pay-phone">9863200285</div>
+      <p class="pay-inst" id="pay-inst">Scan the QR code, then send us the transaction ID below.</p>
+
+      <div class="field">
+        <label for="pay-txn">Transaction ID</label>
+        <input class="input mono" type="text" id="pay-txn" placeholder="e.g. TXN123456789" autocapitalize="characters" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="pay-rem">Anything we should know <span class="t-cap">(optional)</span></label>
+        <input class="input" type="text" id="pay-rem" placeholder="A note for the admin">
+      </div>
+      <div class="field">
+        <span class="field-hint" style="font-weight:600;color:var(--ink-2);font-size:var(--fs-foot)">Screenshot of the payment</span>
+        <label class="file-drop" for="pay-file">
+          <input type="file" id="pay-file" accept="image/*" onchange="APP.onFile()">
+          <span class="fd-btn"><i class="ph ph-image"></i> Choose image</span>
+          <span class="fd-name" id="pay-file-name">No file chosen</span>
+        </label>
+      </div>
+      <button class="btn" id="btn-pay" onclick="APP.submitPayment()">Send for verification</button>
+      <button class="btn btn-sec" onclick="APP.logout()">Back to sign in</button>
+    </div>
+
+    <!-- ── Awaiting review ── -->
+    <div id="form-status" style="display:none">
+      <div class="status-card">
+        <div class="big" id="st-icon"><i class="ph ph-clock-countdown"></i></div>
+        <h2 id="st-title">Payment sent</h2>
+        <p id="st-msg">We've got it. An admin will check it and your access opens as soon as it's approved.</p>
+        <button class="btn btn-sec" onclick="APP.logout()">Back to sign in</button>
       </div>
     </div>
-    <button class="btn" onclick="APP.goUser()">Enter Study Dashboard →</button>
-    <button class="btn-sec" onclick="APP.setMode('payment')">Pay Now (Permanent)</button>
-    <button class="btn-sec" onclick="APP.logout()">Logout</button>
   </div>
+</main>
 
-  <!-- PAYMENT -->
-  <div id="form-payment" class="pay-box" style="display:none">
-    <div class="expired-banner" id="pay-banner" style="display:none">
-      <strong>Trial Expired</strong><br>Complete payment to unlock permanent access.
-    </div>
-    <div class="expired-banner" id="pay-settings-warn" style="display:none">
-      <strong>Couldn't refresh payment details from the server.</strong><br>Showing the last known info — reload the page once you're back online.
-    </div>
-    <div class="mobile-prompt" id="mobile-prompt-pay" style="display:none">
-      <p>Add a mobile number so admin can reach you if there's an issue with your payment.</p>
-      <div class="row">
-        <input type="tel" id="mp-pay-mobile" placeholder="98XXXXXXXX" inputmode="numeric" pattern="[0-9]*" maxlength="10">
-        <button class="btn-sm" type="button" onclick="APP.saveMobile('mp-pay-mobile')">Save</button>
-      </div>
-    </div>
-    <div class="qr-wrap">
-      <div class="qr-fallback" id="qr-fallback"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
-      <img id="qr-img" style="display:none" alt="Payment QR" onerror="APP.onQrError()">
-    </div>
-    <div class="pay-info">
-      <div class="amt">Rs <span id="pay-amt">100</span></div>
-      <div class="phone" id="pay-phone">9863200285</div>
-      <div class="inst" id="pay-inst">Scan the QR code and submit your transaction ID for verification.</div>
-    </div>
-    <div class="fld"><label for="pay-txn">Transaction ID (TXN ID)</label><input type="text" id="pay-txn" placeholder="e.g. TXN123456789"></div>
-    <div class="fld"><label for="pay-rem">Remarks (optional)</label><input type="text" id="pay-rem" placeholder="Any note for admin…"></div>
-    <div class="fld">
-      <label for="pay-file">Screenshot / Receipt</label>
-      <label class="file-up" for="pay-file">
-        <input type="file" id="pay-file" accept="image/*" onchange="APP.onFile()">
-        <span class="file-up-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Choose Image</span>
-        <span class="file-up-name" id="pay-file-name">No file chosen</span>
-      </label>
-    </div>
-    <button class="btn" id="btn-pay" onclick="APP.submitPayment()">Submit Payment →</button>
-    <button class="btn-sec" onclick="APP.logout()">← Back to Login</button>
-  </div>
+<div class="wide">
+  <section class="section" id="about" aria-labelledby="about-h">
+    <h2 id="about-h">What Abhyas is</h2>
+    <p class="lede">Practice for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam. Thousands of questions across the technical paper, plus the General Knowledge and IQ sections that sit alongside it.</p>
 
-  <!-- STATUS / WAITING -->
-  <div id="form-status" class="pay-box" style="display:none">
-    <div class="status-card">
-      <div class="big-icon" id="st-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
-      <h2 id="st-title">Payment Submitted</h2>
-      <p id="st-msg">Your payment is under review. You will be notified once verified.</p>
-      <button class="btn-sec" onclick="APP.logout()">Back to Login</button>
+    <h3 class="t-cap" style="font-weight:700;margin-bottom:var(--sp-2)">Subjects covered</h3>
+    <ul class="subject-list">
+      <li>Structural Engineering</li><li>Engineering Survey</li><li>Construction Materials</li>
+      <li>Concrete Technology</li><li>Geotechnical Engineering</li><li>Construction Management</li>
+      <li>Estimating &amp; Costing</li><li>Engineering Drawing</li><li>Engineering Economics</li>
+      <li>Professional Practices</li><li>General Knowledge</li><li>IQ &amp; reasoning</li>
+    </ul>
+
+    <div class="point">
+      <h3>It keeps working when the power doesn't</h3>
+      <p>Open a chapter once while you have signal and its questions are saved to your phone. After that it opens during load-shedding, on the bus, or anywhere with no connection at all. New chapters need a connection the first time.</p>
     </div>
-  </div>
+    <div class="point">
+      <h3>It tells you what to revise next</h3>
+      <p>Accuracy per chapter, a daily streak, and a miss list that brings questions back on a spacing schedule until you've got them twice in a row. Your progress follows you to any device you sign in on.</p>
+    </div>
+    <div class="point">
+      <h3>Written answers, marked by a person</h3>
+      <p>A timed question every day and full 100-mark papers on demand. Write on paper, photograph it, upload one PDF, and an admin marks it and sends feedback.</p>
+    </div>
+    <div class="point">
+      <h3>Free to try first</h3>
+      <p>Every new account gets a trial period with everything unlocked. Pay only once you know it's useful.</p>
+    </div>
+  </section>
+
+  <section class="section" id="faq" aria-labelledby="faq-h">
+    <h2 id="faq-h">Common questions</h2>
+    <div style="margin-top:var(--sp-4)">
+      <details class="faq">
+        <summary>What is Lok Sewa Aayog?</summary>
+        <p>Nepal's Public Service Commission. It runs the civil service examinations, including the Level 7 Civil Engineering exam that Abhyas is built around.</p>
+      </details>
+      <details class="faq">
+        <summary>Can I really use it with no internet?</summary>
+        <p>Yes, for anything you've opened before. Once a chapter or subtopic has loaded while you were online, it stays on your device and opens with no connection. You can also download everything at once from the Downloads screen.</p>
+      </details>
+      <details class="faq">
+        <summary>What does it cost?</summary>
+        <p>New accounts start on a free trial with full access. After that there's a one-time payment; the amount and the QR code are on the payment screen once your trial ends.</p>
+      </details>
+      <details class="faq">
+        <summary>Is my progress safe if I change phone?</summary>
+        <p>Yes. Progress backs up to your Abhyas account whenever you're online, and you can restore it on a new device by signing in. You can also keep a second copy in your own Google Drive, or export a backup file.</p>
+      </details>
+      <details class="faq">
+        <summary>I forgot my password.</summary>
+        <p>Use "Forgot your password?" on the sign-in form. If the username or email matches an account, a reset code goes to that account's email address.</p>
+      </details>
+    </div>
+  </section>
+
+  <p class="foot">Abhyas — Loksewa Civil Engineering practice for Nepal</p>
 </div>
-<div class="scroll-hint" id="scroll-hint" aria-hidden="true">
-  <span>About Abhyas &amp; FAQ</span>
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-</div>
-</section>
-
-<section class="snap-post top-aligned wide-section intro-section" id="post-about" aria-labelledby="about-heading" role="tabpanel">
-  <h2 id="about-heading" class="section-heading">About Abhyas</h2>
-
-  <div class="about-card">
-    <p>Abhyas is a Loksewa Civil Engineering exam preparation app for Nepal, designed for Level 7 Engineering candidates. It provides Civil Engineering, General Knowledge, and IQ/reasoning practice questions online and offline.</p>
-  </div>
-
-  <div class="about-card">
-    <h3>What is Loksewa?</h3>
-    <p>Lok Sewa Aayog is Nepal's Public Service Commission, which conducts the civil service examinations — including the Level 7 Civil Engineering exam — for government engineering positions.</p>
-  </div>
-
-  <div class="about-card">
-    <h3>What does Abhyas cover?</h3>
-    <p>Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating &amp; Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections that appear alongside the technical paper.</p>
-  </div>
-
-  <div class="about-card">
-    <h3>Online and offline practice</h3>
-    <p>Once a chapter or subtopic has been opened while online, its questions are cached on your device for fully offline practice afterward — during load-shedding, on the bus, or anywhere without a connection.</p>
-  </div>
-
-  <div class="about-card">
-    <h3>Progress tracking</h3>
-    <p>Accuracy, attempted vs. correct counts, a daily study streak, and weak-topic detection so you always know exactly what to review next — synced across your devices whenever you're online.</p>
-  </div>
-
-  <div class="about-card">
-    <h3>Free trial / access</h3>
-    <p>New accounts get a free trial period to explore the app before deciding whether to continue with paid access.</p>
-  </div>
-</section>
-
-<section class="snap-post top-aligned wide-section faq-section" id="post-faq" aria-labelledby="faq-heading" role="tabpanel" style="font-size:.78rem;color:var(--c-text-soft);line-height:1.5">
-  <h2 id="faq-heading" class="section-heading">Frequently Asked Questions</h2>
-
-  <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
-    <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">What is Loksewa (Lok Sewa Aayog)?</summary>
-    <p style="margin-top:.4rem">Lok Sewa Aayog is Nepal's Public Service Commission, which conducts the civil service examinations — including the Level 7 Civil Engineering exam — for government engineering positions. Abhyas is built specifically to help candidates prepare for this exam.</p>
-  </details>
-
-  <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
-    <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">What subjects does Abhyas cover for Level 7 Civil Engineering?</summary>
-    <p style="margin-top:.4rem">Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating &amp; Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections.</p>
-  </details>
-
-  <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
-    <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">Can I use Abhyas offline?</summary>
-    <p style="margin-top:.4rem">Yes. Once you've opened a chapter or subtopic while online, its questions are cached on your device — you can keep practicing with no internet connection, including during load-shedding or while travelling. New content still needs a connection the first time.</p>
-  </details>
-
-  <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
-    <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">Is Abhyas free?</summary>
-    <p style="margin-top:.4rem">New accounts get a free trial period to explore the app before deciding whether to continue with paid access.</p>
-  </details>
-
-  <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
-    <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">Does Abhyas track my progress?</summary>
-    <p style="margin-top:.4rem">Yes — accuracy, attempted vs. correct counts, a daily study streak, and weak-topic detection so you know exactly what to review next, synced across your devices when you're online.</p>
-  </details>
-</section>
 
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "What is Loksewa (Lok Sewa Aayog)?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Lok Sewa Aayog is Nepal's Public Service Commission, which conducts the civil service examinations — including the Level 7 Civil Engineering exam — for government engineering positions. Abhyas is built specifically to help candidates prepare for this exam." }
-    },
-    {
-      "@type": "Question",
-      "name": "What subjects does Abhyas cover for Level 7 Civil Engineering?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating & Costing, Engineering Drawing, Engineering Economics, and Professional Practices, plus General Knowledge and IQ/reasoning sections." }
-    },
-    {
-      "@type": "Question",
-      "name": "Can I use Abhyas offline?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Yes. Once a chapter or subtopic has been opened online, its questions are cached on the device for fully offline practice, including during load-shedding or while travelling." }
-    },
-    {
-      "@type": "Question",
-      "name": "Is Abhyas free?",
-      "acceptedAnswer": { "@type": "Answer", "text": "New accounts get a free trial period to explore the app before deciding whether to continue with paid access." }
-    },
-    {
-      "@type": "Question",
-      "name": "Does Abhyas track my progress?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Yes — accuracy, attempted vs. correct counts, a daily study streak, and weak-topic detection, synced across devices when online." }
-    }
+    { "@type":"Question","name":"What is Lok Sewa Aayog?","acceptedAnswer":{"@type":"Answer","text":"Nepal's Public Service Commission. It runs the civil service examinations, including the Level 7 Civil Engineering exam that Abhyas is built around."} },
+    { "@type":"Question","name":"Can I really use it with no internet?","acceptedAnswer":{"@type":"Answer","text":"Yes, for anything you have opened before. Once a chapter or subtopic has loaded while you were online, it stays on your device and opens with no connection. You can also download everything at once from the Downloads screen."} },
+    { "@type":"Question","name":"What does it cost?","acceptedAnswer":{"@type":"Answer","text":"New accounts start on a free trial with full access. After that there is a one-time payment; the amount and the QR code are on the payment screen once your trial ends."} },
+    { "@type":"Question","name":"Is my progress safe if I change phone?","acceptedAnswer":{"@type":"Answer","text":"Yes. Progress backs up to your Abhyas account whenever you are online, and you can restore it on a new device by signing in. You can also keep a second copy in your own Google Drive, or export a backup file."} },
+    { "@type":"Question","name":"I forgot my password.","acceptedAnswer":{"@type":"Answer","text":"Use Forgot your password on the sign-in form. If the username or email matches an account, a reset code goes to that account's email address."} }
   ]
 }
 </script>
-</main>
 
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
-<!-- Cookie banner — hidden by default; the inline check below reveals it
-     only when the user hasn't yet acknowledged. Runs before paint to
-     avoid a flash. -->
 <div class="cookie-banner" id="cookie-banner" hidden role="region" aria-label="Cookie notice">
-  <p>Abhyas uses cookies for sign-in and to keep the service secure. Continuing to use the site means you're okay with that.</p>
-  <button class="btn-accept" onclick="COOKIE_NOTICE.accept()">Got it</button>
+  <p>Abhyas uses cookies to keep you signed in and to show ads that help keep the app free.</p>
+  <button class="btn" onclick="COOKIE_NOTICE.accept()">Got it</button>
 </div>
-<script>(function(){
-  try{
-    if (localStorage.getItem('abhyas_cookie_ack') !== '1') {
-      document.getElementById('cookie-banner').hidden = false;
-    }
-  }catch(e){}
-})();</script>
 
 <script src="version.js"></script>
 <script src="shared.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
-   ABHYAS — UNIFIED GATEWAY
+   Abhyas — front door.
+
+   Handles six states behind one card: sign in, create account, forgot
+   password, reset password, trial, payment, awaiting review — plus the
+   silent hand-off for anyone who already has permanent access.
+
+   Every credential goes out by POST. None of them ever appear in a URL,
+   which would otherwise put them in browser history and in the Apps
+   Script request log.
    ═══════════════════════════════════════════════════════════════════════ */
+'use strict';
 
 const GAS_URL = ABHYAS_CONFIG.GAS_URL;
-const GOOGLE_CLIENT_ID = ABHYAS_CONFIG.GOOGLE_CLIENT_ID ||
-  "242226857075-hpkbjoqhlem95fu6vkf712e8ijs33sng.apps.googleusercontent.com";
-
-const LS_USER = 'abhyas_session';
+const GOOGLE_CLIENT_ID = "242226857075-hpkbjoqhlem95fu6vkf712e8ijs33sng.apps.googleusercontent.com";
+const LS_USER  = 'abhyas_session';
 const LS_ADMIN = 'abhyas_admin';
 
-/* ═══════════════════════════════════════════════════════════════════════
-   PASSWORD VISIBILITY TOGGLE  (NEW — improved)
-   ─────────────────────────────────────────────────────────────────────
-   • Two icons already in the DOM; CSS toggles which is visible. No
-     innerHTML swap — that would drop focus and, on iOS, close the
-     keyboard.
-   • Preserves caret selection (Safari sometimes moves it on type change).
-   • Updates aria-pressed + aria-label so screen readers know the state.
-   • Auto-hides after 30s of being shown, so a shared device doesn't
-     stay in "password visible" mode.
-   • Announces the change via the #sr-status live region.
-   ═══════════════════════════════════════════════════════════════════════ */
-function togglePwVisibility(btn){
-  const wrap = btn.closest('.pw-field');
-  const input = wrap && wrap.querySelector('input');
-  if (!input) return;
+const $ = id => document.getElementById(id);
 
+/* shared.js ships a theme toggle, but it doesn't move the browser
+   chrome colour with it. Override so the phone status bar matches. */
+window.toggleTheme = function(){
+  const dark = document.documentElement.classList.toggle('dark');
+  try { localStorage.setItem('abhyas_theme', JSON.stringify(dark ? 'dark' : 'light')); } catch(e){}
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', dark ? '#080B14' : '#F2F4F3');
+};
+
+function togglePw(btn){
+  const input = btn.closest('.pw-field').querySelector('input');
   const show = input.type === 'password';
-
-  // Preserve caret/selection across the type flip.
-  let selStart = null, selEnd = null;
-  try { selStart = input.selectionStart; selEnd = input.selectionEnd; } catch(e){}
-
   input.type = show ? 'text' : 'password';
-
-  if (selStart !== null) {
-    try { input.setSelectionRange(selStart, selEnd); } catch(e){}
-  }
-
-  btn.classList.toggle('on', show);
   btn.setAttribute('aria-pressed', show ? 'true' : 'false');
   btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-
-  const sr = document.getElementById('sr-status');
-  if (sr) sr.textContent = show ? 'Password visible' : 'Password hidden';
-
-  // Auto-hide the toggle after 30 seconds of visibility.
-  if (btn._hideTimer) { clearTimeout(btn._hideTimer); btn._hideTimer = null; }
-  if (show) {
-    btn._hideTimer = setTimeout(() => {
-      if (btn.classList.contains('on')) togglePwVisibility(btn);
-    }, 30000);
-  }
+  btn.innerHTML = show ? '<i class="ph ph-eye-slash"></i>' : '<i class="ph ph-eye"></i>';
 }
-// Expose globally — the inline onclick handlers call it directly.
-window.togglePwVisibility = togglePwVisibility;
 
-/* ═══════════════════════════════════════════════════════════════════════
-   APP
-   ═══════════════════════════════════════════════════════════════════════ */
+const MODES = ['redirecting','login','signup','forgot','reset','payment','trial','status'];
+
 const APP = {
   mode: 'login',
   online: false,
   trialTimerId: null,
   fileData: null,
   session: null,
-  _netTimer: null,
-  _netRetryMs: 15000,     // NEW — backoff state
-  _netMaxRetryMs: 120000,
+  settings: {},
+  _gReady: false,
   _payRefreshTimer: null,
 
-  async init() {
+  async init(){
     this.checkNet();
-    this.scheduleNetLoop();
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        this.checkNet();
-        this.scheduleNetLoop();
-      } else {
-        this.stopNetLoop();
-      }
-    });
+    setInterval(() => this.checkNet(), 15000);
     this.initGoogleSignIn();
-    this.initPaging();
+    this.bindForms();
 
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('resetToken') || params.get('reset');
     if (urlToken) {
       history.replaceState(null, '', window.location.pathname);
       this.setMode('reset');
-      const codeEl = document.getElementById('rs-code');
+      const codeEl = $('rs-code');
       if (codeEl) codeEl.value = urlToken;
       return;
     }
@@ -713,166 +864,90 @@ const APP = {
     const saved = this.getSession();
     if (saved) {
       this.session = saved;
-      if (saved.type === 'admin') {
-        this.toast('🛡️ Resuming admin session…');
-        setTimeout(() => this.goAdmin(), 400);
-        return;
-      }
-      if (saved.type === 'user') {
-        this.resumeUserSession(saved);
-        return;
-      }
+      if (saved.type === 'admin') { this.toast('Resuming your admin session…'); setTimeout(() => this.goAdmin(), 400); return; }
+      if (saved.type === 'user')  { this.resumeUserSession(saved); return; }
     }
     this.setMode('login');
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     NETWORK — NEW: pauses when tab is hidden, exponential backoff
-     ═══════════════════════════════════════════════════════════════════ */
-  scheduleNetLoop() {
-    this.stopNetLoop();
-    this._netTimer = setTimeout(async () => {
-      await this.checkNet();
-      // Increase backoff on failure, reset on success.
-      this._netRetryMs = this.online ? 15000 : Math.min(this._netRetryMs * 2, this._netMaxRetryMs);
-      if (document.visibilityState === 'visible') this.scheduleNetLoop();
-    }, this._netRetryMs);
-  },
-  stopNetLoop() {
-    if (this._netTimer) { clearTimeout(this._netTimer); this._netTimer = null; }
+  /* Real forms, so Enter submits and password managers behave. */
+  bindForms(){
+    const on = (id, fn) => { const f = $(id); if (f) f.addEventListener('submit', e => { e.preventDefault(); fn(); }); };
+    on('form-login',  () => this.login());
+    on('form-signup', () => this.signup());
+    on('form-forgot', () => this.requestReset());
+    on('form-reset',  () => this.confirmReset());
+    ['in-user','in-pass','su-user','su-pass','fg-id','rs-code'].forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener('input', () => this.hideErr());
+    });
   },
 
-  async checkNet() {
+  /* ── Connection ─────────────────────────────────────────────────── */
+  async checkNet(){
     const wasOnline = this.online;
-    const dot = document.getElementById('ndot');
-    const txt = document.getElementById('nstat');
-    const badge = document.getElementById('offline-badge');
+    const dot = $('ndot'), txt = $('nstat');
     const startedAt = Date.now();
     this.online = await pingBackend(GAS_URL);
-    const roundTripMs = Date.now() - startedAt;
+    const roundTrip = Date.now() - startedAt;
 
     if (this.online) {
-      const slow = roundTripMs > 3000;
+      const slow = roundTrip > 3000;
       dot.className = slow ? 'ndot warn' : 'ndot';
-      txt.textContent = slow ? 'Connected — slow response' : 'Backend connected';
-      badge.classList.remove('show');
-      if (!wasOnline) {
-        this._netRetryMs = 15000;
-        if (this.mode === 'payment') this.loadPaymentUI();
-        if (navigator.serviceWorker && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_STALE_IF_ONLINE' });
-        }
+      txt.textContent = slow ? 'Connected, but slow' : 'Connected';
+      if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
+      if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type:'CLEAR_STALE_IF_ONLINE' });
       }
     } else {
       dot.className = 'ndot off';
-      txt.textContent = 'Offline mode';
-      if (this.session) badge.classList.add('show');
+      txt.textContent = this.session ? 'Offline — using your saved session' : 'No connection';
     }
     this.updatePayButtonState();
   },
 
-  updatePayButtonState() {
-    const btn = document.getElementById('btn-pay');
+  updatePayButtonState(){
+    const btn = $('btn-pay');
     if (!btn) return;
     btn.disabled = !this.online;
-    btn.textContent = this.online ? 'Submit Payment →' : 'Offline — reconnect to pay';
+    btn.textContent = this.online ? 'Send for verification' : 'Offline — reconnect to pay';
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     SNAP PAGING
-     ═══════════════════════════════════════════════════════════════════ */
-  initPaging() {
-    const container = document.getElementById('snap-container');
-    const dots = Array.from(document.querySelectorAll('#page-dots button'));
-    const hint = document.getElementById('scroll-hint');
-    if (!container || !dots.length) return;
-
-    dots.forEach(dot => {
-      dot.addEventListener('click', () => {
-        const target = document.getElementById(dot.dataset.target);
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    });
-
-    const posts = ['post-login', 'post-about', 'post-faq']
-      .map(id => document.getElementById(id)).filter(Boolean);
-
-    const observer = new IntersectionObserver((entries) => {
-      let best = null;
-      entries.forEach(entry => {
-        if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
-      });
-      if (!best || best.intersectionRatio < 0.5) return;
-      const id = best.target.id;
-      dots.forEach(dot => {
-        const active = dot.dataset.target === id;
-        dot.classList.toggle('active', active);
-        dot.setAttribute('aria-selected', active ? 'true' : 'false');
-      });
-      if (hint && id !== 'post-login') hint.classList.add('hide');
-    }, { root: container, threshold: [0.5] });
-
-    posts.forEach(post => observer.observe(post));
-
-    container.addEventListener('scroll', () => {
-      if (container.scrollTop > 40 && hint) hint.classList.add('hide');
-    }, { passive: true });
+  /* ── Session storage ────────────────────────────────────────────── */
+  getSession(){
+    try { const raw = localStorage.getItem(LS_USER); return raw ? JSON.parse(raw) : null; }
+    catch(e){ localStorage.removeItem(LS_USER); return null; }
   },
-
-  /* ═══════════════════════════════════════════════════════════════════
-     SESSION
-     ═══════════════════════════════════════════════════════════════════ */
-  getSession() {
-    try {
-      const raw = localStorage.getItem(LS_USER);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) {
-      localStorage.removeItem(LS_USER);
-      return null;
-    }
-  },
-  saveSession(obj) {
-    this.session = obj;
-    try { localStorage.setItem(LS_USER, JSON.stringify(obj)); } catch (e) {}
-  },
-  clearSession() {
-    this.session = null;
-    try { localStorage.removeItem(LS_USER); } catch (e) {}
-  },
-  saveAdminToken(username, adminToken, ttlMs) {
+  saveSession(obj){ this.session = obj; try { localStorage.setItem(LS_USER, JSON.stringify(obj)); } catch(e){} },
+  clearSession(){ this.session = null; try { localStorage.removeItem(LS_USER); } catch(e){} },
+  saveAdminToken(username, adminToken, ttlMs){
     try {
       localStorage.setItem(LS_ADMIN, JSON.stringify({
-        user: username,
-        token: adminToken,
-        expires: Date.now() + (ttlMs || 24 * 60 * 60 * 1000)
+        user: username, token: adminToken, expires: Date.now() + (ttlMs || 86400000)
       }));
-    } catch (e) {}
+    } catch(e){}
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     MODE SWITCHER  — NEW: autofocus on the first field of each form
-     ═══════════════════════════════════════════════════════════════════ */
-  setMode(m) {
+  /* ── Mode switching ─────────────────────────────────────────────── */
+  setMode(m){
     this.mode = m;
-    const tabs = document.getElementById('auth-tabs');
+
+    const tabs = $('auth-tabs');
     if (tabs) {
       tabs.style.display = (m === 'login' || m === 'signup') ? 'flex' : 'none';
-      document.querySelectorAll('.tab').forEach((t, i) => {
-        const active = (m === 'login' && i === 0) || (m === 'signup' && i === 1);
-        t.classList.toggle('active', active);
-        t.setAttribute('aria-selected', active ? 'true' : 'false');
+      tabs.querySelectorAll('.tab').forEach((t, i) => {
+        const on = (m === 'login' && i === 0) || (m === 'signup' && i === 1);
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
     }
-    const ids = ['form-redirecting','form-login','form-signup','form-forgot','form-reset','form-payment','form-trial','form-status'];
-    ids.forEach(id => {
-      const el = document.getElementById(id);
-      if (!el) return;
-      const show = id === 'form-' + m;
-      el.style.display = show ? 'block' : 'none';
-      if (show) el.classList.add('on'); else el.classList.remove('on');
+
+    MODES.forEach(id => {
+      const el = $('form-' + id);
+      if (el) el.style.display = (id === m) ? 'block' : 'none';
     });
 
-    const gWrap = document.getElementById('g-signin-wrap');
+    const gWrap = $('g-signin-wrap');
     if (gWrap) gWrap.classList.toggle('g-hidden', !(this._gReady && (m === 'login' || m === 'signup')));
 
     this.hideErr();
@@ -882,9 +957,7 @@ const APP = {
       this.loadPaymentUI();
       if (!this._payRefreshTimer) {
         this._payRefreshTimer = setInterval(() => {
-          if (document.visibilityState === 'visible' && this.mode === 'payment' && this.online) {
-            this.loadPaymentUI();
-          }
+          if (this.mode === 'payment' && this.online) this.loadPaymentUI();
         }, 20000);
       }
     } else if (this._payRefreshTimer) {
@@ -892,148 +965,118 @@ const APP = {
       this._payRefreshTimer = null;
     }
 
-    if (m === 'trial') this.renderMobilePrompt('mobile-prompt-trial');
+    if (m === 'trial')   this.renderMobilePrompt('mobile-prompt-trial');
     if (m === 'payment') this.renderMobilePrompt('mobile-prompt-pay');
 
-    // NEW: autofocus the first meaningful field.
-    const focusMap = {
-      login: 'in-user',
-      signup: 'su-name',
-      forgot: 'fg-id',
-      reset: 'rs-code'
-    };
-    const target = focusMap[m];
-    if (target) {
-      setTimeout(() => {
-        const el = document.getElementById(target);
-        if (el && !el.disabled) el.focus({ preventScroll: true });
-      }, 60);
+    /* Only move focus when the person asked for the switch — never on
+       the first paint, which would scroll a phone to the field and pop
+       the keyboard before they've read anything. */
+    if (this._userSwitched) {
+      const first = $('form-' + m)?.querySelector('input:not([type=hidden])');
+      if (first && matchMedia('(pointer:fine)').matches) setTimeout(() => first.focus(), 60);
     }
+    this._userSwitched = true;
   },
 
-  showErr(msg) {
-    const e = document.getElementById('err');
-    e.textContent = msg;
-    e.classList.add('show');
-  },
-  hideErr() {
-    document.getElementById('err').classList.remove('show');
-  },
+  showErr(msg){ $('err-text').textContent = msg; $('err').classList.add('show'); },
+  hideErr(){ $('err').classList.remove('show'); },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     API
-     ═══════════════════════════════════════════════════════════════════ */
-  async api(action, params = {}, method = 'GET') {
-    const qs = new URLSearchParams(params).toString();
-    if (method === 'GET') {
-      try {
-        const r = await fetch(GAS_URL + '?action=' + action + '&' + qs, { cache: 'no-store' });
-        return await r.json();
-      } catch (e) {
-        return { success: false, error: 'Network error. Check connection or CORS settings.' };
-      }
-    }
+  /* ── Transport ──────────────────────────────────────────────────── */
+  async api(action, params = {}, method = 'GET'){
     try {
+      if (method === 'GET') {
+        const qs = new URLSearchParams(params).toString();
+        const r = await fetch(GAS_URL + '?action=' + action + (qs ? '&' + qs : ''), { cache:'no-store' });
+        return await r.json();
+      }
       const r = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+        method:'POST', headers:{ 'Content-Type':'text/plain' },
         body: JSON.stringify({ action, ...params })
       });
       return await r.json();
-    } catch (e) {
-      return { success: false, error: 'Network error. Check connection or CORS settings.' };
+    } catch(e){
+      return { success:false, error:'Could not reach the server. Check your connection and try again.' };
     }
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     GOOGLE SIGN-IN
-     ═══════════════════════════════════════════════════════════════════ */
-  initGoogleSignIn() {
+  /* ── Google sign-in ─────────────────────────────────────────────── */
+  initGoogleSignIn(){
     if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('REPLACE_WITH_')) return;
     let attempts = 0;
     const tryInit = () => {
       if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-        if (++attempts > 100) {
-          console.warn('[APP] Google Identity Services unavailable — hiding Sign in with Google.');
-          return;
-        }
+        if (++attempts > 100) { console.warn('[APP] Google Identity Services never loaded.'); return; }
         setTimeout(tryInit, 200);
         return;
       }
       google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
-        callback: (response) => this.onGoogleCredential(response),
+        callback: r => this.onGoogleCredential(r),
         itp_support: true
       });
-      const btnHost = document.getElementById('g-signin-btn');
-      google.accounts.id.renderButton(btnHost, {
-        type: 'standard', theme: 'outline', size: 'large', shape: 'pill', width: 280, text: 'continue_with'
+      const host = $('g-signin-btn');
+      google.accounts.id.renderButton(host, {
+        type:'standard', theme:'outline', size:'large', shape:'pill', width:280, text:'continue_with'
       });
       this._gReady = true;
-      if (this.mode === 'login' || this.mode === 'signup') {
-        document.getElementById('g-signin-wrap').classList.remove('g-hidden');
-      }
+      if (this.mode === 'login' || this.mode === 'signup') $('g-signin-wrap').classList.remove('g-hidden');
+
       setTimeout(() => {
-        if (!btnHost.hasChildNodes()) {
-          console.warn('[APP] Google rendered nothing into #g-signin-btn — check origin whitelist. Origin: ' + window.location.origin);
-          btnHost.innerHTML = '<div style="font-size:.74rem;color:var(--c-text-faint);text-align:center;padding:.5rem 0">Google Sign-In isn\u2019t available on this address — use username/password below.</div>';
+        if (!host.hasChildNodes()) {
+          console.warn('[APP] Google rendered nothing — check the origin whitelist for ' + window.location.origin);
+          host.innerHTML = '<p class="t-foot" style="text-align:center">Google sign-in isn\u2019t available on this address. Use your username and password below.</p>';
         }
       }, 1200);
     };
     tryInit();
   },
 
-  async onGoogleCredential(response) {
-    const wrap = document.getElementById('g-signin-wrap');
-    if (!response || !response.credential) return this.showErr('Google sign-in did not return a token. Please try again.');
+  async onGoogleCredential(response){
+    const wrap = $('g-signin-wrap');
+    if (!response || !response.credential) return this.showErr('Google didn\u2019t return a sign-in token. Try again.');
     if (wrap) wrap.classList.add('g-busy');
     this.setLoading('btn-login', true);
     const res = await this.api('googleLogin', { idToken: response.credential }, 'POST');
     this.setLoading('btn-login', false);
     if (wrap) wrap.classList.remove('g-busy');
     if (!res.success) return this.showErr(res.error || 'Google sign-in failed.');
-    this.toast('👋 Signed in with Google');
+    this.toast('Signed in with Google');
     this.handleUserAuth(res);
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     UNIFIED LOGIN
-     ═══════════════════════════════════════════════════════════════════ */
-  async login() {
-    const u = document.getElementById('in-user').value.trim();
-    const p = document.getElementById('in-pass').value;
-    if (!u || !p) return this.showErr('Enter username and password.');
-    if (u.length < 3) return this.showErr('Username too short.');
+  /* ── Sign in ────────────────────────────────────────────────────── */
+  async login(){
+    const u = $('in-user').value.trim();
+    const p = $('in-pass').value;
+    if (!u || !p) return this.showErr('Enter your username and password.');
+    if (u.length < 3) return this.showErr('That username is too short.');
 
     this.setLoading('btn-login', true);
-    const res = await this.api('login', { username: u, password: p }, 'POST');
+    const res = await this.api('login', { username:u, password:p }, 'POST');
     this.setLoading('btn-login', false);
 
-    if (!res.success) return this.showErr(res.error || 'Login failed.');
+    if (!res.success) return this.showErr(res.error || 'That username and password didn\u2019t match.');
 
     if (res.isAdmin) {
       this.saveAdminToken(u, res.adminToken, res.expiresInMs);
 
+      /* Dual-role accounts land in the student app; the admin console is
+         one tap away from inside it. */
       if (res.user && res.token) {
         const access = computeAccessLevel(res, res.user);
         this.saveSession({
-          type: 'user',
+          type:'user',
           username: res.user.username || u,
-          name: res.user.name || '',
-          email: res.user.email || '',
-          mobile: res.user.mobile || '',
-          token: res.token,
-          access,
-          settings: res.settings || {},
-          lastVerified: Date.now(),
-          adminCapable: true
+          name: res.user.name || '', email: res.user.email || '', mobile: res.user.mobile || '',
+          token: res.token, access, settings: res.settings || {},
+          lastVerified: Date.now(), adminCapable: true
         });
-        this.toast('🛡️ Signed in — admin + user access');
+        this.toast('Signed in with admin access');
         setTimeout(() => { window.location.href = 'user.html'; }, 400);
         return;
       }
 
-      this.toast('🛡️ Welcome, Administrator!');
+      this.toast('Welcome back');
       setTimeout(() => { window.location.href = 'admin.html'; }, 400);
       return;
     }
@@ -1041,176 +1084,122 @@ const APP = {
     this.handleUserAuth(res);
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     PASSWORD RESET
-     ═══════════════════════════════════════════════════════════════════ */
-  async requestReset() {
-    const id = document.getElementById('fg-id').value.trim();
+  /* ── Password reset ─────────────────────────────────────────────── */
+  async requestReset(){
+    const id = $('fg-id').value.trim();
     if (!id) return this.showErr('Enter your username or email.');
-
     this.setLoading('btn-forgot', true);
-    const res = await this.api('requestPasswordReset', { identifier: id }, 'POST');
+    const res = await this.api('requestPasswordReset', { identifier:id }, 'POST');
     this.setLoading('btn-forgot', false);
-
-    if (!res.success) return this.showErr(res.error || 'Something went wrong — try again.');
-    this.toast('📧 ' + (res.message || 'If that account exists, a reset code has been emailed to it.'), 6000);
+    if (!res.success) return this.showErr(res.error || 'Something went wrong. Try again.');
+    this.toast(res.message || 'If that account exists, a reset code is on its way to its email.', 6000);
     this.setMode('reset');
   },
 
-  async confirmReset() {
-    const code = document.getElementById('rs-code').value.trim();
-    const newPass = document.getElementById('rs-pass').value;
+  async confirmReset(){
+    const code = $('rs-code').value.trim();
+    const newPass = $('rs-pass').value;
     if (!code) return this.showErr('Paste the reset code from your email.');
-    if (!newPass || newPass.length < 6) return this.showErr('New password must be at least 6 characters.');
-
+    if (!newPass || newPass.length < 6) return this.showErr('Use at least 6 characters for the new password.');
     this.setLoading('btn-reset', true);
-    const res = await this.api('resetPassword', { token: code, newPassword: newPass }, 'POST');
+    const res = await this.api('resetPassword', { token:code, newPassword:newPass }, 'POST');
     this.setLoading('btn-reset', false);
-
-    if (!res.success) return this.showErr(res.error || 'Could not reset password.');
-    this.toast('✅ Password reset — please sign in with your new password.');
-    document.getElementById('rs-code').value = '';
-    document.getElementById('rs-pass').value = '';
+    if (!res.success) return this.showErr(res.error || 'That reset code didn\u2019t work.');
+    this.toast('Password changed — sign in with the new one.');
+    $('rs-code').value = ''; $('rs-pass').value = '';
     this.setMode('login');
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     SIGNUP — NEW: on-blur username validation + strength meter gate
-     ═══════════════════════════════════════════════════════════════════ */
-  validateUsernameField() {
-    const el = document.getElementById('su-user');
-    const hint = document.getElementById('su-user-hint');
-    if (!el || !hint) return true;
-    const v = el.value.trim();
-    if (!v) { el.classList.remove('invalid'); hint.classList.remove('err','show'); return true; }
-    const ok = /^[a-zA-Z0-9_.-]{3,30}$/.test(v);
-    el.classList.toggle('invalid', !ok);
-    hint.classList.toggle('err', !ok);
-    hint.classList.add('show');
-    return ok;
-  },
+  /* ── Create account ─────────────────────────────────────────────── */
+  async signup(){
+    const name = $('su-name').value.trim();
+    const email = $('su-email').value.trim();
+    const mobile = $('su-mobile').value.trim();
+    const user = $('su-user').value.trim();
+    const pass = $('su-pass').value;
+    const cpass = $('su-cpass').value;
 
-  _strengthScore(p) {
-    let s = 0;
-    if (p.length >= 8) s++;
-    if (p.length >= 12) s++;
-    if (/[A-Z]/.test(p) && /[a-z]/.test(p)) s++;
-    if (/\d/.test(p)) s++;
-    if (/[^A-Za-z0-9]/.test(p)) s++;
-    return s;
-  },
+    const bad = (id, msg) => { const el = $(id); if (el) { el.classList.add('invalid'); el.focus(); } this.showErr(msg); };
+    ['su-name','su-email','su-mobile','su-user','su-pass','su-cpass'].forEach(id => $(id).classList.remove('invalid'));
 
-  updateStrength() {
-    const input = document.getElementById('su-pass');
-    const wrap = document.getElementById('pw-strength');
-    const label = document.getElementById('pw-strength-label');
-    if (!input || !wrap || !label) return;
-    const p = input.value;
-    wrap.classList.remove('s1','s2','s3','s4','s5');
-    if (!p) { label.textContent = ''; return; }
-    const s = this._strengthScore(p);
-    const cls = 's' + Math.max(1, Math.min(5, s));
-    wrap.classList.add(cls);
-    label.textContent = ['', 'Weak', 'Fair', 'Good', 'Strong', 'Excellent'][Math.max(1, Math.min(5, s))];
-  },
-
-  async signup() {
-    const name = document.getElementById('su-name').value.trim();
-    const email = document.getElementById('su-email').value.trim();
-    const mobile = document.getElementById('su-mobile').value.trim();
-    const user = document.getElementById('su-user').value.trim();
-    const pass = document.getElementById('su-pass').value;
-    const cpass = document.getElementById('su-cpass').value;
-
-    if (!name || !email || !mobile || !user || !pass) return this.showErr('All fields are required.');
-    if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(user)) return this.showErr('Username: 3–30 characters, letters/numbers/._- only.');
-    if (pass.length < 6) return this.showErr('Password must be at least 6 characters.');
-    if (pass !== cpass) return this.showErr('Passwords do not match.');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return this.showErr('Invalid email address.');
-    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return this.showErr('Invalid Nepali mobile number. Use 10 digits starting with 98/97/96/99.');
+    if (!name || !email || !mobile || !user || !pass) return this.showErr('Fill in every field.');
+    if (user.length < 3) return bad('su-user', 'Your username needs at least 3 characters.');
+    if (pass.length < 6) return bad('su-pass', 'Your password needs at least 6 characters.');
+    if (pass !== cpass)  return bad('su-cpass', 'The two passwords don\u2019t match.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad('su-email', 'That email address doesn\u2019t look right.');
+    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return bad('su-mobile', 'Use a 10-digit Nepali mobile number starting 98, 97, 96 or 99.');
 
     this.setLoading('btn-signup', true);
-    const res = await this.api('signup', { username: user, password: pass, name, email, mobile }, 'POST');
+    const res = await this.api('signup', { username:user, password:pass, name, email, mobile }, 'POST');
     this.setLoading('btn-signup', false);
 
-    if (!res.success) return this.showErr(res.error || 'Signup failed.');
+    if (!res.success) return this.showErr(res.error || 'Couldn\u2019t create that account.');
 
-    this.toast('🎉 Account created! 24-hour trial started.');
+    this.toast('Account created — your free trial has started.');
     this.saveSession({
-      type: 'user',
-      username: user, name, email, mobile,
+      type:'user', username:user, name, email, mobile,
       token: res.token,
-      access: {
-        level: 'trial',
-        trialExpiresAt: res.trialExpiresAt,
-        permanent: false
-      },
-      settings: {},
-      lastVerified: Date.now()
+      access: { level:'trial', trialExpiresAt: res.trialExpiresAt, permanent:false },
+      settings: {}, lastVerified: Date.now()
     });
     this.startTrialTimer(new Date(res.trialExpiresAt));
     this.setMode('trial');
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     USER AUTH ROUTING
-     ═══════════════════════════════════════════════════════════════════ */
-  handleUserAuth(res) {
+  /* ── Routing by access level ────────────────────────────────────── */
+  handleUserAuth(res){
     const user = res.user || {};
     const access = computeAccessLevel(res, user);
 
-    const session = {
-      type: 'user',
+    this.saveSession({
+      type:'user',
       username: user.username || res.username,
-      name: user.name,
-      email: user.email,
-      mobile: user.mobile || '',
-      token: res.token,
-      access,
-      settings: res.settings || {},
-      lastVerified: Date.now(),
-      adminCapable: !!res.adminCapable
-    };
-    this.saveSession(session);
+      name: user.name, email: user.email, mobile: user.mobile || '',
+      token: res.token, access, settings: res.settings || {},
+      lastVerified: Date.now(), adminCapable: !!res.adminCapable
+    });
 
     if (access.level === 'permanent') {
-      this.enterDashboard();
+      this.enterDashboard(user.name || user.username);
     } else if (access.level === 'trial') {
       this.startTrialTimer(new Date(access.trialExpiresAt));
       this.setMode('trial');
     } else if (access.level === 'expired') {
       this.settings = res.settings || {};
-      document.getElementById('pay-banner').style.display = 'block';
+      $('pay-banner').style.display = 'flex';
       this.setMode('payment');
     } else if (access.level === 'pending_review') {
       this.setMode('status');
       this.loadPaymentStatus();
     } else {
-      this.showErr(res.error || 'Account issue. Contact admin.');
+      this.showErr(res.error || 'There\u2019s a problem with this account. Please contact the admin.');
     }
   },
 
-  async loadPaymentStatus() {
+  async loadPaymentStatus(){
     if (!this.session || !this.online) return;
     try {
-      const res = await this.api('getPaymentStatus', { username: this.session.username, token: this.session.token });
+      const res = await this.api('getPaymentStatus', { username:this.session.username, token:this.session.token }, 'POST');
       if (res.success && res.payment) {
         const p = res.payment;
-        const msgEl = document.getElementById('st-msg');
         const when = p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '';
-        msgEl.textContent = `TXN ${p.txId} submitted${when ? ' on ' + when : ''} — waiting for admin verification. You'll get full access as soon as it's approved.`;
+        $('st-msg').textContent =
+          'Transaction ' + p.txId + (when ? ', sent on ' + when : '') +
+          '. An admin will check it and your access opens as soon as it\u2019s approved.';
       }
-    } catch (e) { console.warn('[APP] getPaymentStatus poll failed:', e); }
+    } catch(e){ console.warn('[APP] payment status poll failed:', e); }
   },
 
-  async resumeUserSession(saved) {
-    if (saved.access && saved.access.level === 'permanent') {
+  async resumeUserSession(saved){
+    const a = saved.access || {};
+
+    if (a.level === 'permanent') {
       this.enterDashboard(saved.name || saved.username);
       this.syncSessionQuietly(saved);
       return;
     }
-    if (saved.access && saved.access.level === 'trial' && saved.access.trialExpiresAt) {
-      const end = new Date(saved.access.trialExpiresAt);
+    if (a.level === 'trial' && a.trialExpiresAt) {
+      const end = new Date(a.trialExpiresAt);
       if (end > Date.now()) {
         this.startTrialTimer(end);
         this.setMode('trial');
@@ -1222,275 +1211,226 @@ const APP = {
     }
     if (saved.access && saved.access.level === 'expired') {
       this.settings = saved.settings || {};
-      document.getElementById('pay-banner').style.display = 'block';
+      $('pay-banner').style.display = 'flex';
       this.setMode('payment');
       return;
     }
-    if (saved.access && saved.access.level === 'pending_review') {
+    if (a.level === 'pending_review') {
       this.setMode('status');
       if (this.online) this.loadPaymentStatus();
       return;
     }
 
     if (!this.online) {
-      this.showErr('Offline. Cannot verify session.');
+      this.showErr('You\u2019re offline, so we can\u2019t check your session. Reconnect and try again.');
       this.setMode('login');
       return;
     }
-    const res = await this.api('checkSession', { token: saved.token, username: saved.username });
+    const res = await this.api('checkSession', { token:saved.token, username:saved.username }, 'POST');
     if (!res.success) {
       this.clearSession();
-      this.showErr('Session expired. Please login again.');
+      this.showErr('Your session expired. Please sign in again.');
       this.setMode('login');
       return;
     }
     this.handleUserAuth(res);
   },
 
-  async syncSessionQuietly(saved) {
+  async syncSessionQuietly(saved){
     if (!this.online) return;
     try {
-      const res = await this.api('checkSession', { token: saved.token, username: saved.username });
-      if (!res.success) return;
-      if (res.user) {
-        const updated = { ...saved, access: { ...saved.access }, mobile: res.user.mobile || saved.mobile, lastVerified: Date.now() };
-        if ((res.permanentAccess || res.user.status === 'active') && saved.access.level !== 'permanent') {
-          updated.access.level = 'permanent';
-          updated.access.permanent = true;
-          updated.access.accessType = res.accessType || updated.access.accessType;
-          updated.access.accessExpiresAt = res.accessExpiresAt || '';
-          this.saveSession(updated);
-          this.enterDashboard(updated.name || updated.username);
-        } else {
-          this.saveSession(updated);
-        }
+      const res = await this.api('checkSession', { token:saved.token, username:saved.username }, 'POST');
+      if (!res.success || !res.user) return;
+      const updated = { ...saved, access:{ ...saved.access }, mobile: res.user.mobile || saved.mobile, lastVerified: Date.now() };
+      if ((res.permanentAccess || res.user.status === 'active') && saved.access.level !== 'permanent') {
+        updated.access.level = 'permanent';
+        updated.access.permanent = true;
+        updated.access.accessType = res.accessType || updated.access.accessType;
+        updated.access.accessExpiresAt = res.accessExpiresAt || '';
+        this.saveSession(updated);
+        this.enterDashboard(updated.name || updated.username);
+      } else {
+        this.saveSession(updated);
       }
-    } catch (e) {}
+    } catch(e){}
   },
 
-  enterDashboard(displayName) {
-    const nameEl = document.getElementById('redir-name');
+  enterDashboard(displayName){
+    const nameEl = $('redir-name');
     if (nameEl) nameEl.textContent = displayName ? ', ' + displayName : '';
     this.setMode('redirecting');
-    setTimeout(() => { window.location.href = 'user.html'; }, 350);
+    setTimeout(() => { window.location.href = 'user.html'; }, 400);
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     TRIAL TIMER  — NEW: friendlier format when hours remaining
-     ═══════════════════════════════════════════════════════════════════ */
-  startTrialTimer(end) {
+  /* ── Trial countdown ────────────────────────────────────────────── */
+  startTrialTimer(end){
     this.clearTrialTimer();
-    const el = document.getElementById('trial-timer');
+    const el = $('trial-timer');
     const tick = () => {
       const diff = end - Date.now();
       if (diff <= 0) {
         el.textContent = '00:00:00';
         this.clearTrialTimer();
-        if (this.session) {
-          this.session.access.level = 'expired';
-          this.saveSession(this.session);
-        }
-        document.getElementById('pay-banner').style.display = 'block';
+        if (this.session) { this.session.access.level = 'expired'; this.saveSession(this.session); }
+        $('pay-banner').style.display = 'flex';
         this.setMode('payment');
         return;
       }
-      const h = String(Math.floor(diff / 3600000)).padStart(2, '0');
-      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-      el.textContent = h + ':' + m + ':' + s;
+      const pad = n => String(n).padStart(2, '0');
+      el.textContent = pad(Math.floor(diff / 3600000)) + ':' +
+                       pad(Math.floor((diff % 3600000) / 60000)) + ':' +
+                       pad(Math.floor((diff % 60000) / 1000));
     };
     tick();
     this.trialTimerId = setInterval(tick, 1000);
   },
-  clearTrialTimer() {
-    if (this.trialTimerId) { clearInterval(this.trialTimerId); this.trialTimerId = null; }
-  },
+  clearTrialTimer(){ if (this.trialTimerId) { clearInterval(this.trialTimerId); this.trialTimerId = null; } },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     MOBILE-NUMBER PROMPT
-     ═══════════════════════════════════════════════════════════════════ */
-  renderMobilePrompt(elId) {
-    const el = document.getElementById(elId);
+  /* ── Mobile number ──────────────────────────────────────────────── */
+  renderMobilePrompt(elId){
+    const el = $(elId);
     if (!el) return;
-    const hasMobile = !!(this.session && this.session.mobile);
-    el.style.display = hasMobile ? 'none' : 'block';
+    el.style.display = (this.session && this.session.mobile) ? 'none' : 'flex';
   },
-  async saveMobile(inputId) {
-    const input = document.getElementById(inputId);
-    const mobile = input.value.trim();
-    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return this.showErr('Invalid Nepali mobile number. Use 10 digits starting with 98/97/96/99.');
-    if (!this.session || !this.online) return this.showErr('You need an internet connection to save this.');
-
-    const res = await this.api('updateOwnMobile', { username: this.session.username, token: this.session.token, mobile }, 'POST');
-    if (!res.success) return this.showErr(res.error || 'Could not save mobile number.');
-
+  async saveMobile(inputId){
+    const mobile = $(inputId).value.trim();
+    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return this.showErr('Use a 10-digit Nepali mobile number starting 98, 97, 96 or 99.');
+    if (!this.session || !this.online) return this.showErr('You need a connection to save this.');
+    const res = await this.api('updateOwnMobile', { username:this.session.username, token:this.session.token, mobile }, 'POST');
+    if (!res.success) return this.showErr(res.error || 'Couldn\u2019t save that number.');
     this.session.mobile = mobile;
     this.saveSession(this.session);
     this.renderMobilePrompt('mobile-prompt-trial');
     this.renderMobilePrompt('mobile-prompt-pay');
-    this.toast('✅ Mobile number saved.');
+    this.toast('Mobile number saved.');
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     PAYMENT UI
-     ═══════════════════════════════════════════════════════════════════ */
-  async loadPaymentUI() {
+  /* ── Payment ────────────────────────────────────────────────────── */
+  async loadPaymentUI(){
     this.updatePayButtonState();
     let s = this.settings || {};
     let fetchFailed = false;
+
     if (this.online) {
       try {
-        const r = await this.api('getSettings', {});
+        const r = await this.api('getSettings', {});   // public, no credentials
         if (r.success) s = r.settings || {};
-        else { fetchFailed = true; console.warn('getSettings returned success:false —', r.error || '(no error message)'); }
-      } catch (e) {
-        fetchFailed = true;
-        console.warn('getSettings request threw —', e);
-      }
+        else { fetchFailed = true; console.warn('getSettings returned success:false —', r.error || '(no message)'); }
+      } catch(e){ fetchFailed = true; console.warn('getSettings threw —', e); }
     }
-    if (Object.keys(s).length === 0 && this.session && this.session.settings) s = { ...this.session.settings };
+    if (!Object.keys(s).length && this.session && this.session.settings) s = { ...this.session.settings };
     if (this.session) { this.session.settings = s; this.saveSession(this.session); }
 
-    document.getElementById('pay-amt').textContent = s.paymentAmount || '100';
-    document.getElementById('pay-phone').textContent = s.contactPhone || '9863200285';
-    document.getElementById('pay-inst').textContent = s.paymentInstructions || 'Scan the QR code and submit your transaction ID for verification.';
+    $('pay-amt').textContent = s.paymentAmount || '100';
+    $('pay-phone').textContent = s.contactPhone || '9863200285';
+    $('pay-inst').textContent = s.paymentInstructions || 'Scan the QR code, then send us the transaction ID below.';
+
     const qr = s.qrCodeUrl || '';
-    const img = document.getElementById('qr-img');
-    const fb = document.getElementById('qr-fallback');
+    const img = $('qr-img'), fb = $('qr-fallback');
     if (qr && (qr.startsWith('http') || qr.startsWith('data:image'))) {
-      img.src = qr;
-      img.style.display = 'block';
-      fb.style.display = 'none';
+      img.src = qr; img.style.display = 'block'; fb.style.display = 'none';
     } else {
-      img.style.display = 'none';
-      fb.style.display = 'flex';
+      img.style.display = 'none'; fb.style.display = 'flex';
     }
-    const warn = document.getElementById('pay-settings-warn');
-    if (warn) warn.style.display = (this.online && fetchFailed) ? 'block' : 'none';
+
+    const warn = $('pay-settings-warn');
+    if (warn) warn.style.display = (this.online && fetchFailed) ? 'flex' : 'none';
   },
 
-  onQrError() {
-    document.getElementById('qr-img').style.display = 'none';
-    document.getElementById('qr-fallback').style.display = 'flex';
-  },
+  onQrError(){ $('qr-img').style.display = 'none'; $('qr-fallback').style.display = 'flex'; },
 
-  onFile() {
-    const f = document.getElementById('pay-file').files[0];
-    const nameEl = document.getElementById('pay-file-name');
-    if (!f) { this.fileData = null; if (nameEl) nameEl.textContent = 'No file chosen'; return; }
-    if (nameEl) nameEl.textContent = f.name;
+  onFile(){
+    const f = $('pay-file').files[0];
+    const nameEl = $('pay-file-name');
+    if (!f) { this.fileData = null; nameEl.textContent = 'No file chosen'; return; }
+    nameEl.textContent = f.name;
     if (f.size > 4.5 * 1024 * 1024) {
-      this.showErr('File too large. Max 4.5 MB.');
-      document.getElementById('pay-file').value = '';
-      if (nameEl) nameEl.textContent = 'No file chosen';
+      this.showErr('That image is over 4.5 MB. Try a smaller screenshot.');
+      $('pay-file').value = '';
+      nameEl.textContent = 'No file chosen';
       this.fileData = null;
       return;
     }
     const r = new FileReader();
     r.onload = e => { this.fileData = e.target.result; };
+    r.onerror = () => this.showErr('Couldn\u2019t read that image.');
     r.readAsDataURL(f);
   },
 
-  async submitPayment() {
-    const txn = document.getElementById('pay-txn').value.trim();
-    const rem = document.getElementById('pay-rem').value.trim();
-    if (!txn) return this.showErr('Transaction ID is required.');
-    if (!this.session || this.session.type !== 'user') return this.showErr('Session error. Please login again.');
-    if (!this.online) return this.showErr('You need an internet connection to submit payment. Please reconnect and try again.');
+  async submitPayment(){
+    const txn = $('pay-txn').value.trim();
+    const rem = $('pay-rem').value.trim();
+    if (!txn) { $('pay-txn').classList.add('invalid'); $('pay-txn').focus(); return this.showErr('Enter the transaction ID from your payment.'); }
+    $('pay-txn').classList.remove('invalid');
+    if (!this.session || this.session.type !== 'user') return this.showErr('Something went wrong with your session. Please sign in again.');
+    if (!this.online) return this.showErr('You need a connection to send this. Reconnect and try again.');
 
     this.setLoading('btn-pay', true);
-    const payload = {
-      username: this.session.username,
-      token: this.session.token,
-      name: this.session.name,
-      email: this.session.email,
-      mobile: this.session.mobile,
-      txId: txn,
-      remarks: rem,
-      screenshot: this.fileData || ''
-    };
-    const res = await this.api('submitPayment', payload, 'POST');
+    const res = await this.api('submitPayment', {
+      username: this.session.username, token: this.session.token,
+      name: this.session.name, email: this.session.email, mobile: this.session.mobile,
+      txId: txn, remarks: rem, screenshot: this.fileData || ''
+    }, 'POST');
     this.setLoading('btn-pay', false);
 
-    if (!res.success) return this.showErr(res.error || 'Submission failed.');
+    if (!res.success) return this.showErr(res.error || 'Couldn\u2019t send that. Try again.');
 
     this.session.access.level = 'pending_review';
     this.saveSession(this.session);
-    this.toast('✅ Payment submitted! Waiting for admin verification.');
+    this.toast('Payment sent — an admin will check it shortly.');
     this.setMode('status');
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     NAVIGATION
-     ═══════════════════════════════════════════════════════════════════ */
-  goUser() {
-    if (!this.session || this.session.type !== 'user') {
-      this.showErr('Please login first.');
-      return;
-    }
+  /* ── Exits ──────────────────────────────────────────────────────── */
+  goUser(){
+    if (!this.session || this.session.type !== 'user') return this.showErr('Please sign in first.');
     const lvl = this.session.access.level;
-    if (lvl !== 'permanent' && lvl !== 'trial') {
-      this.showErr('Access denied. Complete payment or wait for verification.');
-      return;
-    }
+    if (lvl !== 'permanent' && lvl !== 'trial') return this.showErr('Complete the payment, or wait for it to be verified.');
     if (lvl === 'trial' && new Date(this.session.access.trialExpiresAt) <= Date.now()) {
-      this.showErr('Trial expired. Please pay to continue.');
       this.session.access.level = 'expired';
       this.saveSession(this.session);
+      this.showErr('Your trial has ended. Complete the payment to carry on.');
       this.setMode('payment');
       return;
     }
     window.location.href = 'user.html';
   },
 
-  goAdmin() {
-    if (!this.session || this.session.type !== 'admin') {
-      this.showErr('Admin session invalid.');
-      return;
-    }
+  goAdmin(){
+    if (!this.session || this.session.type !== 'admin') return this.showErr('That admin session is no longer valid.');
     window.location.href = 'admin.html';
   },
 
-  logout() {
+  logout(){
     this.clearTrialTimer();
     this.clearSession();
-    try { localStorage.removeItem(LS_ADMIN); } catch (e) {}
+    try { localStorage.removeItem(LS_ADMIN); } catch(e){}
     this.fileData = null;
-    ['in-user','in-pass','su-name','su-mobile','su-email','su-user','su-pass','su-cpass','pay-txn','pay-rem','pay-file','fg-id','rs-code','rs-pass','mp-trial-mobile','mp-pay-mobile'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    // Clear strength meter state too.
-    const strength = document.getElementById('pw-strength');
-    if (strength) strength.className = 'pw-strength';
-    const strengthLabel = document.getElementById('pw-strength-label');
-    if (strengthLabel) strengthLabel.textContent = '';
+    ['in-user','in-pass','su-name','su-mobile','su-email','su-user','su-pass','su-cpass',
+     'pay-txn','pay-rem','pay-file','fg-id','rs-code','rs-pass','mp-trial-mobile','mp-pay-mobile']
+      .forEach(id => { const el = $(id); if (el) el.value = ''; });
+    const fn = $('pay-file-name'); if (fn) fn.textContent = 'No file chosen';
     this.setMode('login');
-    this.toast('👋 Logged out.');
+    this.toast('Logged out.');
   },
 
-  setLoading(id, on) {
-    const b = document.getElementById(id);
-    const labels = {
-      'btn-login': 'Sign In →',
-      'btn-signup': 'Create Account →',
-      'btn-pay': 'Submit Payment →',
-      'btn-forgot': 'Send Reset Code →',
-      'btn-reset': 'Reset Password →'
-    };
+  /* ── Chrome ─────────────────────────────────────────────────────── */
+  LABELS: {
+    'btn-login':'Sign in',
+    'btn-signup':'Create my account',
+    'btn-pay':'Send for verification',
+    'btn-forgot':'Email me a code',
+    'btn-reset':'Set the new password'
+  },
+  setLoading(id, on){
+    const b = $(id);
     if (!b) return;
-    if (on) {
-      b.disabled = true;
-      b.innerHTML = '<span class="spin"></span>Processing…';
-    } else {
-      b.disabled = false;
-      b.innerHTML = labels[id] || 'Submit';
-      if (id === 'btn-pay') this.updatePayButtonState();
-    }
+    if (on) { b.disabled = true; b.innerHTML = '<span class="spin"></span>Working…'; }
+    else    { b.disabled = false; b.textContent = this.LABELS[id] || 'Submit'; this.updatePayButtonState(); }
   },
 
-  toast(msg, durationMs = 3000) {
-    const box = document.getElementById('toasts');
+  toast(msg, durationMs = 3400){
+    const box = $('toasts');
     const t = document.createElement('div');
     t.className = 'toast';
     t.textContent = msg;
@@ -1499,17 +1439,19 @@ const APP = {
   }
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
-   COOKIE NOTICE — visibility handled by the inline script near the banner
-   ═══════════════════════════════════════════════════════════════════════ */
 const COOKIE_NOTICE = {
   KEY: 'abhyas_cookie_ack',
-  accept() {
-    try { localStorage.setItem(this.KEY, '1'); } catch (e) {}
-    document.getElementById('cookie-banner').hidden = true;
+  init(){
+    try { if (localStorage.getItem(this.KEY) === '1') return; } catch(e){ return; }
+    $('cookie-banner').hidden = false;
+  },
+  accept(){
+    try { localStorage.setItem(this.KEY, '1'); } catch(e){}
+    $('cookie-banner').hidden = true;
   }
 };
 
+COOKIE_NOTICE.init();
 APP.init();
 </script>
 </body>
