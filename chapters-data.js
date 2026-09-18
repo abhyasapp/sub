@@ -1,84 +1,48 @@
 /* ══════════════════════════════════════════════════════════════════════
-   CHAPTERS-DATA.JS
+   CHAPTERS-DATA.JS — ABHYAS
    ──────────────────────────────────────────────────────────────────────
-   LEVEL 5 + LEVEL 7 + GK — compiled from live Google Drive crawls:
+   Level 5 (Diploma), Level 7 (Engineering), and General Knowledge.
+   Every chapter has a single book: 'Abhyas'.
+   Subtopics map to Drive JSON files with stable file_ids.
 
-   LEVEL 5
-   • 'level 5' folder shared with you by 077bce046@gmail.com
-     (shared 2026-09-05)
+   Raw data shape:
+     CH_NAMES[levelId][chapterNum]          → "Chapter name"
+     LEVEL_LABELS[levelId]                  → "Level 5 — Diploma"
+     DRIVE[levelId][chapterNum][book][sub]  → fileId (string) or null
 
-   LEVEL 7
-   • 'Abhyas' book       -> your own Drive, ABHYAS / LEVEL 7 folder tree
-   • all other books     -> the separate 'LEVEL 7' folder shared with you
-                            by 077bce046@gmail.com
-
-   GK (this section)
-   • RE-FLATTENED on request: every individual Abhyas subtopic number is
-     now its OWN top-level chapter key (no more grouping into just "1" and
-     "2"). So instead of Chapter "1" containing subtopics 1.1-1.17, there
-     are now 17 separate chapters keyed "1.1", "1.2", ... "1.17", plus 3
-     more keyed "2.1", "2.2", "2.3" for the old Reasoning-Test chapter.
-     Chapter names are the Abhyas topic titles (e.g. "1.7": "INTL AFFAIRS").
-   • Under each of these chapters, the BOOK layer is the source: 'Abhyas',
-     'GATE', 'SAARC', or 'Planning and Management' — whichever of those
-     actually has a file for that subtopic. (No 'DPARSAD' book exists for
-     GK specifically — that source only shows up in Level 5 / Level 7.)
-   • Below the book, the leaf key is 'All' for single-file books, or a
-     short descriptor when a book has more than one file for that chapter,
-     e.g. chapter "1.7" / book 'GATE' has 'General', '101-150', '151-180';
-     chapter "1.7" / book 'SAARC' has 'Batch 1', 'Batch 2'; chapter "1.14"
-     / book 'Planning and Management' has 'Fundamentals of management' and
-     'Part 2'.
-   • Chapters "1.1"-"1.4", "1.12", "1.15", "1.16" and all of "2.1"-"2.3"
-     are Abhyas-only (no shared-folder equivalent exists yet). Chapter
-     "1.17" (Charter) is GATE-only (no Abhyas equivalent — added earlier
-     on request, extending Abhyas's numbering by one).
-
-   Hierarchy: Chapter -> Book -> Subtopic -> Google Drive fileId
-
-   NOTES / FLAGS — LEVEL 5 / LEVEL 7: unchanged from prior passes — see
-   in-repo history/chat for full detail (book-name normalization, the
-   3-book Construction Management chapter in Level 7, excluded stub files,
-   etc.)
-
-   ── v1.04 change (helpers only, DRIVE data untouched) ──
-   The ChapterData helper methods at the bottom of this file now skip any
-   BOOK key whose name begins with an underscore. Those keys hold metadata
-   about a chapter, not question sets — specifically DRIVE.level7.10._meta
-   (a subtopics.json fileId that describes the chapter, not a solvable
-   question bank). Without the skip, that key was:
-     • showing up as a fake "book" in the Online Study picker, and
-     • being counted in fileCount() / totalFilesInLevel(), and
-     • being downloaded by CACHE.autoSync() on first install.
-   Filtering in ONE place (the helpers) means every consumer — the picker,
-   Psycho Mode, the offline cache manager, the progress-scope resolver —
-   is protected without any of them having to know about the convention.
+   Exposes window.ChapterData with the API app.js / objective.js call:
+     levels()                → ['gk','level5','level7']
+     levelLabel(lv)          → "Level 5 — Diploma"
+     chapters(lv)            → { [ch]: name, … }
+     chapterName(lv, ch)     → "Surveying"
+     books(lv, ch)           → { [book]: { [subtopic]: fid, … }, … }
+     files(lv, ch, book)     → { [subtopic]: fid, … }
+     chapterFileRefs(lv, ch) → flat [{ lv, ch, book, subtopic, fid, key, name }]
+     allFileRefs()           → same, across every level
+     fileCount(lv[, ch[, book]]) → count of non-null fileIds
    ══════════════════════════════════════════════════════════════════════ */
 
-
-/* ========================================================================
-   CHAPTER NAMES
-   ======================================================================== */
-
 const CH_NAMES = {
-
-  level5: {
-    "1": "Engineering Survey",
+  "gk": {
+    "1": "General Awareness",
+    "2": "Public Management"
+  },
+  "level5": {
+    "1": "Surveying",
     "2": "Construction Materials",
-    "3": "Mechanics of Material",
+    "3": "Mechanics of Materials and Structures",
     "4": "Hydraulics",
     "5": "Soil Mechanics",
     "6": "Structural Design",
     "7": "Building Construction Technology",
-    "8": "Water Supply & Sanitation",
+    "8": "Water Supply and Sanitation",
     "9": "Irrigation Engineering",
     "10": "Highway Engineering",
-    "11": "Estimating & Costing",
+    "11": "Estimating and Costing",
     "12": "Construction Management",
     "13": "Airport Engineering"
   },
-
-  level7: {
+  "level7": {
     "1": "Structural Engineering",
     "2": "Engineering Survey",
     "3": "Construction Materials",
@@ -89,812 +53,608 @@ const CH_NAMES = {
     "8": "Engineering Drawing",
     "9": "Engineering Economics",
     "10": "Professional Practices"
-  },
-
-  gk: {
-    "1.1": "GEO&DEMO",
-    "1.2": "NAT RESOURCES",
-    "1.3": "GEO DIVERSITY&CLIMATE",
-    "1.4": "MODERN HISTORY",
-    "1.5": "PERIODIC PLAN",
-    "1.6": "SUST DEV&ENV",
-    "1.7": "INTL AFFAIRS",
-    "1.8": "CONSTITUTION",
-    "1.9": "GOVERNANCE",
-    "1.10": "CIVIL SERVICE ACT",
-    "1.11": "FUNCTIONAL SCOPE",
-    "1.12": "PSC",
-    "1.13": "PUBLIC POLICY",
-    "1.14": "MGMT FUNDAMENTALS",
-    "1.15": "BUDGET&ACCOUNTING",
-    "1.16": "CURRENT AFFAIRS",
-    "1.17": "CHARTER",
-    "2.1": "LOGICAL REASONING",
-    "2.2": "NUMERICAL REASONING",
-    "2.3": "SPATIAL REASONING"
   }
-
 };
-
 
 const LEVEL_LABELS = {
-  level5: "Level 5 — Diploma",
-  level7: "Level 7 — Engineering",
-  gk: "General Knowledge (shared)"
+  "gk": "General Knowledge (shared)",
+  "level5": "Level 5 — Diploma",
+  "level7": "Level 7 — Engineering"
 };
-
-
-/* ========================================================================
-   DRIVE DATA
-   ======================================================================== */
 
 const DRIVE = {
-
-  /* ======================================================================
-     LEVEL 5
-     ===================================================================== */
-
-  level5: {
-
-    /* Chapter 1 — Engineering Survey */
+  "gk": {
     "1": {
-      "Sunil Sah": {
-        "1-100": "1OAlD5XUf-Ecmj4hNViPAqInI5GUcMExG",
-        "101-200": "1Q6E7isqILUnHG9ZPxTsIltIlEodqr05i",
-        "201-300": "1vZRNltiqTuJxJn8RVCzrSojNeyRYFEfp",
-        "301-400": "13z92Vn1uV7Gw217q-GXQVuOQoV9gUrJO",
-        "401-500": "1OikW1FEi5Zuei4IrWpbjsTr3-O_hY8PQ",
-        "501-575": "1WUg2w7SlHVpAEyOlFyfbnymQ-xivfwNi"
+      "Abhyas": {
+        "1.1 GEO&DEMO": "1Blbxd3mWlMvDpAWd_KfVItE2CzjajB_o",
+        "1.10 CURRENT AFFAIRS": "1y3jaSI-VZmCdFMJzxl86RvApgmliOHXa",
+        "1.2 NAT RESOURCES": "1q5iUoCqqEuo5W6oXM-fJOhO2xueyZG7v",
+        "1.3 PERIODIC PLAN (part 1)": "1LrNN8hq49hwFkqp543ux32wUURHf0POn",
+        "1.3 PERIODIC PLAN (part 2)": "1JAKi7CXryPgqCWwQZ9USB8DTpXI5wRk0",
+        "1.4 SUST DEV&ENV (part 1)": "1d9B_tg6vDDJqXwLkfAzKr0Xr4-rIFZu-",
+        "1.4 SUST DEV&ENV (part 2)": "1UgaWd26bxEMIErOZg3SVgrP5C0ltRqpN",
+        "1.5 SCIENCE & TECH": "1XPHP6rmQR4lAJIepx62LJQmuW9RGYKX-",
+        "1.6 PUBLIC HEALTH": "1c2GTXlBxBSZCiUB3VSKCLGNw_Ku3s72i",
+        "1.7 CONSTITUTION (part 1)": "1-DN36n2dFaoDwF5vug1CJeb-M8XZlx84",
+        "1.7 CONSTITUTION (part 2)": "1_tKTMwfcYo9tbpheG7hIzyAPVV5zOn4w",
+        "1.8 INTL AFFAIRS (part 1)": "1FROU3veGTxUWMwfKID26bePGQc_h7_Ja",
+        "1.8 INTL AFFAIRS (part 2)": "1Dpm9jsnzAFWB4PCyepDOxJTl30XEvpe9",
+        "1.8 INTL AFFAIRS (part 3)": "1gYOMUS3EGchj0NTv2BDXtaa9QmK4bR6P",
+        "1.9 REGIONAL ORGS (part 1)": "1hHgCLiUtMQAEwfXminh2whbF5M15T5SN",
+        "1.9 REGIONAL ORGS (part 2)": "1ysZaMsiHR2kEhR7A5hF0c3FGfkCC3vQv",
+        "1.9 REGIONAL ORGS (part 3)": "1e37ItS29JSwMUM7ER0NezXHhNZ0X5N3o",
+        "UNCLASSIFIED Unclassified questions": "168s0a7JTGpD2EmEGTyVWKaPmhgPYA9In"
       }
     },
-
-    /* Chapter 2 — Construction Materials */
     "2": {
-      "Sunil Sah": {
-        "1-100": "1DCi7TZlsRLXbswMXZ_phkNSvpvR4qEYC",
-        "101-200": "1l2_oKmLGjbMZJAY2EXniIcsXBjgox1LI",
-        "201-300": "1D-Q5Dx7r_PeLb8tuQSJrfdDsSFwje__V",
-        "301-400": "1Ofpj_R63e8ibarImI4Kx4Hjk1GZ5aknd",
-        "401-500": "1WLSUMqyN8bnj9WuQPGRNxK0ssMqDtJ-O",
-        "501-613": "1bQ-eFt4DnPTkejie6Jf435EtGEiwVobO"
+      "Abhyas": {
+        "2.1 OFFICE MGMT": "1ULqyJRfhKBvqB-zhPZcSdTwCXaAPHNHe",
+        "2.10 HUMAN VALUES": "1hxiZfRORqtjPkVTZYCgPnaRLufqe2MOO",
+        "2.2 CIVIL SERVICE ACT (part 1)": "1XfZ-vTpLlgguT92yG74sAUA0Er72d3oN",
+        "2.2 CIVIL SERVICE ACT (part 2)": "1A6tAmJNup2_z0BopQI2vZ1J4rUz33gUM",
+        "2.3 FEDERAL MINISTRY": "15nf-yC5b_xDht00ZUYGgxygL23e3ye-7",
+        "2.4 CONSTITUTIONAL BODIES": "17J7rlJl6xWoiSuqwL9JCCzZlZRjMryNh",
+        "2.5 BUDGET & ACCOUNTING": "1Ezj_uErsMTwTSILn-TjjbcqFny67mSs4",
+        "2.6 SERVICE DELIVERY": "1YDplOgQO5hIDEPr_ilI6I2sdh8QPvBXx",
+        "2.7 GOVERNANCE (part 1)": "1XRo8LWVoMYsCm8v0DWncxIOrBw8PxpKY",
+        "2.7 GOVERNANCE (part 2)": "1Tgdl5atSm4QXG47Zq4geaciygIRk2DNz",
+        "2.7 GOVERNANCE (part 3)": "1BzO3KGksqnEJOBin2Yk2biFAF6nG8Tgx",
+        "2.8 PUBLIC CHARTER": "1E69H-6gQEnfmT8Ek7207hO1ORpaOTxFw",
+        "2.9 MGMT FUNDAMENTALS (part 1)": "1LkFvBbtG4YQ0ads12bTc1BZpo2-Krb1X",
+        "2.9 MGMT FUNDAMENTALS (part 2)": "1DisDBA6h4e0FBub6C7Wt2a5Tn92MddRm",
+        "2.9 MGMT FUNDAMENTALS (part 3)": "10O_Nxw4nzp8AqUh-XmShNvJNu0tTuejg",
+        "2.9 MGMT FUNDAMENTALS (part 4)": "116VSEj3FbWRA8qwRqTI3-jQXF42JFRXx",
+        "2.9 MGMT FUNDAMENTALS (part 5)": "1Yq7FdybWuDV-8ggErjNsThXrluUkcSGT",
+        "2.9 MGMT FUNDAMENTALS (part 6)": "1STi-KYWTchvNgjtmA-T90SsFGCrzXFzv",
+        "UNCLASSIFIED Unclassified questions": "1PPnqXVQTDCiSwjoTNzUHkB51d0E9257S"
+      }
+    }
+  },
+  "level5": {
+    "1": {
+      "Abhyas": {
+        "1.1 General (part 1)": "1QS9jz8BHZqthMF5KmZdDrAetETbXIpKZ",
+        "1.1 General (part 2)": "1QRLMx8OIMTCOwuC7hHZ0ZPUHrf2EP8Rm",
+        "1.1 General (part 3)": "1asVCOtFAbzRG7ZgXnL8e8uDgCtzCuIxk",
+        "1.1 General (part 4)": "1fPMMw4u0ITFCDZQ-4Gkph1s74gCzQNjV",
+        "1.2 Levelling (part 1)": "1sAO2gn6hJC_82yJtCDnXU2kYFSoI7-Sm",
+        "1.2 Levelling (part 2)": "1Bf3px6S__H2WAi8F5awx1sk3VCDx3L50",
+        "1.2 Levelling (part 3)": "1E9lsx8ic51QlUvj4G9l1mmx1T6K5CQGB",
+        "1.2 Levelling (part 4)": "1dFG6EFtnCeX3Y5SlAUOBpYf4dLC_6LXM",
+        "1.3 Plane Tabling": "1G7gHSB8pxya6-RhdKvgdkOIqTzL0KYPd",
+        "1.4 Theodolite and Traverse (part 1)": "1vBAM7Flm8kHyePXnmZdy3UuisUszB-SK",
+        "1.4 Theodolite and Traverse (part 2)": "1k5dSoWSzwMb9kE5q9b95bDOYxWah_w8O",
+        "1.4 Theodolite and Traverse (part 3)": "1n8eyjGH3Akn7kTHCZRT7Jn6XFo4JzCsi",
+        "1.5 Contouring": "1kCzQ6xWz_SO62hmOoY4bC8ZMugyeBm6F",
+        "1.6 Setting Out": "1eNRAJFL2oarxEIhQxGfZwJrAvm0wJ69s",
+        "UNCLASSIFIED Unclassified questions": "1fuK-6_Cglr7B41W95J1ypp6x0GDqBY1d"
       }
     },
-
-    /* Chapter 3 — Mechanics of Material */
+    "2": {
+      "Abhyas": {
+        "2.1 Stone (part 1)": "1q9Th3JN_WFqvD2jijujx8ZJqNHNjrYmh",
+        "2.1 Stone (part 2)": "1CjEoxdaqGPQPxAoDhd-knqtolM59Us5B",
+        "2.1 Stone (part 3)": "1Vo0p-mkRXPNg_rwfertkfgmq6GTi-a9g",
+        "2.2 Cement (part 1)": "1Oxj6Na8t8vCIWlhyGushQzjSbpwajysh",
+        "2.2 Cement (part 2)": "1S5XKN9maVU2nA6rM887m4fud7JSzfb0q",
+        "2.2 Cement (part 3)": "1HhCrRcINO7YrLyNExsLAWTJE1F6w04y_",
+        "2.2 Cement (part 4)": "17zQjzyWHx449hStbSIhI-oUrUEi0OLXE",
+        "2.3 Clay and Clay Products (part 1)": "1WNm-7e2m2b8gRj_hMQaDPmeRW_hQK6wG",
+        "2.3 Clay and Clay Products (part 2)": "1vwDaPlRIUoc4v_6f53AB_FGwsQ8XgtIV",
+        "2.4 Paints and Varnishes (part 1)": "1xsSvvgSVln4Zb27JWaD6GhqoBCIz25uV",
+        "2.4 Paints and Varnishes (part 2)": "1Pq9Lq2NrneBL4wDnooOyn-6l_BOcNEeF",
+        "2.5 Bitumen": "14QcW_1UjwB5-RvNO1bvLGmv7YrLoGFsO",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1LrFAM_BwenfMwMSaAfaszV3bfyemMwpt",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1Jwe55Aoph4lZEQewPb4Oe5vFk7EZkH0Y",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1NQg9rL1tJHWRF3arBpZ4_beACAltJUyd",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1IHHhVTYsMdmA3MRbsj-ol1PE8L92KOIA"
+      }
+    },
     "3": {
-      "Sunil Sah": {
-        "1-100": "18PHUlO1w4w1P6fAJFl1sVA-vuaArgX4c",
-        "101-200": "1WqWfdmpL-boetcfcaRVkAD07U2wScgMz",
-        "201-300": "1P75cTo6Emx6cKMjhKpSHObrcIZK_Q48Z",
-        "301-400": "1iltEhT0DIWa98sAnRSZs7l83Sl5Fp4PA",
-        "401-432": "1H1u78Q95fPXDAzALAwMF2PyrKYqwIluc"
-      },
-
-      "DPARSAD": {
-        "Beam Diagram Relations & Thrust (Q165-187)": "1ZOWTP4bQeuvcwui5xkjqppdCUBY_WT-0",
-        "Bending & Deflection Theory (Q117-164)": "1zkZh7YFEn_-fyk1QfxBtl3VvQ5aY-Euk",
-        "Columns, Struts, Ties & Trusses (Q188-221)": "1_1IxcEHCZPlqN5JfT0agDZXoUxBmiroN",
-        "General SOM Revision - Mixed (Q222-250)": "1q3-aYC9cL7u7Ga4r5kGgGVE9BCiipX8J",
-        "Shear Force & Bending Moment Basics (Q54-116)": "18XMCDrjLIHKW8aHJYleGOgsnBFX5ANyH",
-        "Stress-Strain & Elastic Properties (Q1-53)": "1RWIKVWCl9djWzUyAL0fMOoeNLIYQfQAo"
+      "Abhyas": {
+        "3.1 Mechanics of Materials (part 1)": "18I7XVGjRzn1j7cD6S2ifZpqeBaA4JSWt",
+        "3.1 Mechanics of Materials (part 2)": "1-OGvWVlNc561gO1HwsS5IwHNnRG1qSEQ",
+        "3.1 Mechanics of Materials (part 3)": "19sdkZm-7qvwpOd3haoZ6j0BIYLtfT5tR",
+        "3.1 Mechanics of Materials (part 4)": "19SwUHLsjTRGTdOUpgLwxoVwLgbh16qsN",
+        "3.1 Mechanics of Materials (part 5)": "1MKPMwmRF7-L7VXhI9d-pqVV1r-v-1-F9",
+        "3.1 Mechanics of Materials (part 6)": "1eFZb_H5ydbdor-RUDqQ2sAvjW0zdZE8P",
+        "3.1 Mechanics of Materials (part 7)": "1hWip_sKKscobMKYBvqUjMJ2CG0v1b_1A",
+        "3.2 Mechanics of Beams (part 1)": "1jbDZYrfcbONjBOtu4eK_5LaBusxykQDf",
+        "3.2 Mechanics of Beams (part 2)": "13v1xoASv3T5c_FXVSenGyY5ZS8hQN5s6",
+        "3.2 Mechanics of Beams (part 3)": "1Nq6891k9lzq8KaXH3aIcOYQh4CpStGqo",
+        "3.2 Mechanics of Beams (part 4)": "1KPC2Ez2SWR9C-GrCNJoOh30KsqE-cW2X",
+        "3.2 Mechanics of Beams (part 5)": "1ko6p0H5XCsj1ZqCoujeV5_oEdKAl3hlG",
+        "3.2 Mechanics of Beams (part 6)": "1bXWR-_Slj1PzKNZ__sI1Qul-YYLUnYPL",
+        "3.3 Simple Strut Theory (part 1)": "1iKYkVKAnNlB2A52LnZdaG0R5tuWOh-xm",
+        "3.3 Simple Strut Theory (part 2)": "1Y4KAGFQ8494PI5Coq_4R8P4BTwY8w-D0",
+        "UNCLASSIFIED Unclassified questions": "191XriOJ6smy0aUpWJGM50hup-a9s-0F2"
       }
     },
-
-    /* Chapter 4 — Hydraulics */
     "4": {
-      "Sunil Sah": {
-        "1-100": "1W0Haw_2D00dCGnytzmtiDG40WXiW356m",
-        "101-200": "1q0lScj2EGQYv7n16ZY2qbluOG_xWtgd_",
-        "201-300": "1--gbS8anKXq77VRjm76vm1JzPBQ81NjY",
-        "301-400": "1TcZcXzv7A7eQP_WK7EEySIfWVESgF-fQ",
-        "401-450": "1YwIBiSps43xKr3d5qeODQpW4bQcEFTNj",
-        "451-520": "1WOcNHBJKZJzcjKDTKz215XvGN7N3o7WR"
+      "Abhyas": {
+        "4.1 General (part 1)": "1Yl-8_03YIYlr7zIe_B9J1C9y0-eAcNFg",
+        "4.1 General (part 2)": "1ql1q5J9mQdugTR4ywOyX0NZB_Pi99tZT",
+        "4.1 General (part 3)": "1YMgX7ek0yqoCXvvAD9te0LvKyaTIJ8E9",
+        "4.1 General (part 4)": "15Cpu0bO009KEGcMrHXLUek1q42JyVpz-",
+        "4.2 Hydro-Kinematics and Dynamics (part 1)": "14IovgbNovlBzwcOMNd1AFz5kLmAFMsXI",
+        "4.2 Hydro-Kinematics and Dynamics (part 2)": "1hQvRD10Gdun02Or5ceyg5FXUP1J5TkZP",
+        "4.3 Measurement of Discharge (part 1)": "186km2_ib4fMXhuAsgHdJliYTbBwKGRkD",
+        "4.3 Measurement of Discharge (part 2)": "10xjAUEG4N6i4y7Z1ZPQpPMp3r2Pwk6t3",
+        "4.3 Measurement of Discharge (part 3)": "12qc2LGsXbVlfUU_vM0lnxuu_53vCOruY",
+        "4.4 Flows (part 1)": "1wlsGRqa36H43OJF3DuGvodrhc4j9ZVTR",
+        "4.4 Flows (part 2)": "1FjIvDH0jOcnYkRiueGBhxQwL_PxA4Emn",
+        "4.4 Flows (part 3)": "1SPMMAg_ZM6jZhHBqdojAB7SePMbr3JfU"
       }
     },
-
-    /* Chapter 5 — Soil Mechanics */
     "5": {
-      "Sunil Sah": {
-        "1-100": "11DZsjZfw4WbmglOxGRErYh9VBNv1-yy7",
-        "101-200": "1l6ZBNY7MlRItTKOsglSF9xDGEQ_hrVZI",
-        "201-300": "1ZMPdpgCvJ4LNPVSr0enHKyGxVIr7QLth",
-        "301-400": "1zKOJP55egY2xSu8yxTbQZwRulKyyqwb3"
+      "Abhyas": {
+        "5.1 General (part 1)": "1ZpyIswSQDBvkUeAqZ8-VDPInNPxHWhsC",
+        "5.1 General (part 2)": "1Kf9YeNNPih2MDTA4WNcoPgKsm2gr9_ic",
+        "5.1 General (part 3)": "1cmKa_2GxTQ6zPAV0JfizXXOXnHo7GnBm",
+        "5.1 General (part 4)": "16YcWVO4287_DE0_PwDlVIK20iUaMxVmu",
+        "5.2 Soil Water Relation (part 1)": "1GqNbW82336TLJr2yw82Z8xs0zTNkkQjH",
+        "5.2 Soil Water Relation (part 2)": "1XZCFQDWQJ2XAIH1i4gbe55UKtATZoE2Q",
+        "5.3 Compaction of Soil": "10DPMqPAB_oKKzyHj4pQZcDgBdz5x4ugk",
+        "5.4 Shear Strength of Soils": "1tDqnhu6xs1sSYVnJeD_L2NzkhPOb8omr",
+        "5.5 Earth Pressures": "1fJrUHupjTvtQTYjibCODWUjU0No9F46W",
+        "5.6 Foundation Engineering (part 1)": "1cwtaEbtkLuS-jTgJ6N-LUgD8ox1dC-XC",
+        "5.6 Foundation Engineering (part 2)": "1iYhPJ_UabI8ECUFBA0LKdqoGDnOOQTPl",
+        "UNCLASSIFIED Unclassified questions": "1ZMjYZoeED-ushTg0amSmRDNTT59hKOj8"
       }
     },
-
-    /* Chapter 6 — Structural Design */
     "6": {
-      "Sunil Sah": {
-        "1-100": "1ZTRwGwGkdg6DpZzVizUQEkF-Z1IQT3a2",
-        "101-200": "1NJIDXdgssUhX0QcnmIIN0QLWQjuP-gjs",
-        "201-300": "1n7Qn2gqNo6du6XKb7AjwBypuJIKKqXEd",
-        "301-360": "1utWod1N1YyvWcxXTa-UkD6YobEPmVXri",
-        "361-417": "1i9tauS85s-o8G3L49QgmBaE-6isjbRLW"
+      "Abhyas": {
+        "6.1 RC Sections in Bending (part 1)": "1e1hRG9KFfg4GsXBH-NmaJ4I8kGWH0nr5",
+        "6.1 RC Sections in Bending (part 2)": "1A4-eh6jurGFu-mGc8hNfuII0v5jeSPb4",
+        "6.1 RC Sections in Bending (part 3)": "17TShKlTRaNAoeFylVOCxzwVZAEsYS98M",
+        "6.1 RC Sections in Bending (part 4)": "18sVlPMbWnmnv2bbNaRDyp9oO6rZxW5sx",
+        "6.2 Shear and Bond for RC (part 1)": "1YIQHgNUD5KGtFIHsroaxm-z_FZLGy_X9",
+        "6.2 Shear and Bond for RC (part 2)": "1HL4GwL_Ggp2rR_4Jnsqc0-YWG_ExIkqv",
+        "6.3 Axially Loaded RC Columns (part 1)": "1pbZKCfkWoGPqE5Pts-M4jEWW1rAVvNUn",
+        "6.3 Axially Loaded RC Columns (part 2)": "1umpGLm2GGlWGXLUZppRMnylFr2ePLIni",
+        "6.4 Design and Drafting of RC (part 1)": "1Gxi7T8jgm9EG6GdoxxfVJzP4FnxqA6ev",
+        "6.4 Design and Drafting of RC (part 2)": "1owHzhpjZ-VF6xmqpCZuuOMh-9u-VJWWN",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1p9iYSeh4C3O3slC-S1pOG1PqmskUYnkY",
+        "UNCLASSIFIED Unclassified questions (part 2)": "14EiEcCyb3n4lfcSyI9R_GGWoM5VNrFxa"
       }
     },
-
-    /* Chapter 7 — Building Construction Technology */
     "7": {
-      "R.K Shrestha": {
-        "1-65": "1kzYm9czns3Do26a2XV8-tTm5VSJ_TUXt",
-        "131-195": "19DsKXwT_RSX1B_xlQHz06tR0J8HLNf1C",
-        "196-260": "1mZP6ujsccyC8OlKwMyGssf9t4st7-sPB",
-        "65-130": "164FLjujhfBl-q2Q_CaYcuW0T89fY1avd"
-      },
-
-      "Sunil Sah": {
-        "1-100": "1H8b2DIcDQQ4dCDRaJctM6mYOyMMa7Rh-",
-        "101-200": "1jYggTJbHhYxZDvroz5XIk-1O-I-trv5A",
-        "201-300": "15f2CiEgfd0y45C6YiAujV35bpvHBpGnG",
-        "301-400": "1upPz6YXp7yLLjz73lnzUP828EFApy-Mb",
-        "401-500": "1eVtbEWc9LGsLty0Y2ZM6PDeIk2ykBP2b",
-        "501-600": "1_tytL1YFi_8glzjswiGKelgkQrvNNAfQ",
-        "601-658": "1V_Cgasu59PipCReiiMRzcqeKDHwTfDoe",
-        "659-716": "161Hw8Db80fggFIBHTkzKwiDqm9oApAA7"
+      "Abhyas": {
+        "7.1 Foundations (part 1)": "13w6CYuOiHKqTVyoLoOFGyYJQsKwvRm4-",
+        "7.1 Foundations (part 2)": "1YKNq5gZy3_uQ2GHFhWI-CjS7_bcJGz-q",
+        "7.1 Foundations (part 3)": "1mCBdY3Tr1zoriZjlL8grKIfL2v-pfo7Y",
+        "7.1 Foundations (part 4)": "1ITKH9lGXIqazo-P5XEemeh3VUr1BaroG",
+        "7.2 Walls (part 1)": "1pvegv3iGcXjv74hLttBZWCEKaPXzWNXC",
+        "7.2 Walls (part 2)": "1N8sy1c49vxWkI8pK5iHCyXjcGOGtYjeR",
+        "7.2 Walls (part 3)": "1uebMGqH2P7kQACnf8wUE2Ybxo0r664xg",
+        "7.2 Walls (part 4)": "1Ca4ykbCnxyszYAA5bUHWBZQJzZvRv0n-",
+        "7.2 Walls (part 5)": "1OsuSs51w21j4zQ19nUNmZgBrZyGXfF7a",
+        "7.3 Damp Proofing": "1k1MafGxS5-Vqdl5cPeubhUjYX6yqzTt-",
+        "7.4 Concrete Technology (part 1)": "1jEdqRUcZBtjtzbi6naun9lTxZO0bAv4r",
+        "7.4 Concrete Technology (part 2)": "1STqsdKWbXqfBfzm6hIrKVMcCdRLICP7f",
+        "7.4 Concrete Technology (part 3)": "1foWhTyFE1KuUcv1W8B-g9K2RtXd3_UuQ",
+        "7.4 Concrete Technology (part 4)": "1_x9KrU0SZ3sHZroLsi5K_12kTdWoaJma",
+        "7.4 Concrete Technology (part 5)": "1xfNlxotnj7Q42d8rYMmZUgIADhMIpbrK",
+        "7.5 Wood Work (part 1)": "1Rb1I5_tOSBnN2Kh4gE94MB12BSfSlQSv",
+        "7.5 Wood Work (part 2)": "1JdnbQ36fxGf1Q-6dktZOPOnYVLo9OoDV",
+        "7.5 Wood Work (part 3)": "1ioF3CS_z12ntjoBI1hxh4pyv73PjVcP1",
+        "7.5 Wood Work (part 4)": "1TlJbNZVkq0AZoca5ojQ5MQ6C4_QooQw2",
+        "7.6 Flooring and Finishing (part 1)": "12nU77pxu01UousR8RDY1AZoEhchAQeOS",
+        "7.6 Flooring and Finishing (part 2)": "1L6AQcrW_6i9AvhLkctbUnl9aT6rZS6LA",
+        "7.6 Flooring and Finishing (part 3)": "1z9F2AvzL85zdYfpABtrmr4h4mARNMukW",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1mefJMCflvjSfRQcd8PuFzUu36CXjiosN",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1VTOJvKRqMSEX_e1-_Y3JN5EugoJo3oD8"
       }
     },
-
-    /* Chapter 8 — Water Supply & Sanitation */
     "8": {
-      "Sunil Sah": {
-        "1-100": "1oCYIwNj8h6SdiOP4bB5HNG3cyX6ZRygd",
-        "101-200": "1lSJuN-fvaBRsyABUNPApWm09rZn_V0ko",
-        "201-300": "1aEj_hw63qbOfJsIp1AwnyulTRIQ-e1xh",
-        "301-400": "1tHiL_rKWaNRHd0y2yphJpElMNKBLDiGq",
-        "401-500": "1A1Hh0YqmMLsLE7-Ey-9YrYHbRYccE7iZ",
-        "501-554": "1LnUcKO28KnhVXIerrj003UsrLAiTdUoP"
+      "Abhyas": {
+        "8.1 General (part 1)": "1mae50_GC0oB8_A193UyNyKKMB5iSzJmg",
+        "8.1 General (part 2)": "1pKuwmNVwQQv48ndrhKkmozvUhLrrYtP6",
+        "8.1 General (part 3)": "1vCaF0KHEwEYPFR0qcp-wXlxfpOJ-V0u-",
+        "8.1 General (part 4)": "11lYj0YczxrfNP-D8ooMGp6q-AOigvJn0",
+        "8.1 General (part 5)": "1r1mobpYvzfzihTm-joEpevoaZbYTLp0e",
+        "8.1 General (part 6)": "130O2izvyyaJFfpQgSLZ-EiB1juIEYtT6",
+        "8.1 General (part 7)": "1Mql89SX5Gpx850YF_oV_aUng8tA3BIpc",
+        "8.1 General (part 8)": "1EagBCTDP_UWhJYT1mX_WV84L1_jQDKmD",
+        "8.2 Gravity Water Supply System": "1OifiEZumBwrub1K6jsg0MPSlLVjGdy9e",
+        "8.3 Design of Sewer (part 1)": "17Z_Em4DZ_LAjwdZ2U1A58d5TnMD2r8f_",
+        "8.3 Design of Sewer (part 2)": "1wMUDgIPZanl1o5aOryuwAlb_S8fGm1_t",
+        "8.3 Design of Sewer (part 3)": "17lIRCRwoa0lLThHoIbK18P_mOvJfB8cL",
+        "8.4 Excreta Disposal (part 1)": "1igNiasy8MvwFiW-1EtRkVelEzGcKK4Ga",
+        "8.4 Excreta Disposal (part 2)": "1aBevQJrD0_V8CKawRW5UeFnEyWl7BwUx",
+        "UNCLASSIFIED Unclassified questions": "1r9NMHyWsi3MCey7M7YjMvuXupEG8iruQ"
       }
     },
-
-    /* Chapter 9 — Irrigation Engineering */
     "9": {
-      "Sunil Sah": {
-        "1-100": "1SFVGZBZCmcsMlBRLuv3rKjOr-ocKuJTy",
-        "101-200": "1CeQH3i49wF9dc0e6mIznjiSA3A9Qxf3u",
-        "201-300": "1ho8sdNzmE9YHBfUCBWg86ti4oH8w_UxE",
-        "301-376": "1Zg4rlXqtmFgUctS53I_ga_gtj-u3KEPC",
-        "376-408": "1rcHJY4DnOgABTsz1JrrwUlLcfU7VWKhm"
+      "Abhyas": {
+        "9.1 General (part 1)": "1fdyudGhdYfozogN4O6j1RzuBrFxoJfC9",
+        "9.1 General (part 2)": "1aBNF-dQiMHltNje0-Tir6lnuKUe_9XIY",
+        "9.2 Crop Water Requirement (part 1)": "1iHl2YsHzT6-vICRJ82OsSswhI4-dcPm2",
+        "9.2 Crop Water Requirement (part 2)": "1pglrDDhRt04R7kVVp7FAqonmMOuTxeJp",
+        "9.3 Irrigation Canals (part 1)": "16EA6ttlV7KU8JfmYBEAgIql7FIjIGxg8",
+        "9.3 Irrigation Canals (part 2)": "1eN9AMg_cmFq6d-XwOvyTk7bGr2yTSD2p",
+        "9.3 Irrigation Canals (part 3)": "1zEa0_QPrLmUSke-x_YTI9nvUzocC4NJ7",
+        "9.3 Irrigation Canals (part 4)": "1Xmflf76oILf4skEhUrD-yO2MFUm-F9ol",
+        "9.3 Irrigation Canals (part 5)": "1Otb2-BsNv9UrPfaFo6Di9L5OWJymTUkI",
+        "UNCLASSIFIED Unclassified questions": "1ANsrU2Z1ZvDDssb432Ul2QZPhqscxdLv"
       }
     },
-
-    /* Chapter 10 — Highway Engineering */
     "10": {
-      "Sunil Sah": {
-        "1-100": "1oglXPjLqCifewdj8-0MDx-UI5oCVyJ0G",
-        "101-200": "1DJWlgozHY4-Obn4FAzL4ITZZJIiyCcrD",
-        "201-300": "1NdciqWDMenHJd9Nl2euJaazASJRkYbtE",
-        "301-400": "1ZDhz_MWRSrGpOqNXj69-Plkl2RRaja9M",
-        "401-449": "1KEops4saZRcQGJPtcFAunGue8A392Qwy"
+      "Abhyas": {
+        "10.1 General": "1xEv8HVeyAjRoHPjUidUPA8QyhYLpd6O7",
+        "10.2 Geometric Design (part 1)": "1ExxJFKOoOn2f6fFI6WrZGFRAIiOGe-xe",
+        "10.2 Geometric Design (part 2)": "1cPHbFrkH3Si7ROADK07Tz3iBd25on44j",
+        "10.2 Geometric Design (part 3)": "1qEahT0gQer3-26ZPXlUbNoHfOoLrgp0f",
+        "10.2 Geometric Design (part 4)": "1T5tMvAnCab9DZFia3R7pl176_ypiGEDF",
+        "10.3 Drainage System": "1xaJbqbaWl-sryZW1F1BifLGB-FqxKTx7",
+        "10.4 Road Pavement": "1JdhujVm9BT2MAmrZJUn_BvqRdDL6y627",
+        "10.6 Road Construction Technology": "1oWQjaWNsKmVwBgWPOzzriYhz-QwlzIaH",
+        "10.7 Bridge": "1bNgxhrnhUoL-LWliDXtgbwjEqfXscgTD",
+        "10.8 Road Maintenance and Repair": "1NOuf2QMxOXPiAl60UJR08WmfZ8anFYYW",
+        "10.9 Tracks and Trails": "1c0VeC-o8BQ9eOWlm_4n0SYQ-hW_wWHWv",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1Wpr9FJ1fXWmZxXkclRAJeJsThQb8a9Tv",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1-aqOrfcTBSjnPXH2eLMZBZrQcrk7Q3kb",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1GUExTa_lQPLpCc6K9tqc1qWhMtyhSxeS",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1sTgLp2NcTY5K0aS2SedDnIdOLPaRrd4_",
+        "UNCLASSIFIED Unclassified questions (part 5)": "1vXqCxHGtIrVhJMXEv2auxDqC3f5T50yv",
+        "UNCLASSIFIED Unclassified questions (part 6)": "1WDJnE6yzF4QQblE9RqUXnQoVFSNp8WbQ"
       }
     },
-
-    /* Chapter 11 — Estimating & Costing */
     "11": {
-      "R.K Shrestha": {
-        "1-50": "1ivzRvvI9ZqXyyin4ncwW-GQIzECHOEDF",
-        "101-183": "193NC9O8OnKkqdC8dXCxjzvB-sYnD49_q",
-        "50-100": "1RLHdLWtDPgQnpNDpO4fdRGBHwMI0LLsX"
-      },
-
-      "Sunil Sah": {
-        "1-50": "1PatlHpX83cgMO8VH9bbOq6aRoifCNoNW",
-        "101-150": "1pN1as3DjClVrYhEWBKXXwR2n4Egd4IIc",
-        "151-200": "1WdqpEn0eSgZzhbT7X5ycF6m57bpRctBZ",
-        "201-260": "1WmIZf9XFN9CUPxJ9rzwBf6NvE_qrje42",
-        "261-312": "1wJZMh8dJYUF4Pm-qa80sU0sYMYX8hhKj",
-        "50-100": "1S82Lnx41zlFQx4-H7bGWW1Zt-I7zCeSx"
+      "Abhyas": {
+        "11.1 General (part 1)": "1ufyaNaVUan8RdlJl05EHOl0x44BhnIDP",
+        "11.1 General (part 2)": "17L6kQTXTLUKhWYq3NjNzpDJG8tVacisp",
+        "11.2 Rate Analysis": "1L5_e2xOIKTi3o4xZLEs_Q8TiK1p3Ya3T",
+        "11.3 Specifications": "1PRQ-DybFH2CWeahpH6Sy3N6Yl0xv7nny",
+        "11.4 Valuation (part 1)": "1UR5JlW1wXnxx02-mZjBncnVcZY8aYdoM",
+        "11.4 Valuation (part 2)": "1zgUUBFVcmMM9UBYs3pgpJLkexES2EBKH",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1jTzBHLLgwo60XP7kajBCBdeoiRvexI3u",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1eXGvlls1W8__pAo6mrBFoArlaeo4ObxD",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1kc3tpVVv4pNcKrGqpjvap2KUEKi1r_Yg",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1yJms0qCSkQm70zUaAs2rQc8RDpCuSIK-",
+        "UNCLASSIFIED Unclassified questions (part 5)": "10dHGxevjqjJgYPcbMz1S-4h8YsYMEL2k",
+        "UNCLASSIFIED Unclassified questions (part 6)": "1EQHgu_IUo2329ftY9KnvM5yAXAS6UYy2",
+        "UNCLASSIFIED Unclassified questions (part 7)": "1qNX1FJtxZzjLUziXhyMAVFNGa61diOKM",
+        "UNCLASSIFIED Unclassified questions (part 8)": "1xTJFHEXReA4ryHnuejl6VVPXgV7SAyOn"
       }
     },
-
-    /* Chapter 12 — Construction Management */
     "12": {
-      "Sunil Sah": {
-        "1-100": "1atj3Pt2St3Ag_9Lp1IIKfyFfzyES4jCu",
-        "101-200": "1EgH0tKtUJQVmsopLeh61lXTTDzMqbMy6",
-        "201-300": "1ErTJa6lzuCmqtcWMFMH-bwWQnsTPQByU",
-        "301-348": "10YYfufwvVqTi5XKlSlDQRzeap99HI8Lo"
+      "Abhyas": {
+        "12.1 Organization": "10CDeOIL_2K2CdD1-KoY0Dcjx8pkekw91",
+        "12.2 Site Management": "1rV5BZa_9p4F9dljYqycqs42FfOZZ4dfZ",
+        "12.3 Contract Procedure": "1TREYC7-nmuMvK3Ff_lpL50aPsv99vBmr",
+        "12.4 Accounts": "1Jup3-cPIRA1w5Xf-a7wX_clNaLkztEiH",
+        "12.5 Planning and Control (part 1)": "1fiZRoyF7E12-2hDhyjHEHChGeZ38tieS",
+        "12.5 Planning and Control (part 2)": "1mfYDKaz0965gvJmRGj_gxaGFHG8xvytR",
+        "12.5 Planning and Control (part 3)": "17-dL5b57vt2Xy0pdJPt-c9m7w_1c6e1Q",
+        "12.5 Planning and Control (part 4)": "1TqMI2Z3a-0ciUlHOCaWSFMnVvHlhVH0e",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1pKWWtBZCp0VJCEZutlk0waEzEbaXjOgU",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1vrMLXmQKfbvZTC6TM8uoQ1u0SiykS5Zn",
+        "UNCLASSIFIED Unclassified questions (part 3)": "17_XWZlxF9-FqzssAUTPHUXVuRyIPVpqq",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1RPuSDHwqk_RRJIdpdTfNTUE_d0svKJTj"
       }
     },
-
-    /* Chapter 13 — Airport Engineering */
     "13": {
-      "Sunil Sah": {
-        "1-70": "1W_tOzVueuNMTJEj4Zuwxkk4TxaSyHMm1",
-        "71-154": "1t8HiHvCUclSdZ_le0PzOe-D5a77xsVpj"
-      },
-
-      "DPARSAD": {
-        "All": "1uxYrB-uf5NSsrjV51lL7hsrvdlDfWP0i"
+      "Abhyas": {
+        "13.1 General (part 1)": "1-L9u07cWLJXfZgmu3vu1EDl5c0s6Fvze",
+        "13.1 General (part 2)": "1lcxALSkD_Ep6YXK3fhK-jb_hYZpdvW-W",
+        "13.1 General (part 3)": "1lkPLcVw_UezOs-0lkoPXCtAKy9kQpF7h",
+        "13.1 General (part 4)": "1ZZr3tQZtP4erZmu44W5EC6HiB31BlLgf",
+        "13.2 Design (part 1)": "1sGJwW8B_Y0f544Igs4AfFPTA58xiatzo",
+        "13.2 Design (part 2)": "1uSWnILnPLJxUi-OPnsXkIN45rAT7OR4K",
+        "13.3 Airport Maintenance": "1DWXH2v3yu_AVOQ1S_VFC5NmbwSbTK5zo",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1gYguHiKk6osB9SRLtywiXHimnywlyX1a",
+        "UNCLASSIFIED Unclassified questions (part 2)": "12DPM6kWM-FoJvcI2XOsY2zLqDGYjvBuM",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1iKcW_N46vuVB0RQfMORq0a55BZJSy9Yp",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1syIn7dRTbb2cYLDo7kcXLFqTaulc-XxT"
       }
     }
-
   },
-
-
-  /* ======================================================================
-     LEVEL 7
-     ===================================================================== */
-
-  level7: {
-
-    /* Chapter 1 — Structural Engineering */
+  "level7": {
     "1": {
       "Abhyas": {
-        "3.1 CG&MOI": "1EG0uEIOS9dSx91PmGfWHvDR6UtCRv1D6",
-        "3.2 STRESS&TORSION": "19c5aF_fDmwhFn328w6NmCrzgas3FT-c2",
-        "3.3 BEAM&FRAME": "1zX9WrcT4wky0-I8vTlzF0wEWgxOl7iBr",
-        "3.4 DETERMINATE STR": "1bbVC4CKhpG4WXF2qbem4EpBqRyFlhZoq",
-        "3.5 INDETERMINATE STR": "1QCQ_zcsbEG1ozW5b7x2COlLwjaZd6jFl",
-        "3.6 PLASTIC ANALYSIS": "1_rbUBhMRiJn-OMjk1Gf8gjFhkzpeZY8a"
-      },
-
-      "DPARSAD": {
-        "1-70": "1h3NQ9AL7DSx-5K3uU7XSb9Q7CvPiRwPD",
-        "141-228": "1ulh8RD7_hHeBUyrRD95kW_bgyvKQsk51",
-        "71-140": "1mgOsZkjGqWZ1AOhu1oQ6ZWtIOA-R3RwS"
+        "3.1 CG&MOI": "1XFl2GuG7KWq-csJHQGTgRlOK7PxyJEtI",
+        "3.2 STRESS&TORSION (part 1)": "1F8OiOp4X1J3cNxufatwkDHwp-KMhieYO",
+        "3.2 STRESS&TORSION (part 2)": "1XpyXcNHmgeTNHQIJc9yIpBv0EHmgkZWG",
+        "3.2 STRESS&TORSION (part 3)": "1E3TC7ASsQPhiWnao0MiJxw2M1FKgD8jH",
+        "3.2 STRESS&TORSION (part 4)": "1XzzFiqBt0KOl0j0VxvG2ftvl4AKnexeS",
+        "3.2 STRESS&TORSION (part 5)": "1937CcXWP8M0ls5WxHLeX4_wrh9IR9OC3",
+        "3.3 BEAM&FRAME (part 1)": "19wY10Z1YgnCThz_38tCFwitcqNjkLAKR",
+        "3.3 BEAM&FRAME (part 2)": "1rD19VRIO-qN1yXz52R2LQ09XVoaSW6og",
+        "3.3 BEAM&FRAME (part 3)": "11SyvOVNHqa1mjAx3j6rDCws3L0jsO-7C",
+        "3.3 BEAM&FRAME (part 4)": "1OCjR4vFXdLhlieR8n8zEJyTC0zZHYJCt",
+        "3.4 DETERMINATE STR (part 1)": "1pNkPBXvheqat7BDi1LxeoiN8R0AT_Xrr",
+        "3.4 DETERMINATE STR (part 2)": "1uLZshiv_OJ8Z23UsDOjbZtMjp4xPoX3i",
+        "3.5 INDETERMINATE STR (part 1)": "1Lm_O3az5rvNPZS0q5cotL29qGIygPbrQ",
+        "3.5 INDETERMINATE STR (part 2)": "1h8m7DmxejiwsKL9ch9ze0CwCxkk01sYq",
+        "3.6 PLASTIC ANALYSIS": "1S8cMUFq5L6yk5BK4w3CaUvQQNL3kTpdB",
+        "UNCLASSIFIED Unclassified questions (part 1)": "17XHPbdUtlYGT7DyTuB0yLcdJ_e7coa3i",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1EaSeQnDPoGrDlJP0lGk_f4upHRZNCInR",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1YYXqRHcCHdQgCGJuGRL5FsWw4t1CoGJk",
+        "UNCLASSIFIED Unclassified questions (part 4)": "1nSv2Fr8Gy3S5ZoGQ3mxIho8xjudJySRF"
       }
     },
-
-    /* Chapter 2 — Engineering Survey */
     "2": {
       "Abhyas": {
-        "4.1 INTRO&CLASSIFICATION": "1wbPJT2kei3KARwCNpYfaMp6zyJS_H3Fy",
-        "4.10 CURVES": "1CtK008-ohQtBw-qNdGlDljBvv9OnZQvq",
-        "4.11 AREA&VOLUME": "1ywPr6-7BdvgV1vFu6k_MN4r1QdH12VDf",
-        "4.2 LINEAR MEASUREMENT": "1vjeazMh9SHKejUGzS9zpv5yTZEJUTrkO",
-        "4.3 COMPASS": "19Uw3ELNKuxqt5xGYtVnyBBV1Hydzd_2N",
-        "4.4 PLANE TABLE": "1ffYjw6PACS3Ate0E4TBV3Metsaj-9O7O",
-        "4.5 LEVELING": "1g7P_VQ8-sf0WOB4t9AXlUCPCrSkp1kDG",
-        "4.6 CONTOURING": "1EIsFNCEkpDcsMdr-CRC8XGkPriVmWGqc",
-        "4.7 THEODOLITE TRAVERSE": "1aJmlhaUdz1u_60ZEBMV507wWEoJsCNgw",
-        "4.8 TACHEOMETRY": "1tPehSRACcKb39lHQAIyN9qsHk73uXnTi",
-        "4.9 TOTAL STATION": "1A6tik-Wn8jhE6cu3m8Bhy6dRnrGeHe65"
-      },
-
-      "RK SHRESTHA": {
-        "1-77": "1dCqKCDCgIyoNobRilOdP50bbqmOdTSWg",
-        "155-231": "1qHHhdU_TtWnM4uvp5EwHQx8m9N5GAk05",
-        "232-307": "1vNqbQIhOgiFmeGsmZj6AhKGmnqNm7Yr-",
-        "78-154": "1cCrVquPYs1VH7b2eKv9yqhiDttbjoDgT"
-      },
-
-      "DPARSAD": {
-        "1-100": "1yXZHd56UGxIi5RGl4XA-600dDaq8PpDR",
-        "101-175": "14zRkZBGZnFXkxGylMqplHxDgq53CWayc",
-        "175-250": "1TzBMpOzm-Qp5-yqB5T7y7J3cS06Kt8vs",
-        "251-350": "1jw4nzypzxqQo7xO9JcRUUtyVL1U6kbDq",
-        "350-455": "1K1C4cyYliqsH84pwlxrBmux8HNUtv9Ra"
+        "4.1 INTRO&CLASSIFICATION": "1wiNTbloogCwobm_9ijdXToSOEeialTAE",
+        "4.10 CURVES": "1en5GuPB7GRuG4wUna1a7IVR4eL24sWNU",
+        "4.11 AREA&VOLUME": "1hWK7HYhnnjxY5AUXSqRX6-oxnBeBsfjb",
+        "4.2 LINEAR MEASUREMENT": "1l98-MFQGn2kRf9sSNo9qnZD-ZS39OLe0",
+        "4.3 COMPASS (part 1)": "1xJu1Xnv038eoExBh5KGh6JGuX0O5IcOQ",
+        "4.3 COMPASS (part 2)": "1abyEyVGArmYjhUV_QEnu0wCnMT-hbAYG",
+        "4.4 PLANE TABLE (part 1)": "140F_FVggZ50a-TlLnG2xpI0OFpmFQ2No",
+        "4.4 PLANE TABLE (part 2)": "1_DrNBqTIqJkAe_UvbVgUMciQkH_0qIXT",
+        "4.5 LEVELING (part 1)": "1OcrME8Yf-PNNYHaE2iyBJi1bz18rVetC",
+        "4.5 LEVELING (part 2)": "1-9bAY8aemkclCObhoh8iKi4Z_ISnWATO",
+        "4.5 LEVELING (part 3)": "11kgh70itdxGn_VhL-NKeqh8ZWOhoAeHU",
+        "4.5 LEVELING (part 4)": "16tJIyCWefYy20C728U7nkn9wLNPtZTXA",
+        "4.6 CONTOURING": "19IAd3kgbUmsILKJ8O-1mDAPQ6cCzKvXi",
+        "4.7 THEODOLITE TRAVERSE (part 1)": "1S4FySJNshVxegARAPBueomEJufppWc_u",
+        "4.7 THEODOLITE TRAVERSE (part 2)": "1E2CFOyIrCFYlJkSJ81l5QQl4NO-TNXyn",
+        "4.8 TACHEOMETRY": "1cBIIzonwzMMGCuWPyJLMZdlPw5AQOnWn",
+        "4.9 TOTAL STATION": "1xk0gIESlCSnKBsQgegfNhthXJsNZ5enz",
+        "UNCLASSIFIED Unclassified questions": "1FRrvUGIWtuW6BgsOAm_HJAfAXpumeIBR"
       }
     },
-
-    /* Chapter 3 — Construction Materials */
     "3": {
       "Abhyas": {
-        "5.1 MATERIAL PROPERTIES": "1xq0qJg_DCtEcFMa8ALVsercbpC1Wo1UL",
-        "5.2 STONES": "1FeyTH5YX_oaqwkicY3EOAp_yfVSqcoh3",
-        "5.3 CERAMIC MATERIALS": "1EJOdjRII6R3I1qTvGSHJxMTseUAKiMW-",
-        "5.4 CEMENTING MATERIALS": "1Kn2zkXYtb8QsgrYwlw9SYBsnvNMtSkyu",
-        "5.5 METALS": "1-w2GgK5x_BQOXV1L4PmmX--I6pu2-Pjj",
-        "5.6 TIMBER&WOOD": "1xm9bJdbLm-9OA-sj0X4Ros8S_5KVB9qx",
-        "5.7 MISC MATERIALS": "1yNLIr5MA5MUYljoa29Bdi_1JTsqvI_hj",
-        "5.8 SOIL PROPERTIES": "1gyyZj77lsbMRHsKodEJJqzjHmOY5F7R5",
-        "5.9 LOCAL&MODERN MAT": "1dF0aR228CrYtLYEg79C9-n8u6yOlU9Sb"
-      },
-
-      "RK SHRESTHA": {
-        "1-75": "149Jiv13N8z5n2UdmhfE8RaXnGiQPz21z",
-        "151-225": "1MKSdWQ_63uRElC6Zlr4cMIru1csvwEdQ",
-        "226-300": "1rDmevr2rOcf894F7agAPNtN_ku6i8HWU",
-        "301-375": "1GuCW5aF4k2IMHGOJoKKUDw4vvAGb8THc",
-        "76-150": "1QW_IbwgQyEyfqVeDezET5dZHRqb1fMDq"
-      },
-
-      "DPARSAD": {
-        "1-100": "1v1LXYwzNF2TafCQKunBOrxl_UHn8W7NO",
-        "101-175": "1xXcFMVIymWnuTOJF-nh9SSJzuXNQYfWr",
-        "176-255": "1-XkoaqH9T6hRKec8j-dfuJwPKQDKYpFt",
-        "255-350": "1Z-kyfriVVY8ROCOK7_jrzVg2SuL2xP29",
-        "351-447": "1jTaYfKLulzd7heCGJc4BLR5kaaQA0mX2"
+        "5.1 MATERIAL PROPERTIES": "1ggPLMgIgaSfL5FEssRXCJRWoINLPkyHk",
+        "5.2 STONES (part 1)": "117JomcMijVr64a0FEMLa81hcQD89FlW8",
+        "5.2 STONES (part 2)": "1pb6OUOz08ai1E12OPDHpUuClMEV7P-XL",
+        "5.2 STONES (part 3)": "1aQsxp8i387PBYSs73Vawqad-GJ0DCNMk",
+        "5.3 CERAMIC MATERIALS (part 1)": "1iMkuiVUkmOJaIEiQwBe1nu37TbdoVTBj",
+        "5.3 CERAMIC MATERIALS (part 2)": "1ie_L7uMuF5X0pPKigWbM1t_metMsnxiI",
+        "5.3 CERAMIC MATERIALS (part 3)": "11IBfsxmRHXxjn1DQF0GnOGn5p0Mq7zZd",
+        "5.4 CEMENTING MATERIALS (part 1)": "1XRYWqm8tG0nlECNX_RKlEB9szzLWm470",
+        "5.4 CEMENTING MATERIALS (part 2)": "1LjBvxSkA3aQelhlTqM_6iX4SaKpBRWGJ",
+        "5.4 CEMENTING MATERIALS (part 3)": "1PQIZp2qR4N_pPpjcAlnCWxizwZgVazLB",
+        "5.4 CEMENTING MATERIALS (part 4)": "1oQYOusWcXGsYbhtRop7Gn9uLXhCa_fOi",
+        "5.5 METALS (part 1)": "1FbmYM1ZEGllfgUcSiT-xyMp0J4NvQfVz",
+        "5.5 METALS (part 2)": "11c-NeBvuBVFwmh8NsAzF9qchAA30kN_T",
+        "5.6 TIMBER&WOOD (part 1)": "1KMzUcwMHbQp7QiJzVAwS2ax_CkcHYZaz",
+        "5.6 TIMBER&WOOD (part 2)": "1MLdnbrXO1Q2WS1KML_CMfl4Lbg3_PsV6",
+        "5.7 MISC MATERIALS (part 1)": "1X51TpbokX40KGU0T6N8qioUkrYvEr0RH",
+        "5.7 MISC MATERIALS (part 2)": "1amamCIqiJGylnkx6cczVlNbkjCacDn0h",
+        "5.7 MISC MATERIALS (part 3)": "1bTNZevz-1wJ1s15iQKEbmCwFmLrL046m",
+        "5.7 MISC MATERIALS (part 4)": "18w2EYU7O-Ox-HYpqDfHgFHHftmIpICCT",
+        "5.8 SOIL PROPERTIES": "1b0c2qTtR5Wj7OTUKrqO386Hiffg_y1V3",
+        "5.9 LOCAL&MODERN MAT": "1xvF8KzRkevYKAputJBnW9T-Hoo-Xo691",
+        "UNCLASSIFIED Unclassified questions": "17GwQCvxAbIx77KDMRP7sshHX9INQJ9Ut"
       }
     },
-
-    /* Chapter 4 — Concrete Technology */
     "4": {
       "Abhyas": {
-        "6.1 CONCRETE CONSTITUENTS": "1iazvTuHBDaQxJCENIhxUwnsqzVjCG2Jx",
-        "6.2 W-C RATIO": "1IlHQ-3GXveMhfd_E_hiF-_cdJzaRuoSr",
-        "6.3 GRADE&MIX DESIGN": "1te_KTUkxYfalKxdyVA2s-8Uy2NDok0kI",
-        "6.4 MIXING&CURING": "14yqGXhxO3SGFBVkBNcwTwxPJG-zQYrUC",
-        "6.5 ADMIXTURES": "1fQLh_9juinKD_hV3KLBEcltdd5F-poV3",
-        "6.6 HIGH STRENGTH CONC": "1ee6mpS2WoaIEVxjXW8MiJbDxHVvWDKkx",
-        "6.7 PRESTRESSED CONC (sorted)": "1kr7oUnuhWKF1eV57RZWc7ZebNIXpZQc5"
-      },
-
-      "RK SHRESTHA": {
-        "1-80": "1ogn7X2qg57YbNVu_ExzsW4aas-8TKEU_",
-        "161-240": "1GgimqtgDGbUjdXAVP6J4KXdfEx5NcFhF",
-        "81-160": "1EaAqgiwXjaXsiwP9NBB2Vn07RhIBfPTZ"
-      },
-
-      "DPARSAD": {
-        "1-50": "1jhAs_3b61Cn6YjY45hHqwO2ceJuygbr_",
-        "101-150": "13T28p8WnYFPqNguu_4YsRnFJ5zOlaQ5B",
-        "151-200": "1OjdrC5yQ4x8jTijTNm6VmOWG5bqoBpQ5",
-        "201-250": "1hAP5zyfL5MaK1EqS_J-ZSWQXAX3J0UOB",
-        "250-300": "1sRb5evs5CLiK0xDn6wHP0qQmi2sY8f4s",
-        "301-350": "1Bug0gYU7UcILpX9je5xtgfWfHZIEN4W6",
-        "350-405": "1UoQ5GoTD_ggx9AJqAaqYgfLARb10pqOp",
-        "50-100": "11UWRoG-JKMxE28HF44iUGYidJ46XIi17"
+        "6.1 CONCRETE CONSTITUENTS (part 1)": "1eqL9LYEHQN2ZUvAQEMnY4bsBuyAxk5to",
+        "6.1 CONCRETE CONSTITUENTS (part 2)": "14GuWUWUdMlmdhROkttLGnbkYXHExFJfT",
+        "6.1 CONCRETE CONSTITUENTS (part 3)": "1GEHKlG2X0YJ3mqma8gjARZzmNXCisvXy",
+        "6.1 CONCRETE CONSTITUENTS (part 4)": "1REnXGKQaB86akhP4W6gdrkvEwlhJckoy",
+        "6.1 CONCRETE CONSTITUENTS (part 5)": "1lpLrLuAiWZErwEDzSlVizjE8xwV8ynpJ",
+        "6.1 CONCRETE CONSTITUENTS (part 6)": "1LkTyJkobvRaxrVPDe1KdlN5UAg8yxJia",
+        "6.2 W-C RATIO (part 1)": "1weyAdacF8z34Yya8zsgqLnm48_Vcjt_1",
+        "6.2 W-C RATIO (part 2)": "1BzjJoTtuls5DsthKlsySXAgDF5i4ZGY2",
+        "6.3 GRADE&MIX DESIGN (part 1)": "1Wm2iw9AWyzZopHBxS57pBcDh5EaSZKsJ",
+        "6.3 GRADE&MIX DESIGN (part 2)": "1UWa4rGpnNHuD4ZhVBjIztKfFkVka36ZB",
+        "6.4 MIXING&CURING (part 1)": "1YpIV_3S0GTc5t96GX4masX3V4nCESLFF",
+        "6.4 MIXING&CURING (part 2)": "13bZG9LlGpVIA9cbkiGMG_RFnDJ1eDozA",
+        "6.4 MIXING&CURING (part 3)": "1TzN4mHWyb67xIyrpljf0ecVCirELx9Yc",
+        "6.5 ADMIXTURES": "1truBhwnl0TVGeHIi8R1-N2M8CC667l6e",
+        "6.6 HIGH STRENGTH CONC": "1OHrq75LdBNFO7V-0yoYeaDgngAlIdBeV",
+        "6.7 PRESTRESSED CONC (sorted)": "1hK0SHHzioJuijXiz4r2ws2F2uZPGcar0",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1W9gYqBmq3S7fO4b7oWAkntdLvzKcXVkN",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1DvlSMUzTbUuw8JGwrXsVERIimKPwgTS8"
       }
     },
-
-    /* Chapter 5 — Geotechnical Engineering */
     "5": {
       "Abhyas": {
-        "7.1 SOIL FORMATION": "1Jfg5Gji1MLsQ4tSRfhnE5LpVhD7j4Vcc",
-        "7.2 3-PHASE SOIL": "1rHR8T3Ndwhf8wbe7gKH-CB8hvA9H3m9C",
-        "7.3 WATER IN SOIL": "1_PABQhwTxdMN2HZy0IpGELAWXMhIwFO1",
-        "7.4 INDEX PROPERTIES": "17_MfKmOWTwIRDqcwhykTOHYNc2CViaqp",
-        "7.5 ROCK&EARTHQUAKE": "1bfoKt4uKYaL4AaSimTSv2SbBo6HZxLX_",
-        "7.6 TUNNELING": "1BO3UpqbjxApK8fdxp3K_Irv6o3FNSIDa"
-      },
-
-      "D PARSAD": {
-        "All": "1ipRrpTWBA7JIdwCuTY73ZZwY0CTM-LAP"
-      },
-
-      "RK SHRESTHA": {
-        "1-69": "1AJlI1Dsf1vugz-e76IOnrLcDUi8ANSvv",
-        "139-207": "1E4vRDqK86c23Ki-reszLKuMIg5-QUsEU",
-        "208-276": "17E7qw-1-Q3cIy8e6Gt76WdDlC-gQsubc",
-        "70-138": "1a5xfPk5LFN8t5C5MSlFupxUw2zf9rGS8"
+        "7.1 SOIL FORMATION": "1IX0QhTrbyINKRqD99SEh9vmphDZ_kfe-",
+        "7.2 3-PHASE SOIL (part 1)": "1mHGNxXiZdTbwA9i3E7--ZI1h8XwMNEot",
+        "7.2 3-PHASE SOIL (part 2)": "1qE8AFEttq7P-vsEUfNZ5R_q2eYPbWgJQ",
+        "7.3 WATER IN SOIL": "1DZi0XdPzmy7mf7CUVxDn2u5Gtw6ApJK3",
+        "7.4 INDEX PROPERTIES (part 1)": "15DRO5T4UnKz8fn3HS1ToAoiEh2XKJSkO",
+        "7.4 INDEX PROPERTIES (part 2)": "1F8PV0aVTyMcZgUVrwaz0vd_Lx1ZCFC_u",
+        "7.5 ROCK&EARTHQUAKE": "1RO1M1rXP0vklBs-flj1Nrsc-4ftlTf1W",
+        "7.6 TUNNELING (part 1)": "1_xZZ-962-ah2O9hxZ0wnTEkD40PInM4V",
+        "7.6 TUNNELING (part 2)": "1xYq-gfjY8_gQ0eMbs2zxlgXFAJfAOILY",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1LfPGiW6d1DEnDIRjNazxbe8JCIAgfWH7",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1cqJucIeHJY93jB5QYxd-FTJoIbx_WkXA"
       }
     },
-
-    /* Chapter 6 — Construction Management */
     "6": {
       "Abhyas": {
-        "8.1 SCHEDULING&PLANNING": "1lsPuaKBIuAM7WRirGfVBNNU05mbOmnZl",
-        "8.2 CONTRACTUAL PROCEDURE": "1-unallplP0bXzlQZpN8uUoNxOA9w5HfK",
-        "8.3 MATERIAL MGMT": "1Isu1oOsqnLv-UE0KmwcCPOt7YbhJcU0A",
-        "8.4 COST QUALITY TIME": "117x7V5t0exDB2k4OTCC10OINNIhB9HZH",
-        "8.5 PROJECT MGMT": "1gzkQSJuV0SVTovgVDeJzY_ib0Dkddcrn",
-        "8.6 HEALTH&SAFETY": "18JlIjTuUxMVq3-mrl3vGE7wvTr4v_xns",
-        "8.7 MONITORING&EVAL": "1sXc6hx-sryLUDt-ScG9EAb9sl1r9g8Nz",
-        "8.8 QA PLAN": "18BwOWW5dpnffF17T9CC7GxIGRtpV1VZ4",
-        "8.9 VARIATION&ALTERATION": "1YNQk_Lyzg8AGMwCk5ykYKgR5tFi7-mlb"
-      },
-
-      "New DPARSAD": {
-        "1-75": "1cQGpQHGzekcDnE2duOkYzx3NAoeuPv5h",
-        "151-225": "1tro7AirSkoOm9zYvJyQo5W_hlUvoqvlg",
-        "226-310": "12jhiq9Jbp3EwvqJgW_bxyPq77IYfUEAa",
-        "75-150": "1T2tghXwm_6Dqy5FkQgs0wiRrhl0NQuGM"
-      },
-
-      "Old DPRASAD": {
-        "1-100": "1IYG4gFrvXBJ8n2kJRFL1UCRZdUOZsZCv",
-        "100-150": "1KY9GTqB8sTJpGha_JnYYE9Pvnnzotf9h",
-        "150-200": "18HnjG1-leT6OXk5mYPGTJluMw2yiFUEy",
-        "200-205": "1KA-3P2cmmQKQRmr_-UU74ik_MmNsJ8F2",
-        "50-100": "1981sMj5WNTZeKsghbz4N_eEqqxm1XbT5"
-      },
-
-      "RK SHRESTHA": {
-        "Batch 1": "1_KH4l09hI0GeH6J5tGd6vGCQZzNjj7_J",
-        "Batch 2": "1V9EtSiGB2_jaOpTdna_0VGt6iSVh6WmG",
-        "Batch 3": "1vdN4MvatiJJ-7Qjz4epjV6FluEVf5a-m",
-        "Batch 4": "1nz3Tvjl6THGuXYKTnXLH8ZbYKxyfRy-w",
-        "Batch 5": "1CJfsghP6UOy5qv29ktUrhhNBhqnmqRj7"
+        "8.1 SCHEDULING&PLANNING (part 1)": "1Mr8ymW0xC2l8PSAg-hMQjpNkzHNh6s-k",
+        "8.1 SCHEDULING&PLANNING (part 2)": "1CQxpVyHx6mdDFzzyI9WbNvN2g4vsENJO",
+        "8.1 SCHEDULING&PLANNING (part 3)": "1SnUb3plKG5fF5QS4QxtVZPC3Nv0GLdov",
+        "8.1 SCHEDULING&PLANNING (part 4)": "1LfljtlCl2E7T6_qJV3KMHrezp5Zi0dYa",
+        "8.1 SCHEDULING&PLANNING (part 5)": "1cPR98LNs6Wb50lst0FK_Mo65s0KIXmey",
+        "8.1 SCHEDULING&PLANNING (part 6)": "11ngeMKIyPR6rclNcUAJiANsYLRNmmgM1",
+        "8.1 SCHEDULING&PLANNING (part 7)": "1iLBpLIgalBlkAoDlvBh77rvwUXJxgidJ",
+        "8.2 CONTRACTUAL PROCEDURE (part 1)": "149qAuaYAptVU8yHF3TtzABjF4ri0eeqT",
+        "8.2 CONTRACTUAL PROCEDURE (part 2)": "1kVYIm2F3Nse7Hb3I8D2g0Og7j9o4O9fg",
+        "8.2 CONTRACTUAL PROCEDURE (part 3)": "1sLDfskbwZdQJoYxEyYJoF3X4N7BINB0r",
+        "8.3 MATERIAL MGMT": "1SnR_KbZWE9YDCHHb83gWOTBmyvnByL5L",
+        "8.4 COST QUALITY TIME": "1zFsr77LezhFXj6HCzWOhmxVWr-LA6261",
+        "8.5 PROJECT MGMT (part 1)": "1VW6Lp60a7IyU1I5t6GmI7wJJt7KqJKUL",
+        "8.5 PROJECT MGMT (part 2)": "1qJ2xA4JMOwgQJk2oYI9tIW-sh01dzDAo",
+        "8.6 HEALTH&SAFETY": "17lmjAUBg_JUV6KMBAlvtpXYLVtxXhBUw",
+        "8.7 MONITORING&EVAL": "164NQqouT4zcIZKJPdmFLpfZj2476GKbz",
+        "8.8 QA PLAN": "1fm6biDeGkrgZnm2axTIUWtt8pJkgzedj",
+        "8.9 VARIATION&ALTERATION": "1CbLU9kCdN3pXb_FC6v8tleyz9MjuExwz",
+        "UNCLASSIFIED Unclassified questions": "1N72rleYcSglTt8PrlbjN1FSSMgtynUU-"
       }
     },
-
-    /* Chapter 7 — Estimating & Costing */
     "7": {
       "Abhyas": {
-        "9.1 TYPES OF ESTIMATES": "1MQesOkFEVzpRyZ7f5ZJxmmJixEuYLEVO",
-        "9.2 QUANTITY CALC": "1d77m_6-DqGeMHYizeZxlCPzhSgeRmNEB",
-        "9.3 RATE ANALYSIS": "1iI4ZsKFdS3VfIRPnt07pmAlpV1Qpjbn1",
-        "9.4 BOQ": "1QzTZRC37wpfmtvdr9DF4TaZECyT3gWWZ",
-        "9.5 SPECIFICATION": "1zv_Kj1b5OinAqFtTTprikNvMRfWbh8iW",
-        "9.6 VALUATION": "19b5w82zFWyzfMP6GNDzMsNWs8W6gHfgA"
-      },
-
-      "DPARSAD": {
-        "1-50": "1WR0c-cQrD6ZNrpW31pgFTrhekyT_0n4K",
-        "101-151": "1O3bhzDvGZfUTy1T9guFuq_aAn3PAq7Xi",
-        "151-200": "1E22sJNC6miJwVNDD5cz8EW3OXTWKc4XT",
-        "201-250": "1-VeNFb81ynETihERKfWNUOZSqrYopyOH",
-        "51-100": "1RjkK83GYpLncIqJJ2FGYkHh0FGGksJ_J"
-      },
-
-      "RK SHRESTHA": {
-        "1-81": "1x38YE2cp5xh0HDOS4MxJ4lvPqu3BdGdc",
-        "163-242": "1_QL2BkJ0KasZes4mlPqRdxygRCctGMS5",
-        "82-162": "1XNc9kD0zGUJ1x3c-0wmL71XalNg46W42"
+        "9.1 TYPES OF ESTIMATES (part 1)": "1zmWe4OL0rQ37WsSCyc5XbYkTJYvKYblZ",
+        "9.1 TYPES OF ESTIMATES (part 2)": "1k6P60xOkZ1vps2jukZ__F33-N9BYPqCq",
+        "9.2 QUANTITY CALC (part 1)": "16Wib3sKVHrFWU2dDf9WD0LGeD7VFH_Ro",
+        "9.2 QUANTITY CALC (part 2)": "1VLF0UPqiXLmFGTjoVY5DT4mp8399aA27",
+        "9.2 QUANTITY CALC (part 3)": "1AS3B9gWz7BkLSYKqdDqp6dMYJeoVadtE",
+        "9.2 QUANTITY CALC (part 4)": "1e-PwCSbmrKRYluopS25ZoYtD7K7e6vU7",
+        "9.2 QUANTITY CALC (part 5)": "1-VNui11txE_dMk_NimXopr3UadnnL9hz",
+        "9.3 RATE ANALYSIS (part 1)": "1SjRmA-9ljxPYlEAdWvCWEt24m6yQqWVd",
+        "9.3 RATE ANALYSIS (part 2)": "1YpRKN2xEafcnE6gqiSJFn62KJNNNY9MW",
+        "9.4 BOQ": "17zYCkZUAlQDCl2goS8TMahb_nxGvXi4m",
+        "9.5 SPECIFICATION (part 1)": "1CnonOWc2KMSwb0x4UncfO7Lr984di218",
+        "9.5 SPECIFICATION (part 2)": "1IQSeVxC8jbiq45-EHjrfKDuvhZ-PHULd",
+        "9.6 VALUATION (part 1)": "1frSNHIeKJ6TsPPoBzWW9tDFdJ9zVI86l",
+        "9.6 VALUATION (part 2)": "1PspPhGTcMLT5w2dF-agutPJvGs-eSbRd",
+        "UNCLASSIFIED Unclassified questions": "1C91xLjHM5YE13Ro8YuBR5Cd8K_U6HoJL"
       }
     },
-
-    /* Chapter 8 — Engineering Drawing */
     "8": {
       "Abhyas": {
-        "10.1 DRAWING SHEET": "1QYmvyWgDEpKZuJCY2PVmT-iapsjYt6bE",
-        "10.2 SCALES&SITE PLANS": "1P82yikIheWhYE9lbZXPxLT4FJLn0zJ-g",
-        "10.3 PROJECTION THEORY": "1vxdlZFCJhfIrYL0Px3kCllGJb1nQnyS-",
-        "10.4 DRAFTING TOOLS": "1u5M7zPP7IcRNWeSh-K7Zkxif2wPFsdCe",
-        "10.5 DRAFTING CONVENTIONS": "1P0J4nuGdxfRkUBirAIbZvMl5UYd40okm",
-        "10.6 TOPO&SERVICE DWG": "1DR4vlhVXdkFk1OdUqqbiX7K9qjclpTqK",
-        "10.7 FREEHAND DRAWING": "1_fhZYcuOynoNlRm-yQjBvx15ct3Hdra_"
-      },
-
-      "DPARSAD": {
-        "1-100": "1WqQPC_gqQ8gM43tMEatrpvFb91Rzfb5k",
-        "101-183": "1AXIlR6OKS9cG65HU5xZvyJWeNj6-MJk1"
-      },
-
-      "RK SHRESTHA": {
-        "1-71": "172V_845Zdr84U69dr0bmMDbxz56Ya74M",
-        "143-213": "1EvRKn9B2I8jjT1UeWzB8IYiDKRhz0NSs",
-        "72-142": "1YrxxoZ0IPON3ycUL0sa8sjiRHEtKip5r"
+        "10.1 DRAWING SHEET": "1sT5yFX_tJjLVbapKIHLEf8pjQKZ4773z",
+        "10.2 SCALES&SITE PLANS": "1w8iFZF3W1-K3DovCVba4OACOI_Ck-iHq",
+        "10.3 PROJECTION THEORY (part 1)": "1k6iGbKxJuDcUlhLzn5ybLMREal379eUH",
+        "10.3 PROJECTION THEORY (part 2)": "1cu2MjztO8LkN0OqjrL4vw8OQCmyfGlxS",
+        "10.3 PROJECTION THEORY (part 3)": "1BT_TtAA3e7pNTr-EQKktSWv65p4G0VVN",
+        "10.4 DRAFTING TOOLS (part 1)": "1R8OOzAvUvybHF27np6P4DeKz02EkBg4K",
+        "10.4 DRAFTING TOOLS (part 2)": "1gzEVdSWG27Ti37q6_1ZW2ttRPx_AsdvU",
+        "10.5 DRAFTING CONVENTIONS": "1FkIk2uLU26KpcSBRUEzcEEhR98CuMCNH",
+        "10.6 TOPO&SERVICE DWG": "1pSdSzQcL_sJfLx6hKaWbOaGgvg_Dbzz0",
+        "10.7 FREEHAND DRAWING": "13-spjrkMpLX_9NJQhCJ4GDdWw5jECwOP",
+        "UNCLASSIFIED Unclassified questions (part 1)": "1Ts5hZywGuXjuAkHN-fUcfj5Xe2xIyCYp",
+        "UNCLASSIFIED Unclassified questions (part 2)": "1xeFMevs_l4eZd13ZOrRdnYi8QL1RNaU-",
+        "UNCLASSIFIED Unclassified questions (part 3)": "1t5ZSLBwwBkVp6z8Xcnjh53tZlefcyxAw"
       }
     },
-
-    /* Chapter 9 — Engineering Economics */
     "9": {
       "Abhyas": {
-        "11.1 INTEREST&TIME VALUE": "1BXoTkgknjpCG5LzLRtj8k6QJoHPtcZpg",
-        "11.2 ANNUITIES&SINKING FUND": "1QMnGhrfoV5F47eVQ-_APk2kxVYnaVOBn",
-        "11.3 NPV IRR WORTH METHODS": "1NupM_Qdz5qYrug0WHKLPPfFMnqSsIhXw",
-        "11.4 COST CONCEPTS": "1f3JdoFQeQqugV2c1-iMJ2v15A8pQs7gM",
-        "11.5 BREAKEVEN&SENSITIVITY": "1Nv2D1WJfWTbX7paoLlQMO87lcnMJLPbU",
-        "11.6 ECONOMICS BASICS": "1LJkfj2iru8Ue2ZKkLSrTH3Qk4Mx7ABd4"
-      },
-
-      "RK SHRESTHA": {
-        "1-54": "1OJYDYMCCYbayimPJzRlf7ZNI3C48YJIw",
-        "55-108": "1VBxr0CbRm7LYah9FBTC3Cnl2-ddyIV39"
-      },
-
-      "DPARSAD": {
-        "1-75": "1vzp6vp3jscMoDEsNwLTAdX6fw2qoOe55",
-        "76-end": "1abshceD1-c5wygd9L32gAoLpuYdBqkd8"
+        "11.1 INTEREST&TIME VALUE": "1MGuTXQ-qP2G0Z1E001t-saDzfAAzrFrP",
+        "11.2 ANNUITIES&SINKING FUND": "1n4NfhtCbrCjH1iHRhjaapZ27c6V_K_Ev",
+        "11.3 NPV IRR WORTH METHODS (part 1)": "1Znmkrn_ow29ZkgUz6noZz75IDlzM1hRK",
+        "11.3 NPV IRR WORTH METHODS (part 2)": "18g6KPp0OTox14-637A-m6eOyqybrdihy",
+        "11.4 COST CONCEPTS": "10yjV0wziatz_866cellSTWsXKQSQSaUt",
+        "11.5 BREAKEVEN&SENSITIVITY": "1zifB3_TU5X5UB9JCEe0MR7gvoHPdOq8v",
+        "11.6 ECONOMICS BASICS": "1dlAwzYRLMbePRP5N7Q1RaDLOce0ftQE1",
+        "UNCLASSIFIED Unclassified questions": "1RP4UUrmCKWtGolgzghwsG80_FN7qdkuc"
       }
     },
-
-    /* Chapter 10 — Professional Practices */
     "10": {
       "Abhyas": {
-        "12.1 ETHICS&INTEGRITY": "1n0iZ2dKnUYjv1AtjMmQyndEWHNY52-0g",
-        "12.2 NEC ACT": "1As0-bXhVE4B0av_iSdQhgnPi8DA3WAsw",
-        "12.3 CLIENT&CONTRACTOR REL": "1JJZwp5_uUx1CmOS4vgbeZkl_aF0bQnKG",
-        "12.4 PUBLIC PROCUREMENT": "1oVdr1E2GWPvS-cpSohUjeNgIcd7DP7r3",
-        "12.5 NBC": "1_JEkzhm07SmcKejscg5hkCB44sQqknR1",
-        "12.6 BUILDING BYLAWS": "17mDJyHSvDCYjwnlsAvAoPptHQzss9TWU"
-      },
-
-      "RK SHRESTHA": {
-        "Batch 1": "1TsbaxhfnQdqsR31Qc0m48q3aIO2rqHfy",
-        "Batch 2": "1hTK4XCovy30ZCZ5j5AmCOcTdfQCYLsTq"
-      },
-
-      "DPARSAD": {
-        "All": "16Yw0SALw-Vk1KR-7HnRZdetJFqarj7S2"
-      },
-
-      "_meta": {
-        "subtopics.json (metadata, not questions)": "1cKJlBecxKWCezPotU8qncwWSpQyhK57u"
+        "12.1 ETHICS&INTEGRITY": "1cDqsWmher7WccGChIMQt40ZuT86Se6ZC",
+        "12.2 NEC ACT (part 1)": "1qPvXAabXx_0sC8Ps6Fgnsvx5igK5qESg",
+        "12.2 NEC ACT (part 2)": "1aiITtBW-s95O81_ZlvkAhAHxEIHLbw9f",
+        "12.3 CLIENT&CONTRACTOR REL": "1fsxIIdUEMjgVR78mYJAtHPe7HHzq3yaH",
+        "12.4 PUBLIC PROCUREMENT": "1w6ZKJJ7GaqW6GpdmasYhTphMZ7l5Q7x_",
+        "12.5 NBC": "1uHrNq4bscyX_xzIjOHdXtdMhwysxrKcy",
+        "12.6 BUILDING BYLAWS": "1joL3r2x9q5TBg0hAhu-9HkvGhezeMdWi",
+        "UNCLASSIFIED Unclassified questions": "1iYa4ouvbAoYt4c1fMvZLAhc8s7e-5RsP"
       }
     }
-
-  },
-
-
-  /* ======================================================================
-     GK (shared 'GK' folder only — see header note re: Abhyas GK)
-     ===================================================================== */
-
-  gk: {
-
-    /* Chapter 1.1 — GEO&DEMO */
-    "1.1": {
-      "Abhyas": {
-        "All": "1F20fh00eQpPXs45QXW7T3gFT1xlMf734"
-      }
-    },
-
-    /* Chapter 1.2 — NAT RESOURCES */
-    "1.2": {
-      "Abhyas": {
-        "All": "1VHUZPsulfZHy2iMPDC07kCWyAnBQy8jL"
-      }
-    },
-
-    /* Chapter 1.3 — GEO DIVERSITY&CLIMATE */
-    "1.3": {
-      "Abhyas": {
-        "All": "1yH-DJSPVgAVRlASd1b0-nCmsPC6Wu6BF"
-      }
-    },
-
-    /* Chapter 1.4 — MODERN HISTORY */
-    "1.4": {
-      "Abhyas": {
-        "All": "1kl_W3zRZf625Yc_WoRMx-Q552sNDLfsq"
-      }
-    },
-
-    /* Chapter 1.5 — PERIODIC PLAN */
-    "1.5": {
-      "Abhyas": {
-        "All": "19wKOhaIw1y-yJneyUwQDDv0-fPw0i7tL"
-      },
-
-      "GATE": {
-        "All": "1S39S--nt9QVepKlcszdpntB8rRgAEqfd"
-      }
-    },
-
-    /* Chapter 1.6 — SUST DEV&ENV */
-    "1.6": {
-      "Abhyas": {
-        "All": "1h6TTxSnMnIcYV8riyTgsDcG4QvCfi9eW"
-      },
-
-      "GATE": {
-        "All": "1922CKz8p81DWUWhimygloqKDNDQXbXXF"
-      }
-    },
-
-    /* Chapter 1.7 — INTL AFFAIRS */
-    "1.7": {
-      "Abhyas": {
-        "All": "1XpoO3NsQFwcDDdSks8xBzlTKUpb353vb"
-      },
-
-      "GATE": {
-        "101-150": "1TTD1aKKl_P6nGcUxzyyDkpbH2O7hPx_u",
-        "151-180": "1dEdvbPuxrSKys_jlMAJkaHGLuSHQ47fF",
-        "General": "1pomfoXhK1mWU7QAO-oihx2SMsPJqxOCh"
-      },
-
-      "SAARC": {
-        "Saarc batch 1": "1mgbD6Zr3t5zu7oGAraj1BeIXOqbGSojp",
-        "Saarc batch 2": "1SWybO9ZCwzFPvAY6k_8StQk9Nf04MZzm"
-      }
-    },
-
-    /* Chapter 1.8 — CONSTITUTION */
-    "1.8": {
-      "Abhyas": {
-        "All": "1ekHVTT84JW1U8xplW_SqsN5I2VDFI-K2"
-      },
-
-      "GATE": {
-        "All": "1HRlsrjjxF8tW89R4fT9wTGjAnFt0gfVS"
-      }
-    },
-
-    /* Chapter 1.9 — GOVERNANCE */
-    "1.9": {
-      "Abhyas": {
-        "All": "1bTztLbaAcEjy9_pJ1jDK_99utkAImae1"
-      },
-
-      "GATE": {
-        "All": "1xO4bk4QCPzqCORupW07MtNj-60OFlqZE"
-      }
-    },
-
-    /* Chapter 1.10 — CIVIL SERVICE ACT */
-    "1.10": {
-      "Abhyas": {
-        "All": "1rnZIF8vRPmYEMXO6B3GWpeSRSz9IzS6x"
-      },
-
-      "GATE": {
-        "All": "1W628YzIRlatpN0BhdtVqv1V7q44Fn8F0"
-      }
-    },
-
-    /* Chapter 1.11 — FUNCTIONAL SCOPE */
-    "1.11": {
-      "Abhyas": {
-        "All": "16_eBtRVcS1VvLkEafwTT0ky9vf5I6rB4"
-      },
-
-      "GATE": {
-        "All": "1TdUQchW6i2LBKdWsjMNNTGwB5hAR1iCB"
-      }
-    },
-
-    /* Chapter 1.12 — PSC */
-    "1.12": {
-      "Abhyas": {
-        "All": "1sl2eGivffxVph_TcUTH6p6GqcDcv28Nd"
-      }
-    },
-
-    /* Chapter 1.13 — PUBLIC POLICY */
-    "1.13": {
-      "Abhyas": {
-        "All": "1Lamc5bwUId2EEZ2eFWl80tpnb999QUQ7"
-      },
-
-      "GATE": {
-        "All": "1u3hA3p7wtUaDvzDioLVrFaq02WUuNCpt"
-      }
-    },
-
-    /* Chapter 1.14 — MGMT FUNDAMENTALS */
-    "1.14": {
-      "Abhyas": {
-        "All": "1j5xcwSAZCRQ5oBm98N2R79uaOUD7SAUu"
-      },
-
-      "GATE": {
-        "All": "1G5BtPfzG_bnmDhIORtJM6N5cmCEiAt3A"
-      },
-
-      "Planning and Management": {
-        "Duplicate": "1Gzu0Or4R4TufdNbRAfIvuWsstiNRJzJ3",
-        "Part 2": "1pqYGgBageMaEsa6QZoCcqzpjr1Bpd3DA"
-      }
-    },
-
-    /* Chapter 1.15 — BUDGET&ACCOUNTING */
-    "1.15": {
-      "Abhyas": {
-        "All": "1fptEiZVBE_jzmVqoeoXzgBbTM9xcAQoY"
-      }
-    },
-
-    /* Chapter 1.16 — CURRENT AFFAIRS */
-    "1.16": {
-      "Abhyas": {
-        "All": "1RihlAcMkOLvNjGwkFvm_q9IMNLLjlhsI"
-      }
-    },
-
-    /* Chapter 1.17 — CHARTER */
-    "1.17": {
-      "GATE": {
-        "All": "1SkPP7n4nIjmdEzWu8zZ5nywQaY2BmGQD"
-      }
-    },
-
-    /* Chapter 2.1 — LOGICAL REASONING */
-    "2.1": {
-      "Abhyas": {
-        "All": "1bwgC1qylMuepvp52rqvW4IleuVWUpOTV"
-      }
-    },
-
-    /* Chapter 2.2 — NUMERICAL REASONING */
-    "2.2": {
-      "Abhyas": {
-        "All": "1ZWWRRh1ZZc_B__u4cGQsk5bQZc7GKpLX"
-      }
-    },
-
-    /* Chapter 2.3 — SPATIAL REASONING */
-    "2.3": {
-      "Abhyas": {
-        "All": "1cMGd3B5N-e9NbgShSlF1QAsW8VuYjPwx"
-      }
-    }
-
   }
-
 };
 
+/* ══════════════════════════════════════════════════════════════════════
+   CHAPTERDATA — accessor API used by app.js / objective.js / admin.html
+   ══════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
 
-/* ========================================================================
-   CHAPTER DATA HELPERS
-   ======================================================================== */
+function _levels(){
+  return Object.keys(LEVEL_LABELS);
+}
 
-/* v1.04 — any book whose name starts with an underscore is metadata, not
-   questions: e.g. DRIVE.level7.10._meta describes the chapter's subtopic
-   file(s) and is not itself a solvable set. Every consumer (the Online
-   Study picker, Psycho Mode, CACHE.autoSync, file counts) walks the same
-   helper methods below, so filtering here in ONE place means none of them
-   can be tricked into showing or downloading it. */
-const _SKIP_BOOK_PREFIX = '_';
+function levelLabel(lv){
+  return LEVEL_LABELS[lv] || lv;
+}
 
-const ChapterData = {
-  levels() {
-    return Object.keys(CH_NAMES);
-  },
+function chapters(lv){
+  return CH_NAMES[lv] || {};
+}
 
-  levelLabel(lv) {
-    return LEVEL_LABELS[lv] || lv;
-  },
+function chapterName(lv, ch){
+  return (CH_NAMES[lv] && CH_NAMES[lv][String(ch)]) || `Chapter ${ch}`;
+}
 
-  chapters(lv) {
-    return CH_NAMES[lv] || {};
-  },
+function books(lv, ch){
+  return (DRIVE[lv] && DRIVE[lv][String(ch)]) || {};
+}
 
-  chapterName(lv, ch) {
-    return (CH_NAMES[lv] || {})[ch] || `Chapter ${ch}`;
-  },
+function files(lv, ch, book){
+  const b = books(lv, ch);
+  return b[book] || {};
+}
 
-  books(lv, ch) {
-    const raw = (DRIVE[lv] && DRIVE[lv][ch]) || {};
-    const cleaned = {};
-    for (const name of Object.keys(raw)) {
-      if (name.startsWith(_SKIP_BOOK_PREFIX)) continue;
-      cleaned[name] = raw[name];
-    }
-    return cleaned;
-  },
+/* Flat refs for one chapter. Skips null/empty fileIds so callers can
+   treat the return value as "ready to fetch". */
+function chapterFileRefs(lv, ch){
+  const out = [];
+  const chBooks = books(lv, ch);
+  const chLabel = chapterName(lv, ch);
+  Object.keys(chBooks).forEach(book => {
+    const subs = chBooks[book] || {};
+    Object.keys(subs).forEach(subtopic => {
+      const fid = subs[subtopic];
+      if (!fid) return;
+      out.push({
+        lv: String(lv),
+        ch: String(ch),
+        book,
+        subtopic,
+        fid: String(fid),
+        key: `${lv}_${ch}_${book}_${subtopic}`,
+        name: `${chLabel} — ${book} — ${subtopic}`
+      });
+    });
+  });
+  return out;
+}
 
-  bookNames(lv, ch) {
-    return Object.keys(ChapterData.books(lv, ch));
-  },
+/* Flat refs across every level/chapter. This is what `QUIZ.daily()`,
+   `QUIZ.adaptive()`, `CACHE.autoSync()`, and the psycho-mode mixer
+   iterate over. */
+function allFileRefs(){
+  const out = [];
+  _levels().forEach(lv => {
+    const chs = CH_NAMES[lv] || {};
+    Object.keys(chs).forEach(ch => {
+      out.push(...chapterFileRefs(lv, ch));
+    });
+  });
+  return out;
+}
 
-  files(lv, ch, book) {
-    // Guard the direct-lookup path too — a caller that has the raw
-    // book name from elsewhere (e.g. an old cached session, a URL
-    // parameter) shouldn't be able to fetch a metadata file through
-    // this function even if books() would have hidden it.
-    if (String(book).startsWith(_SKIP_BOOK_PREFIX)) return {};
-    const books = ChapterData.books(lv, ch);
-    return books[book] || {};
-  },
-
-  fileCount(lv, ch, book) {
-    if (book !== undefined) {
-      if (String(book).startsWith(_SKIP_BOOK_PREFIX)) return 0;
-      return Object.values(ChapterData.files(lv, ch, book)).filter(Boolean).length;
-    }
-    let count = 0;
-    for (const bookFiles of Object.values(ChapterData.books(lv, ch))) {
-      count += Object.values(bookFiles).filter(Boolean).length;
-    }
-    return count;
-  },
-
-  totalFilesInLevel(lv) {
+/* Count non-null fileIds for a scope. Used by ON.onLv/onCh to gate
+   "(coming soon)" labels on the dropdowns. */
+function fileCount(lv, ch, book){
+  if (!lv){
     let total = 0;
-    for (const ch of Object.keys(DRIVE[lv] || {})) {
-      total += ChapterData.fileCount(lv, ch);
-    }
+    _levels().forEach(l => {
+      const chs = CH_NAMES[l] || {};
+      Object.keys(chs).forEach(c => { total += chapterFileRefs(l, c).length; });
+    });
     return total;
-  },
-
-  chapterFileRefs(lv, ch) {
-    const out = [];
-    const books = ChapterData.books(lv, ch);
-    for (const book of Object.keys(books)) {
-      const subtopics = books[book];
-      for (const subtopic of Object.keys(subtopics)) {
-        const fid = subtopics[subtopic];
-        if (!fid) continue;
-        out.push({
-          lv, ch, book, subtopic,
-          name: `${book} — ${subtopic}`,
-          fid,
-          key: `${lv}_${ch}_${book}_${subtopic}`
-        });
-      }
-    }
-    return out;
-  },
-
-  allFileRefs() {
-    const out = [];
-    for (const lv of Object.keys(DRIVE)) {
-      for (const ch of Object.keys(DRIVE[lv])) {
-        out.push(...ChapterData.chapterFileRefs(lv, ch));
-      }
-    }
-    return out;
   }
-};
+  if (!ch){
+    let total = 0;
+    const chs = CH_NAMES[lv] || {};
+    Object.keys(chs).forEach(c => { total += chapterFileRefs(lv, c).length; });
+    return total;
+  }
+  if (!book) return chapterFileRefs(lv, ch).length;
+  const subs = files(lv, ch, book) || {};
+  return Object.values(subs).filter(Boolean).length;
+}
 
-
-if (typeof window !== "undefined") {
+if (typeof window !== 'undefined') {
+  // Preserve the raw objects other code might expect directly.
   window.CH_NAMES = CH_NAMES;
   window.LEVEL_LABELS = LEVEL_LABELS;
   window.DRIVE = DRIVE;
-  window.ChapterData = ChapterData;
+
+  // Public API used by app.js / objective.js / admin.html.
+  window.ChapterData = {
+    levels: _levels,
+    levelLabel,
+    chapters,
+    chapterName,
+    books,
+    files,
+    chapterFileRefs,
+    allFileRefs,
+    fileCount
+  };
 }
+
+})();

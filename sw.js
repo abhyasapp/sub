@@ -1,48 +1,36 @@
-/* ═══════════════════════════════════════════════════════════════
-   SW.JS — Abhyas  Service Worker
+/* ═══════════════════════════════════════════════════════════════════════
+   SW.JS — Abhyas Service Worker  (v1.07)
+
    Strategy:
    • Admin panel      → NEVER intercepted. Always live network.
-   • index.html/shell → network-first, cache-bypass (no-store) so a
-                         live connection is never shadowed by a stale
-                         copy. Falls back to the last cached copy ONLY
-                         when the network genuinely fails — that cached
-                         index.html still boots normally and its own
-                         resumeUserSession() logic decides whether a
-                         permanent/trial user can proceed straight in,
-                         or whether to show the login screen.
-   • API/getFile      → network-first. Plain API calls (login, checkSession,
-                         etc.) get a generic offline JSON fallback and are
-                         never cached — most of them aren't safe to serve
-                         stale. `action=getFile` responses (the actual
-                         question-set JSON) ARE cached in Cache Storage as
-                         a second offline layer alongside app.js's own
-                         localStorage cache — Cache Storage's quota is far
-                         higher than localStorage's ~5-10MB.
+   • index.html/shell → network-first, cache-bypass (no-store) so a live
+                         connection is never shadowed by a stale copy.
+                         Falls back to the last cached copy ONLY when the
+                         network genuinely fails.
+   • API/getFile      → network-first. Plain API calls get a generic
+                         offline JSON fallback and are never cached.
+                         `action=getFile` responses (question-set JSON,
+                         including subjective topic files) ARE cached in
+                         Cache Storage as a second offline layer alongside
+                         app.js's IndexedDB QDB.
    • Stale clearance  → whenever we're confirmed online again, purge
-                         any cached entries that aren't part of the
-                         current SHELL, so a reconnect never leaves old
-                         orphaned responses sitting in Cache Storage.
-   ═══════════════════════════════════════════════════════════════ */
+                         cached entries that aren't part of the current
+                         SHELL.
+   ═══════════════════════════════════════════════════════════════════════ */
 
-/* 👇 CACHE_NAME is derived from version.js's APP_VERSION, so bumping
-   APP_VERSION there is now the ONLY step needed to force every open
-   browser tab to drop its old cached shell on the next activation —
-   no separate manual cache-name edit here. Still bump APP_VERSION for
-   ANY shell change (index.html, user.html, app.js, chapters-data.js,
-   shared.js, manifest.json, or the vendor/ assets), not just version
-   releases — a cache-relevant file change with no version bump would
-   otherwise never get picked up by an already-installed client. */
+/* CACHE_NAME derives from version.js's APP_VERSION, so bumping that
+   value is the ONLY step needed to force every open browser tab to
+   drop its old cached shell on next activation. Bump APP_VERSION for
+   ANY shell-relevant change — HTML, JS, CSS, manifest, or the vendor
+   assets — not just version releases. */
 importScripts('./version.js');
 const CACHE_NAME = 'abhyas-v' + APP_VERSION;
 
-/* ── PUSH NOTIFICATIONS (Firebase Cloud Messaging) ──────────────────
+/* ── PUSH NOTIFICATIONS (Firebase Cloud Messaging) ─────────────────
    Wrapped in try/catch: these are remote CDN scripts, not part of our
    own SHELL, so a network hiccup during SW install/activation must
    never break offline caching (this SW's actual job) just because push
-   notifications couldn't initialize. If firebase-config.js still has
-   its placeholder values (FIREBASE_CONFIGURED === false — see that
-   file), this deliberately skips initializing Firebase at all, rather
-   than letting it throw on a fake API key. */
+   notifications couldn't initialize. */
 let _fcmMessaging = null;
 try {
   importScripts(
@@ -75,33 +63,43 @@ if (_fcmMessaging) {
   });
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   SHELL — everything precached for offline use.
+   v1.07 adds the four new module scripts; they must be listed or the
+   offline boot will fail when user.html tries to load them.
+   ═══════════════════════════════════════════════════════════════════════ */
 const SHELL = [
   './',
   './index.html',
   './user.html',
-  './app.js',
+
+  /* Core scripts */
+  './config.js',
   './version.js',
+  './shared.js',
   './firebase-config.js',
   './chapters-data.js',
-  './shared.js',
   './cloud-sync.js',
+
+  /* Modular app code — user.html loads these three in this order */
+  './app.js',
+  './objective.js',
+  './subjective.js',
+
+  /* Subjective syllabus data (chapter/topic map) and topic fileId map */
+  './subjective_chapters.js',
+  './subjective-data.js',
+
+  /* Styles + manifest */
   './design-system.css',
   './manifest.json',
+
+  /* Icon font used across all pages */
   './vendor/phosphor/phosphor-regular.css',
-  './vendor/phosphor/Phosphor.woff2',
-  // v1.04 — Google Identity Services client. Precached so the Personal
-  // Drive Backup card's "Sign in with Google" button still works when
-  // the user opens Progress while offline: CLOUD._waitForGsi() polls
-  // for window.google.accounts.oauth2 and would otherwise time out
-  // after 20s with "Google Identity Services didn't load".
-  //
-  // NOTE: this is a cross-origin URL, so addAll() may fail it
-  // silently (opaque response). That's fine — the fetch handler's
-  // network-first path caches it on the next online request anyway,
-  // and a miss here is non-fatal for the SW install.
-  'https://accounts.google.com/gsi/client'
-  // NOTE: admin.html is deliberately NOT in SHELL — it must never be
-  // served from cache.
+  './vendor/phosphor/Phosphor.woff2'
+
+  /* NOTE: admin.html is deliberately NOT in SHELL — it must never be
+     served from cache. */
 ];
 
 /* Is this request/page the admin panel? */
@@ -115,22 +113,30 @@ async function isAdminOrigin(request, clientId) {
   } catch (e) { return false; }
 }
 
-/* ----- INSTALL: precache the shell and skip waiting (activate immediately) ----- */
+/* ═══════════════════════════════════════════════════════════════════════
+   INSTALL — precache the shell and activate immediately
+   ═══════════════════════════════════════════════════════════════════════ */
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(c => c.addAll(SHELL))
-      .catch(err => console.warn('SW install: some shell files could not be cached', err))
+      .catch(err => {
+        // addAll is atomic — a single failure means NOTHING was cached.
+        // Log loudly so a broken install is visible in the console; the
+        // SW still activates and the per-request fallbacks below will
+        // fill in what they can on first online use.
+        console.warn('SW install: shell precache failed — some files may not be available offline:', err);
+      })
   );
   self.skipWaiting();  // ← immediate activation, no old SW left behind
 });
 
-/* ----- ACTIVATE: delete all old caches, claim all clients, and tell
-   every open tab the new SW is now in control. That notification is
-   what lets app.js surface a "reload to update" toast — the SW itself
-   can activate mid-session (skipWaiting + clients.claim below), but the
-   PAGE keeps executing the OLD JavaScript until it reloads, which is
-   invisible to the user without this nudge. ── */
+/* ═══════════════════════════════════════════════════════════════════════
+   ACTIVATE — delete old caches, claim clients, notify every open tab.
+   The notification is what lets app.js surface a "reload to update"
+   toast — the SW activates mid-session (skipWaiting + clients.claim),
+   but the PAGE keeps executing the OLD JavaScript until it reloads.
+   ═══════════════════════════════════════════════════════════════════════ */
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
@@ -145,31 +151,34 @@ self.addEventListener('activate', e => {
   })());
 });
 
-/* Remove any cached shell entries that aren't in the current SHELL list */
+/* ═══════════════════════════════════════════════════════════════════════
+   STALE CLEARANCE — remove shell entries that aren't in the current SHELL
+   (i.e. assets from a previous version). API responses are preserved.
+   ═══════════════════════════════════════════════════════════════════════ */
 async function clearStaleShellEntries() {
   const cache = await caches.open(CACHE_NAME);
   const keys = await cache.keys();
   const shellAbs = new Set(SHELL.map(p => new URL(p, self.registration.scope).href));
   await Promise.all(keys.map(req => {
     const url = new URL(req.url);
-    const isApi = url.hostname.includes('script.google.com'); // keep getFile responses
+    const isApi = url.hostname.includes('script.google.com');   // keep getFile responses
     if (isApi) return Promise.resolve();
-    if (!shellAbs.has(req.url)) {
-      return cache.delete(req);
-    }
+    if (!shellAbs.has(req.url)) return cache.delete(req);
     return Promise.resolve();
   }));
 }
 
-/* Listen for clear‑stale message from index.html / app.js (optional) */
+/* Message from index.html / user.html — purge stale shell entries now
+   that the network is confirmed online. */
 self.addEventListener('message', e => {
   if (e.data && e.data.type === 'CLEAR_STALE_IF_ONLINE') {
     e.waitUntil ? e.waitUntil(clearStaleShellEntries()) : clearStaleShellEntries();
   }
 });
 
-/* Tapping a timetable reminder focuses an already-open Abhyas tab if
-   there is one, otherwise opens user.html in a new one. */
+/* ═══════════════════════════════════════════════════════════════════════
+   NOTIFICATION CLICK — focus an existing Abhyas tab, or open user.html
+   ═══════════════════════════════════════════════════════════════════════ */
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil((async () => {
@@ -181,7 +190,9 @@ self.addEventListener('notificationclick', e => {
   })());
 });
 
-/* ----- FETCH: network-first with cache fallback, admin bypassed ----- */
+/* ═══════════════════════════════════════════════════════════════════════
+   FETCH — network-first with cache fallback; admin bypassed entirely
+   ═══════════════════════════════════════════════════════════════════════ */
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
@@ -200,21 +211,18 @@ self.addEventListener('fetch', e => {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         }
-        // v1.04 — deliberately NO clearStaleShellEntries() call here.
-        // It used to fire on every getFile fetch (a full cache-key scan
-        // per question-file request, so ~200 scans during a first-time
-        // CACHE.autoSync of the whole library). The message-triggered
-        // path above is the only place stale entries can actually
-        // accumulate — index.html posts CLEAR_STALE_IF_ONLINE on every
-        // reconnect — so the hot-path call was pure redundancy with a
-        // real cost.
+        // Deliberately NO clearStaleShellEntries() call here. It used to
+        // fire on every getFile fetch — a full cache-key scan per
+        // question-file request, so ~200 scans during a first-time
+        // CACHE.autoSync of the whole library. The message-triggered
+        // path above is the only place stale entries accumulate.
         return res;
       } catch (err) {
         if (isGetFile) {
           const cached = await caches.match(e.request);
           if (cached) return cached;
         }
-        // Don’t fabricate a fake response — let the page handle the error.
+        // Don't fabricate a fake response — let the page handle the error.
         throw err;
       }
     }

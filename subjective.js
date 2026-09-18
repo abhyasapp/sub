@@ -1,0 +1,1188 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   SUBJECTIVE.JS — Subjective module (QOTD + Proper Exam + Topic List)
+
+   Loaded via <script src="subjective.js"> AFTER app.js and objective.js
+   in user.html. Classic global, no modules.
+
+   Depends on globals from app.js:
+     S, LS, APP_CONFIG, APPS, _save, _load, toast, esc, fmtHMS (if any),
+     QDB, netFetch, qs, pluralize, today
+
+   Reads window.SUBJECTIVE_DATA / window.SUBJECTIVE_FILE_REFS /
+   window.SUBJECTIVE_CHAPTERS from the two sibling files.
+
+   Question-bank file shape (per chapter, one Drive file each):
+     { "group": "...", "sections": [
+         { "section": "...", "questions": [
+             { "type":"subjective", "chapter":"...", "q":"...", "marks":"..." }
+         ] }
+     ] }
+
+   `marks` may be a plain number (5, 10) or a string like "5+5=10" or
+   "3+3.5+3.5=10". _parseMarks() reads the total.
+
+   Exposes on window:
+     SUBJ        — user-facing module (QOTD, Exam, List)
+     SUBJ_SMART  — Smart Paste parser used by admin.html
+   ═══════════════════════════════════════════════════════════════════════ */
+(function(){
+'use strict';
+
+const $   = id => document.getElementById(id);
+const esc = (typeof window.esc === 'function') ? window.esc : (s => String(s == null ? '' : s));
+
+/* ── Backend URL from config.js ── */
+function _backendUrl(){
+  if(typeof window.ABHYAS_CONFIG !== 'undefined' && window.ABHYAS_CONFIG.GAS_URL) return window.ABHYAS_CONFIG.GAS_URL;
+  if(typeof window.APPS !== 'undefined') return window.APPS;
+  return '';
+}
+
+/* ── Auth params — piggyback on the session app.js manages ── */
+function _authParams(){
+  const u = (window.S && S.user) || {};
+  return { username: u.username || '', token: u.token || '' };
+}
+
+async function _api(action, params, method){
+  const url = _backendUrl();
+  if(!url) return { success:false, error:'Backend URL not configured.' };
+  const base = _authParams();
+  try{
+    if(method === 'GET'){
+      const qs = new URLSearchParams({ action, ...base, ...(params||{}) }).toString();
+      const r = await fetch(url + '?' + qs, { redirect:'follow' });
+      return await r.json();
+    }
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type':'text/plain' },
+      body: JSON.stringify({ action, ...base, ...(params||{}) })
+    });
+    return await r.json();
+  }catch(e){
+    return { success:false, error: e.message || 'Network error' };
+  }
+}
+
+/* ── Constants ── */
+const TIMERS = {
+  solveSecondsFor5:  10 * 60,   // 10 min for a 5-mark question
+  solveSecondsFor10: 20 * 60,   // 20 min for a 10-mark question
+  solveSecondsFallback: 15 * 60,
+  uploadSeconds: 5 * 60,        // 5 min to upload the PDF after solving
+  examSeconds:  3 * 60 * 60     // 3 hours for the full 100-mark paper
+};
+
+const LS_QOTD = 'abhyas_subj_qotd_v1';
+const LS_EXAM = 'abhyas_subj_exam_v1';
+const MAX_PDF_BYTES = 8 * 1024 * 1024;
+const FETCH_CONCURRENCY = 4;
+
+/* ── Chapter data (from subjective-data.js) ── */
+const SUBJ_FILE_REFS = window.SUBJECTIVE_FILE_REFS || [];
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QUESTION-BANK LOADER — one JSON file per chapter, cached in IndexedDB
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let BANK = { byChapter: {}, loaded: false, loading: false, error: null };
+const _fetchPromises = {};   // fileId → Promise (dedupe concurrent loads)
+
+/* Marks arrive as: 5  |  "5"  |  "5+5=10"  |  "3+3.5+3.5=10".
+   Anything that doesn't resolve to 5 or 10 collapses to 10 — the timer
+   table only knows those two values, and defaulting to 10 is the safe
+   choice for a subjective question. */
+function _parseMarks(raw){
+  if (typeof raw === 'number' && isFinite(raw)) {
+    return (raw === 5 || raw === 10) ? raw : 10;
+  }
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return 10;
+
+  // "a+b+...=TOTAL" — trust the stated total after the last "=".
+  const eq = s.lastIndexOf('=');
+  if (eq > -1) {
+    const m = s.slice(eq + 1).match(/\d+(?:\.\d+)?/);
+    if (m) {
+      const n = Math.round(parseFloat(m[0]));
+      return (n === 5 || n === 10) ? n : 10;
+    }
+  }
+
+  // "a+b" with no "=" — sum them.
+  if (s.includes('+')) {
+    const parts = s.split('+').map(x => parseFloat(x)).filter(x => isFinite(x));
+    if (parts.length) {
+      const sum = Math.round(parts.reduce((a,b) => a+b, 0));
+      return (sum === 5 || sum === 10) ? sum : 10;
+    }
+  }
+
+  // Plain number string.
+  const m = s.match(/\d+(?:\.\d+)?/);
+  if (!m) return 10;
+  const n = Math.round(parseFloat(m[0]));
+  return (n === 5 || n === 10) ? n : 10;
+}
+
+/* Two accepted file shapes:
+     1) { group, sections: [ { section, questions: [...] } ] }  ← current
+     2) bare array  OR  { questions: [...] }                     ← legacy
+   Both are normalized into the same flat array of question objects
+   tagged with their chapter and topic (section label). */
+function _normalizeSubjRaw(raw, fileId, chapterId, chapterName){
+  if(raw && typeof raw === 'object' && !Array.isArray(raw) && raw.success === false){
+    console.warn('[SUBJ] Server error for', fileId, '—', raw.error);
+    return [];
+  }
+
+  // ── Shape 1: sections-wrapped ──
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && Array.isArray(raw.sections)) {
+    const out = [];
+    raw.sections.forEach(sec => {
+      const secTopic = String(sec.section || chapterName || 'General').trim();
+      const qs = Array.isArray(sec.questions) ? sec.questions : [];
+      qs.forEach((q, i) => {
+        if (!q || typeof q !== 'object') return;
+        const text = String(q.q || q.question || '').trim();
+        if (!text) return;
+        out.push({
+          id: q.id || `${fileId}_${secTopic}_${i}`,
+          chapterId,
+          topic: secTopic,
+          q: text,
+          marks: _parseMarks(q.marks),
+          hint: String(q.hint || '').trim(),
+          modelAnswer: String(q.modelAnswer || '').trim()
+        });
+      });
+    });
+    return out;
+  }
+
+  // ── Shape 2: bare array or { questions: [...] } ──
+  let arr = Array.isArray(raw) ? raw
+          : (raw && Array.isArray(raw.questions) ? raw.questions : null);
+  if (!Array.isArray(arr) || !arr.length) {
+    console.warn('[SUBJ] No questions found in', fileId);
+    return [];
+  }
+  const out = [];
+  arr.forEach((q, i) => {
+    if (!q || typeof q !== 'object') return;
+    const text = String(q.q || q.question || '').trim();
+    if (!text) return;
+    out.push({
+      id: q.id || `${fileId}_${i}`,
+      chapterId,
+      topic: String(q.chapter || chapterName || 'General').trim(),
+      q: text,
+      marks: _parseMarks(q.marks),
+      hint: String(q.hint || '').trim(),
+      modelAnswer: String(q.modelAnswer || '').trim()
+    });
+  });
+  return out;
+}
+
+async function _fetchSubjFileFromNetwork(ref, cacheKey){
+  const url = _backendUrl();
+  if(!url) throw new Error('Backend URL not configured');
+  const r = await fetch(`${url}?action=getFile&fileId=${encodeURIComponent(ref.fileId)}`, { redirect:'follow' });
+  if(!r.ok) throw new Error('HTTP ' + r.status);
+  const data = await r.json();
+  if(data && data.success === false) throw new Error(data.error || 'Server error');
+  const payload = (data && data.result !== undefined) ? data.result : data;
+  if(typeof QDB !== 'undefined') QDB.set(cacheKey, payload).catch(() => {});
+  return _normalizeSubjRaw(payload, ref.fileId, ref.chapterId, ref.name);
+}
+
+async function _fetchSubjFile(ref){
+  if(_fetchPromises[ref.fileId]) return _fetchPromises[ref.fileId];
+  const cacheKey = 'subj_' + ref.fileId;
+  const promise = (async () => {
+    // Offline-first: try IndexedDB before the network.
+    if(typeof QDB !== 'undefined'){
+      try{
+        const cached = await QDB.get(cacheKey);
+        const isValid = cached && !(typeof cached === 'object' && !Array.isArray(cached) && cached.success === false);
+        if(isValid){
+          if(typeof S !== 'undefined' && S.online && !S.forcedOffline){
+            _fetchSubjFileFromNetwork(ref, cacheKey).catch(() => {});
+          }
+          return _normalizeSubjRaw(cached, ref.fileId, ref.chapterId, ref.name);
+        }
+      }catch(e){ /* fall through to network */ }
+    }
+    if(typeof S !== 'undefined' && (!S.online || S.forcedOffline)) return [];
+    try{
+      return await _fetchSubjFileFromNetwork(ref, cacheKey);
+    }catch(e){
+      console.warn('[SUBJ] fetch failed for', ref.fileId, e.message);
+      return [];
+    }
+  })();
+  _fetchPromises[ref.fileId] = promise.finally(() => { delete _fetchPromises[ref.fileId]; });
+  return _fetchPromises[ref.fileId];
+}
+
+async function loadBank(force){
+  if(BANK.loaded && !force) return BANK;
+  if(BANK.loading) return BANK;
+  BANK.loading = true;
+
+  const refs = SUBJ_FILE_REFS.filter(r => r.fileId && !/^REPLACE_WITH/.test(r.fileId));
+
+  if(!refs.length){
+    BANK = { byChapter: {}, loaded: true, loading: false, error: 'No chapter files configured in subjective-data.js' };
+    return BANK;
+  }
+
+  const byChapter = {};
+  let i = 0;
+  async function worker(){
+    while(i < refs.length){
+      const ref = refs[i++];
+      const qs = await _fetchSubjFile(ref);
+      if(qs.length){
+        (byChapter[ref.chapterId] = byChapter[ref.chapterId] || []).push(...qs);
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(FETCH_CONCURRENCY, refs.length) }, worker));
+
+  // Sort each chapter's questions by section label, preserving the
+  // order the author placed them in within a section.
+  Object.keys(byChapter).forEach(ch => {
+    byChapter[ch].sort((a, b) => String(a.topic).localeCompare(String(b.topic)));
+  });
+
+  BANK = { byChapter, loaded: true, loading: false, error: null };
+  return BANK;
+}
+
+/* ── Accessors ── */
+function _allQuestions(){
+  return Object.values(BANK.byChapter).flat();
+}
+function _questionsByChapter(chId){ return BANK.byChapter[chId] || []; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PERSISTED STATE — QOTD + Exam
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let QOTD = null;
+let EXAM = null;
+
+function _todayKey(){
+  return (typeof window.today === 'function') ? window.today() : new Date().toISOString().slice(0,10);
+}
+
+function _restoreState(){
+  try{
+    const raw = localStorage.getItem(LS_QOTD);
+    QOTD = raw ? JSON.parse(raw) : null;
+  }catch(e){ QOTD = null; }
+  if(QOTD && QOTD.date !== _todayKey()) QOTD = null;
+
+  try{
+    const raw = localStorage.getItem(LS_EXAM);
+    EXAM = raw ? JSON.parse(raw) : null;
+  }catch(e){ EXAM = null; }
+  if(EXAM && !EXAM.deadlineAt) EXAM = null;
+}
+function _persistQotd(){
+  try{ localStorage.setItem(LS_QOTD, JSON.stringify(QOTD)); }catch(e){}
+}
+function _persistExam(){
+  try{
+    if(EXAM) localStorage.setItem(LS_EXAM, JSON.stringify(EXAM));
+    else localStorage.removeItem(LS_EXAM);
+  }catch(e){}
+}
+function _clearQotd(){
+  QOTD = null;
+  try{ localStorage.removeItem(LS_QOTD); }catch(e){}
+}
+function _clearExam(){
+  EXAM = null;
+  try{ localStorage.removeItem(LS_EXAM); }catch(e){}
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function _solveSecFor(marks){
+  if(marks === 5)  return TIMERS.solveSecondsFor5;
+  if(marks === 10) return TIMERS.solveSecondsFor10;
+  return TIMERS.solveSecondsFallback;
+}
+function _fmtHMS(sec){
+  if(sec < 0) sec = 0;
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  return h > 0
+    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function _fmtMins(sec){
+  const m = Math.round(sec/60);
+  return m === 60 ? '1 hour' : `${m} minutes`;
+}
+function _chapterNameOf(chapterId){
+  const c = (window.SUBJECTIVE_CHAPTERS || []).find(x => x.id === chapterId);
+  return c ? `${c.icon || ''} ${c.name}`.trim() : (chapterId || 'Subjective');
+}
+function _emptyCard(icon, title, subtitle){
+  return `<div class="card" style="text-align:center;padding:2rem 1rem">
+    <div class="empty-i" style="opacity:.6"><i class="ph ${icon}" style="font-size:2rem"></i></div>
+    <p style="font-weight:600;color:var(--t2);margin-top:.5rem">${esc(title)}</p>
+    ${subtitle ? `<p style="font-size:.72rem;color:var(--t3);margin-top:.2rem;line-height:1.55">${esc(subtitle)}</p>` : ''}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QOTD STATE MACHINE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+let _qotdTick = null;
+let _pendingQotdFile = null;
+
+function _todayPick(){
+  const all = _allQuestions();
+  if(!all.length) return null;
+  const day = _todayKey();
+  let h = 0;
+  for(let i = 0; i < day.length; i++) h = (h * 31 + day.charCodeAt(i)) >>> 0;
+  return all[h % all.length];
+}
+
+function _qotdPhase(){
+  if(!QOTD) return 'idle';
+  if(QOTD.submitted) return 'submitted';
+  const now = Date.now();
+  if(now < QOTD.solveEndsAt) return 'solving';
+  if(QOTD.uploadEndsAt && now < QOTD.uploadEndsAt) return 'upload';
+  return 'expired';
+}
+
+function _qotdPublicState(){
+  if(!QOTD) return { phase: 'idle' };
+  const phase = _qotdPhase();
+  if(phase === 'submitted') return { phase, marks: QOTD.marks };
+  if(phase === 'solving'){
+    const leftSec = Math.max(0, Math.round((QOTD.solveEndsAt - Date.now()) / 1000));
+    return { phase, leftSec, left: _fmtHMS(leftSec), marks: QOTD.marks };
+  }
+  if(phase === 'upload'){
+    const leftSec = Math.max(0, Math.round((QOTD.uploadEndsAt - Date.now()) / 1000));
+    return { phase, leftSec, left: _fmtHMS(leftSec), marks: QOTD.marks };
+  }
+  return { phase: 'expired', marks: QOTD.marks };
+}
+
+function _hasBank(){
+  return BANK.loaded && _allQuestions().length > 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QOTD RENDER
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function _renderQotd(){
+  const body = $('subj-qotd-body');
+  if(!body) return;
+
+  if(!BANK.loaded){
+    body.innerHTML = _emptyCard('ph-circle-notch','Loading…','Fetching today\'s question.');
+    return;
+  }
+  if(!_allQuestions().length){
+    body.innerHTML = _emptyCard('ph-sun-horizon','No daily questions yet',
+      BANK.error || 'Your administrator hasn\'t uploaded any subjective questions yet.');
+    return;
+  }
+
+  if(QOTD && !QOTD.submitted && !QOTD.uploadEndsAt && Date.now() >= QOTD.solveEndsAt){
+    QOTD.uploadEndsAt = QOTD.solveEndsAt + TIMERS.uploadSeconds * 1000;
+    _persistQotd();
+  }
+
+  const phase = _qotdPhase();
+  const q = QOTD
+    ? (_allQuestions().find(x => x.id === QOTD.questionId) || _todayPick())
+    : _todayPick();
+
+  if(!q){ body.innerHTML = _emptyCard('ph-sun-horizon','Nothing today','Check back tomorrow.'); return; }
+
+  if(phase === 'idle'){
+    body.innerHTML = `
+      <div class="card">
+        <div class="qotd-head">
+          <div>
+            <div class="qotd-meta">Today's Question</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--t1);margin-top:.15rem">${esc(_chapterNameOf(q.chapterId))}</div>
+            <div style="font-size:.66rem;color:var(--t3);margin-top:.1rem">${esc(q.topic || '')}</div>
+          </div>
+          <div class="qotd-marks ${q.marks===10?'m10':''}">${q.marks} marks</div>
+        </div>
+        <p style="font-size:.78rem;color:var(--t3);line-height:1.55;margin-bottom:.85rem">
+          You get <b>${_fmtMins(_solveSecFor(q.marks))}</b> to write, then <b>${TIMERS.uploadSeconds/60} minutes</b>
+          to photograph/scan and upload a PDF. Admin grades it after that. One attempt.
+        </p>
+        <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ._qotdBegin()">
+          <i class="ph ph-play"></i> Start ${q.marks}-Mark Question
+        </button>
+      </div>`;
+    return;
+  }
+
+  if(phase === 'submitted'){
+    body.innerHTML = `
+      <div class="card qotd-done">
+        <span class="big"><i class="ph ph-check-circle" style="color:var(--grn)"></i></span>
+        <h3>Submitted for review</h3>
+        <p>Your answer was sent to admin at ${new Date(QOTD.submittedAt).toLocaleTimeString()}.</p>
+        <p style="margin-top:.5rem">Come back tomorrow for a fresh question.</p>
+      </div>`;
+    _stopQotdTick();
+    return;
+  }
+
+  if(phase === 'solving'){
+    const left = Math.max(0, Math.round((QOTD.solveEndsAt - Date.now()) / 1000));
+    const total = _solveSecFor(QOTD.marks);
+    body.innerHTML = `
+      <div class="card">
+        <div class="qotd-head">
+          <div>
+            <div class="qotd-meta">Now Solving</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--t1);margin-top:.15rem">${esc(_chapterNameOf(q.chapterId))}</div>
+            <div style="font-size:.66rem;color:var(--t3);margin-top:.1rem">${esc(q.topic || '')}</div>
+          </div>
+          <div class="qotd-marks ${q.marks===10?'m10':''}">${q.marks} marks</div>
+        </div>
+        <div class="qotd-q">${esc(q.q)}</div>
+        ${q.hint ? `<div style="font-size:.72rem;color:var(--t3);font-style:italic;margin-top:-.4rem;margin-bottom:.85rem">${esc(q.hint)}</div>` : ''}
+        <div class="qotd-timer ${left < 120 ? 'urgent' : ''}" id="qotd-tmr">${_fmtHMS(left)}</div>
+        <div class="qotd-timer-lbl">Time left to write</div>
+        <div class="qotd-phase-bar"><div class="qotd-phase-fill" id="qotd-bar" style="width:${(left/total)*100}%"></div></div>
+        <p style="font-size:.72rem;color:var(--t3);text-align:center;line-height:1.55">
+          Write on paper. A <b>${TIMERS.uploadSeconds/60}-minute upload window</b> opens automatically when the timer hits zero.
+        </p>
+      </div>`;
+    _startQotdTick();
+    return;
+  }
+
+  if(phase === 'upload'){
+    const left = Math.max(0, Math.round((QOTD.uploadEndsAt - Date.now()) / 1000));
+    const total = TIMERS.uploadSeconds;
+    body.innerHTML = `
+      <div class="card">
+        <div class="qotd-head">
+          <div>
+            <div class="qotd-meta">Upload Window</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--sky);margin-top:.15rem">Send your answer now</div>
+          </div>
+          <div class="qotd-marks ${q.marks===10?'m10':''}">${q.marks} marks</div>
+        </div>
+        <div class="qotd-timer upload ${left < 60 ? 'urgent' : ''}" id="qotd-tmr">${_fmtHMS(left)}</div>
+        <div class="qotd-timer-lbl">Upload closes in</div>
+        <div class="qotd-phase-bar"><div class="qotd-phase-fill upload" id="qotd-bar" style="width:${(left/total)*100}%"></div></div>
+        <label class="qotd-drop" for="qotd-pdf">
+          <input type="file" id="qotd-pdf" accept="application/pdf,.pdf" onchange="SUBJ._qotdFile(this)">
+          <span class="ii"><i class="ph ph-file-pdf"></i></span>
+          <span class="dn">Choose PDF of your answer</span>
+          <span class="ds">Scan or photograph all pages, combine into one PDF</span>
+        </label>
+        <div id="qotd-file-slot"></div>
+        <button class="btn btn-solid btn-lg btn-blk" id="qotd-submit" style="margin-top:.7rem" disabled onclick="SUBJ._qotdSubmit()">
+          <i class="ph ph-paper-plane-tilt"></i> Submit for Review
+        </button>
+      </div>`;
+    if(_pendingQotdFile){
+      _renderQotdFileChip(_pendingQotdFile);
+      const b = $('qotd-submit'); if(b) b.disabled = false;
+    }
+    _startQotdTick();
+    return;
+  }
+
+  body.innerHTML = `
+    <div class="card qotd-done">
+      <span class="big"><i class="ph ph-clock-countdown" style="color:var(--ros)"></i></span>
+      <h3 style="color:var(--ros)">Upload window closed</h3>
+      <p>Nothing was submitted for today's question in time.</p>
+    </div>`;
+  _stopQotdTick();
+}
+
+function _renderQotdFileChip(fileInfo){
+  const slot = $('qotd-file-slot');
+  if(!slot || !fileInfo) return;
+  slot.innerHTML = `<div class="qotd-file-chip">
+    <i class="ph ph-file-pdf" style="color:var(--grn);font-size:1.1rem"></i>
+    <span class="fn">${esc(fileInfo.filename)}</span>
+    <span style="font-size:.66rem;color:var(--t3)">${Math.round(fileInfo.size/1024)} KB</span>
+    <button type="button" aria-label="Remove file" onclick="SUBJ._qotdClearFile()"><i class="ph ph-x"></i></button>
+  </div>`;
+}
+
+function _startQotdTick(){
+  _stopQotdTick();
+  _qotdTick = setInterval(() => {
+    _renderQotd();
+    if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+  }, 1000);
+}
+function _stopQotdTick(){
+  if(_qotdTick){ clearInterval(_qotdTick); _qotdTick = null; }
+}
+
+function _qotdBegin(){
+  const q = _todayPick();
+  if(!q){ toast('No question available'); return; }
+  const now = Date.now();
+  const solveSec = _solveSecFor(q.marks);
+  QOTD = {
+    date: _todayKey(),
+    questionId: q.id,
+    marks: q.marks,
+    startedAt: now,
+    solveEndsAt: now + solveSec * 1000,
+    uploadEndsAt: 0,
+    submitted: false
+  };
+  _persistQotd();
+  _renderQotd();
+  if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+}
+
+function _qotdFile(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  if(f.size > MAX_PDF_BYTES){
+    toast('❌ PDF too large — max ' + Math.round(MAX_PDF_BYTES/1024/1024) + ' MB');
+    input.value = '';
+    return;
+  }
+  const looksPdf = /pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name);
+  if(!looksPdf){
+    toast('❌ Only PDF files are accepted');
+    input.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = e => {
+    _pendingQotdFile = { dataUrl: e.target.result, filename: f.name, size: f.size };
+    _renderQotdFileChip(_pendingQotdFile);
+    const btn = $('qotd-submit'); if(btn) btn.disabled = false;
+  };
+  r.onerror = () => toast('❌ Could not read that file');
+  r.readAsDataURL(f);
+}
+
+function _qotdClearFile(){
+  _pendingQotdFile = null;
+  const input = $('qotd-pdf'); if(input) input.value = '';
+  const slot = $('qotd-file-slot'); if(slot) slot.innerHTML = '';
+  const btn = $('qotd-submit'); if(btn) btn.disabled = true;
+}
+
+async function _qotdSubmit(){
+  if(!QOTD || !_pendingQotdFile){ toast('Attach a PDF first'); return; }
+  const q = _allQuestions().find(x => x.id === QOTD.questionId);
+  if(!q){ toast('❌ Question no longer available'); return; }
+  const btn = $('qotd-submit');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Uploading…'; }
+
+  const res = await _api('submitSubjectiveAnswer', {
+    kind: 'qotd',
+    questionId: QOTD.questionId,
+    questionText: q.q.slice(0, 2000),
+    chapterId: q.chapterId,
+    marks: QOTD.marks,
+    solveSec: _solveSecFor(QOTD.marks),
+    startedAt: QOTD.startedAt,
+    pdfData: _pendingQotdFile.dataUrl,
+    filename: _pendingQotdFile.filename
+  }, 'POST');
+
+  if(!res || !res.success){
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Submit for Review'; }
+    toast('❌ ' + ((res && res.error) || 'Submit failed'));
+    return;
+  }
+
+  QOTD.submitted = true;
+  QOTD.submittedAt = Date.now();
+  _persistQotd();
+  _pendingQotdFile = null;
+  _stopQotdTick();
+  toast('✅ Submitted — admin will grade it');
+  _renderQotd();
+  if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PROPER EXAM — 100-mark random paper, 3-hour timer, one PDF upload
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const EXAM_GROUPS = {
+  A: { name: "Group A — Structure + Geotech",    marks: 30, chapterIds: ["structure","geotech"] },
+  B: { name: "Group B — Water Resource",         marks: 25, chapterIds: ["irrigationAndCo"] },
+  C: { name: "Group C — Transportation",         marks: 25, chapterIds: ["transportAndCo"] },
+  D: { name: "Group D — Public Health & Misc",   marks: 20, chapterIds: ["publicHealth","miscellaneous"] }
+};
+
+let _examTick = null;
+let _pendingExamFile = null;
+
+function _shuffle(a){
+  const b = a.slice();
+  for(let i = b.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [b[i], b[j]] = [b[j], b[i]];
+  }
+  return b;
+}
+
+function _questionsByGroup(gKey){
+  const meta = EXAM_GROUPS[gKey];
+  if(!meta) return [];
+  return meta.chapterIds.flatMap(id => _questionsByChapter(id));
+}
+
+function _generateExam(){
+  const sections = [];
+  for(const [key, meta] of Object.entries(EXAM_GROUPS)){
+    const pool = _questionsByGroup(key).map(q => ({ ...q, marks: (q.marks === 5 || q.marks === 10) ? q.marks : 10 }));
+    const picked = [];
+    const used = new Set();
+    let remaining = meta.marks;
+    for(const q of _shuffle(pool)){
+      if(q.marks <= remaining){
+        picked.push(q);
+        used.add(q.id);
+        remaining -= q.marks;
+      }
+      if(remaining <= 0) break;
+    }
+    if(remaining > 0){
+      for(const q of _shuffle(pool)){
+        if(used.has(q.id)) continue;
+        const m = Math.min(q.marks, remaining);
+        picked.push({ ...q, marks: m });
+        used.add(q.id);
+        remaining -= m;
+        if(remaining <= 0) break;
+      }
+    }
+    sections.push({ group: key, name: meta.name, targetMarks: meta.marks, questions: picked });
+  }
+  return {
+    generatedAt: Date.now(),
+    deadlineAt: Date.now() + TIMERS.examSeconds * 1000,
+    sections,
+    submitted: false,
+    submittedAt: 0
+  };
+}
+
+function _renderExam(){
+  const body = $('subj-exam-body');
+  if(!body) return;
+
+  if(!BANK.loaded){
+    body.innerHTML = _emptyCard('ph-circle-notch','Loading…','Fetching the syllabus.');
+    return;
+  }
+  if(!_allQuestions().length){
+    body.innerHTML = _emptyCard('ph-note-pencil','No exam questions yet',
+      BANK.error || 'Ask your administrator to add subjective questions first.');
+    return;
+  }
+
+  if(EXAM && EXAM.submitted){
+    body.innerHTML = `
+      <div class="card">
+        <div class="qotd-head">
+          <div>
+            <div class="qotd-meta">Exam Submitted</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--grn);margin-top:.15rem">Sent for grading</div>
+          </div>
+          <div class="qotd-marks">100</div>
+        </div>
+        <p style="font-size:.78rem;color:var(--t3);line-height:1.55;margin-bottom:.85rem">
+          Submitted at ${new Date(EXAM.submittedAt).toLocaleString()}. Admin will grade it and you'll get a push notification when it's done.
+        </p>
+        <button class="btn btn-r btn-blk" onclick="SUBJ._examReset()">
+          <i class="ph ph-arrow-counter-clockwise"></i> Discard &amp; Start a Fresh Paper
+        </button>
+      </div>`;
+    return;
+  }
+
+  if(!EXAM){
+    body.innerHTML = `
+      <div class="card">
+        <div class="card-hd"><h3><i class="ph ph-note-pencil"></i> Proper Exam — 100 Marks</h3>
+          <span class="ctag ta">Group A/B/C/D</span></div>
+        <p style="font-size:.78rem;color:var(--t3);line-height:1.6;margin-bottom:.85rem">
+          A full paper: 30 marks Structure+Geotech, 25 Water Resource, 25 Transportation,
+          20 Public Health &amp; Misc — matching the Loksewa L7 Civil pattern. You get
+          <b>3 hours</b>; upload the scanned answer as a single PDF when done.
+        </p>
+        <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ._examGenerate()">
+          <i class="ph ph-dice-five"></i> Generate a Random Paper
+        </button>
+      </div>`;
+    return;
+  }
+
+  const leftSec = Math.max(0, Math.round((EXAM.deadlineAt - Date.now()) / 1000));
+  const parts = [];
+  parts.push(`
+    <div class="card">
+      <div class="qotd-head">
+        <div>
+          <div class="qotd-meta">Proper Exam — In Progress</div>
+          <div style="font-size:1rem;font-weight:800;color:var(--t1);margin-top:.15rem">Full 100-Mark Paper</div>
+        </div>
+        <div class="qotd-marks">100</div>
+      </div>
+      <div class="qotd-timer ${leftSec < 300 ? 'urgent' : ''}" id="exam-tmr">${_fmtHMS(leftSec)}</div>
+      <div class="qotd-timer-lbl">Total exam time left</div>
+    </div>`);
+
+  EXAM.sections.forEach(sec => {
+    parts.push(`
+      <div class="card">
+        <div class="card-hd"><h3>${esc(sec.name)}</h3><span class="ctag tg">${sec.targetMarks} marks</span></div>
+        ${sec.questions.length
+          ? sec.questions.map((q,i) => `
+              <div class="subj-q-row">
+                <span class="qn">${i+1}.</span>
+                <span class="qt">${esc(q.q)}</span>
+                <span class="qm ${q.marks===10?'m10':'m5'}">${q.marks}M</span>
+              </div>`).join('')
+          : '<p style="font-size:.72rem;color:var(--t3);padding:.4rem .3rem">No questions available for this group yet.</p>'}
+      </div>`);
+  });
+
+  parts.push(`
+    <div class="card">
+      <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload Answer PDF</h3></div>
+      <label class="qotd-drop" for="exam-pdf">
+        <input type="file" id="exam-pdf" accept="application/pdf,.pdf" onchange="SUBJ._examFile(this)">
+        <span class="ii"><i class="ph ph-file-pdf"></i></span>
+        <span class="dn">Choose your completed paper (PDF)</span>
+        <span class="ds">Scan all pages into one PDF, under 8 MB</span>
+      </label>
+      <div id="exam-file-slot"></div>
+      <button class="btn btn-solid btn-lg btn-blk" id="exam-submit" style="margin-top:.7rem" ${_pendingExamFile ? '' : 'disabled'} onclick="SUBJ._examSubmit()">
+        <i class="ph ph-paper-plane-tilt"></i> Submit Paper for Grading
+      </button>
+      <button class="btn btn-r btn-blk" style="margin-top:.5rem" onclick="SUBJ._examReset()">
+        <i class="ph ph-arrow-counter-clockwise"></i> Discard &amp; Start Over
+      </button>
+    </div>`);
+
+  body.innerHTML = parts.join('');
+  if(_pendingExamFile){
+    const slot = $('exam-file-slot');
+    if(slot) slot.innerHTML = `<div class="qotd-file-chip">
+      <i class="ph ph-file-pdf" style="color:var(--grn);font-size:1.1rem"></i>
+      <span class="fn">${esc(_pendingExamFile.filename)}</span>
+      <span style="font-size:.66rem;color:var(--t3)">${Math.round(_pendingExamFile.size/1024)} KB</span>
+      <button type="button" aria-label="Remove file" onclick="SUBJ._examClearFile()"><i class="ph ph-x"></i></button>
+    </div>`;
+  }
+  _startExamTick();
+}
+
+function _startExamTick(){
+  _stopExamTick();
+  _examTick = setInterval(() => {
+    if(!EXAM || EXAM.submitted){ _stopExamTick(); return; }
+    const el = $('exam-tmr');
+    if(!el){ _stopExamTick(); return; }
+    const left = Math.max(0, Math.round((EXAM.deadlineAt - Date.now()) / 1000));
+    el.textContent = _fmtHMS(left);
+    el.classList.toggle('urgent', left < 300);
+    if(left <= 0){
+      _stopExamTick();
+      toast('⏰ Exam time up — upload your PDF now.', 6000);
+    }
+  }, 1000);
+}
+function _stopExamTick(){
+  if(_examTick){ clearInterval(_examTick); _examTick = null; }
+}
+
+function _examGenerate(){
+  EXAM = _generateExam();
+  _pendingExamFile = null;
+  _persistExam();
+  _renderExam();
+}
+
+function _examReset(){
+  if(EXAM && !EXAM.submitted){
+    if(!confirm('Discard this paper? Any answers you\'ve written on paper will not be submitted.')) return;
+  } else {
+    if(!confirm('Discard this submitted paper? You can generate a new one afterwards.')) return;
+  }
+  _clearExam();
+  _pendingExamFile = null;
+  _stopExamTick();
+  _renderExam();
+}
+
+function _examFile(input){
+  const f = input.files && input.files[0];
+  if(!f) return;
+  if(f.size > MAX_PDF_BYTES){
+    toast('❌ PDF too large — max ' + Math.round(MAX_PDF_BYTES/1024/1024) + ' MB');
+    input.value = '';
+    return;
+  }
+  const looksPdf = /pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name);
+  if(!looksPdf){
+    toast('❌ Only PDF files are accepted');
+    input.value = '';
+    return;
+  }
+  const r = new FileReader();
+  r.onload = e => {
+    _pendingExamFile = { dataUrl: e.target.result, filename: f.name, size: f.size };
+    const slot = $('exam-file-slot');
+    if(slot) slot.innerHTML = `<div class="qotd-file-chip">
+      <i class="ph ph-file-pdf" style="color:var(--grn);font-size:1.1rem"></i>
+      <span class="fn">${esc(f.name)}</span>
+      <span style="font-size:.66rem;color:var(--t3)">${Math.round(f.size/1024)} KB</span>
+      <button type="button" aria-label="Remove file" onclick="SUBJ._examClearFile()"><i class="ph ph-x"></i></button>
+    </div>`;
+    const btn = $('exam-submit'); if(btn) btn.disabled = false;
+  };
+  r.onerror = () => toast('❌ Could not read that file');
+  r.readAsDataURL(f);
+}
+function _examClearFile(){
+  _pendingExamFile = null;
+  const input = $('exam-pdf'); if(input) input.value = '';
+  const slot = $('exam-file-slot'); if(slot) slot.innerHTML = '';
+  const btn = $('exam-submit'); if(btn) btn.disabled = true;
+}
+
+async function _examSubmit(){
+  if(!EXAM || !_pendingExamFile){ toast('Attach the PDF first'); return; }
+  const btn = $('exam-submit');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Uploading…'; }
+
+  const paperText = EXAM.sections.map(s =>
+    `[${s.name}]\n` + s.questions.map((q,i) => `${i+1}. ${q.q} [${q.marks}]`).join('\n')
+  ).join('\n\n').slice(0, 3000);
+
+  const res = await _api('submitSubjectiveAnswer', {
+    kind: 'exam',
+    questionId: 'exam_' + EXAM.generatedAt,
+    questionText: paperText,
+    chapterId: 'exam',
+    marks: 100,
+    solveSec: TIMERS.examSeconds,
+    startedAt: EXAM.generatedAt,
+    pdfData: _pendingExamFile.dataUrl,
+    filename: _pendingExamFile.filename
+  }, 'POST');
+
+  if(!res || !res.success){
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Submit Paper for Grading'; }
+    toast('❌ ' + ((res && res.error) || 'Submit failed'));
+    return;
+  }
+
+  EXAM.submitted = true;
+  EXAM.submittedAt = Date.now();
+  _persistExam();
+  _pendingExamFile = null;
+  _stopExamTick();
+  toast('✅ Paper submitted for grading');
+  _renderExam();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   TOPIC LIST
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function _renderList(){
+  const body = $('subj-list-body');
+  if(!body) return;
+
+  if(!BANK.loaded){
+    body.innerHTML = _emptyCard('ph-circle-notch','Loading…','Fetching the question bank.');
+    return;
+  }
+  if(!_allQuestions().length){
+    body.innerHTML = _emptyCard('ph-list-dashes','Nothing to browse yet',
+      BANK.error || 'Once questions are added, this becomes a topic-wise index.');
+    return;
+  }
+
+  const chapters = window.SUBJECTIVE_CHAPTERS || [];
+  const tree = chapters.map(ch => {
+    const qs = _questionsByChapter(ch.id);
+    if(!qs.length) return '';
+
+    // Group by section (topic) within this chapter.
+    const byTopic = {};
+    qs.forEach(q => {
+      const key = q.topic || 'General';
+      (byTopic[key] = byTopic[key] || []).push(q);
+    });
+    const topics = Object.keys(byTopic).sort();
+
+    const topicBlocks = topics.map(topic => {
+      const tQs = byTopic[topic];
+      return `<div style="margin:0 0 .55rem">` +
+        `<div style="font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);padding:.35rem .3rem .2rem;border-bottom:1px solid var(--b1)">` +
+          `${esc(topic)} <span style="font-weight:500;opacity:.6">(${tQs.length})</span>` +
+        `</div>` +
+        tQs.map((q, i) => `<div class="subj-q-row">` +
+          `<span class="qn">${i+1}.</span>` +
+          `<span class="qt">${esc(q.q)}</span>` +
+          `<span class="qm ${q.marks===10?'m10':'m5'}">${q.marks}M</span>` +
+        `</div>`).join('') +
+      `</div>`;
+    }).join('');
+
+    return `<div class="subj-group">` +
+      `<div class="subj-group-hd" onclick="this.parentElement.classList.toggle('open')">` +
+        `<div><div>${ch.icon || ''} ${esc(ch.name)} <span style="color:var(--t3);font-weight:400">· Group ${esc(ch.group || '')}</span></div>` +
+        `<div class="meta">${qs.length} question${qs.length !== 1 ? 's' : ''} · ${topics.length} section${topics.length !== 1 ? 's' : ''}</div></div>` +
+        `<i class="ph ph-caret-right chev"></i>` +
+      `</div>` +
+      `<div class="subj-group-body">${topicBlocks}</div>` +
+    `</div>`;
+  }).filter(Boolean).join('');
+
+  body.innerHTML = tree || _emptyCard('ph-list-dashes','No chapters loaded','');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PUBLIC MODULE
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const SUBJ = {
+  async init(){
+    await loadBank();
+    _restoreState();
+    _renderQotd();
+    _renderExam();
+    _renderList();
+    _refreshBadge();
+    if(QOTD && !QOTD.submitted && _qotdPhase() !== 'expired') _startQotdTick();
+    if(EXAM && !EXAM.submitted && EXAM.deadlineAt > Date.now()) _startExamTick();
+    if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+  },
+
+  ready(){ return BANK.loaded; },
+
+  async refreshBank(){
+    await loadBank(true);
+    _renderQotd();
+    _renderExam();
+    _renderList();
+    _refreshBadge();
+    if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+    toast('🔄 Question bank refreshed');
+  },
+
+  goTo(tab){
+    const el = document.getElementById('subj-' + tab);
+    if(!el) return;
+    el.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'start' });
+    document.querySelectorAll('.subj-tab').forEach(t => {
+      const on = t.dataset.tab === tab;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  },
+
+  _qotdPublicState,
+  _hasBank,
+
+  _qotdBegin,
+  _qotdFile,
+  _qotdClearFile,
+  _qotdSubmit,
+
+  _examGenerate,
+  _examFile,
+  _examClearFile,
+  _examSubmit,
+  _examReset,
+
+  _renderQotd,
+  _renderExam,
+  _renderList,
+
+  _refreshBadge(){
+    const b = $('subj-qotd-badge');
+    if(!b) return;
+    const fresh = _hasBank() &&
+      (!QOTD || QOTD.date !== _todayKey() || (!QOTD.submitted && _qotdPhase() === 'expired'));
+    b.style.display = fresh ? '' : 'none';
+  }
+};
+
+window.SUBJ = SUBJ;
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SMART PASTE PARSER — used by admin.html
+   ═══════════════════════════════════════════════════════════════════════ */
+
+const SORT_RULES = {
+  structure: { group: 'A', keywords: [
+    'beam','slab','column','footing','rcc','reinforced','concrete','bending',
+    'shear','deflection','bond','anchorage','prestress','prestressed','working stress',
+    'limit state','doubly reinforced','staircase','two-way slab','cantilever',
+    't-beam','box culvert','bridges','bridge','suspension','deck girder',
+    'earthquake','seismic','ductility','masonry','rule of thumb','stiffness matrix',
+    'flexibility matrix','influence line','moment capacity','fe415','m20','m15'
+  ]},
+  geotech: { group: 'A', keywords: [
+    'soil','compaction','consolidation','void ratio','permeability','effective stress',
+    'capillary','quick sand','seepage','flow net','shear strength','mohr','coulomb',
+    'slope failure','factor of safety','bio-engineering','bioengineering','retaining wall',
+    'earth pressure','rankine','coloumb','bearing capacity','terzaghi','settlement',
+    'pile','caisson','well foundation','mat foundation','raft',
+    'spt','standard penetration','plate load','site investigation','boring','soil sample',
+    'foundation','underpinning','grouting'
+  ]},
+  irrigationAndCo: { group: 'B', keywords: [
+    'rainfall','hydrograph','unit hydrograph','flood','flood frequency','gumbel',
+    'runoff','run-off','watershed','catchment','discharge','rating curve','sediment',
+    'glof','reservoir','dam height','trap efficiency','infiltration',
+    'irrigation','canal','weir','barrage','headworks','headwork','duty','delta',
+    'kennedy','lacey','regime','silt factor','cross drainage','aqueduct','syphon',
+    'hydraulic jump','froude','bernoulli','manning','chezy','pipe flow','open channel',
+    'water hammer','surge tank','penstock','turbine','hydropower','de-sanding',
+    'spillway','gravity dam','embankment dam','canal lining','waterlogging',
+    'drainage coefficient','recharge','aquifer','well hydraulics'
+  ]},
+  transportAndCo: { group: 'C', keywords: [
+    'highway','road','pavement','flexible pavement','rigid pavement','cbr','subgrade',
+    'bitumen','asphalt','aggregate','marshal','penetration test','ductility test',
+    'viscosity','highway alignment','geometric design','superelevation','transition curve',
+    'sight distance','stopping sight','hair pin','hill road',
+    'traffic','traffic volume','o-d survey','origin destination','parking survey',
+    'accident','intersection','rotary','traffic signal','road marking','road lighting',
+    'airport','runway','taxiway','apron','aerodrome','icao','stol','heliport',
+    'maintenance','overlay','pothole','crack','pci','pavement distress','esal','eal'
+  ]},
+  publicHealth: { group: 'D', keywords: [
+    'water supply','potable','water demand','per capita demand','intake','reservoir tank',
+    'distribution system','water treatment','sedimentation','coagulation','flocculation',
+    'filtration','slow sand','rapid sand','disinfection','chlorination','break point',
+    'hardness','alkalinity','iron removal','manganese','who standard','water quality',
+    'bod','cod','bod5','sewage','sewer','sewerage','self cleansing','non scouring',
+    'septic tank','soak pit','activated sludge','trickling filter','oxidation pond',
+    'sludge','effluent','wastewater','sanitation','ecological sanitation','excreta',
+    'water borne disease','typhoid','cholera','solid waste','landfill','composting',
+    'incineration','iee','eia','environmental impact','pollution','air pollution',
+    'greenhouse','carbon','recycle','reuse'
+  ]},
+  miscellaneous: { group: 'D', keywords: [
+    'project management','cpm','pert','critical path','bar chart','gantt',
+    'quantity surveying','rate analysis','estimate','bill of quantities','boq',
+    'tender','contract','specification','quality assurance','qa plan',
+    'professional ethics','code of conduct','loksewa','public procurement',
+    'hydropower policy','nea','electricity act','renewable','solar','wind','biogas',
+    'load factor','capacity factor','utilization factor','roi','irr','roe'
+  ]}
+};
+
+function _classifyQuestion(text){
+  const t = ' ' + String(text).toLowerCase().replace(/\s+/g, ' ') + ' ';
+  let best = { chapterId: null, groupKey: null, score: 0 };
+  for(const [chId, rule] of Object.entries(SORT_RULES)){
+    let score = 0;
+    for(const kw of rule.keywords){
+      const safe = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(^|\\W)${safe}(\\W|$)`, 'gi');
+      const m = t.match(re);
+      if(m) score += m.length;
+    }
+    if(score > best.score) best = { chapterId: chId, groupKey: rule.group, score };
+  }
+  return best.score > 0 ? best : null;
+}
+
+function _splitRawTextIntoQuestions(raw){
+  if(!raw) return [];
+  const cleaned = String(raw)
+    .replace(/\r/g, '')
+    .replace(/^\s*=====.*=====\s*$/gim, '')
+    .replace(/^\s*Page \d+.*$/gim, '')
+    .replace(/\n{2,}/g, '\n');
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+  const out = [];
+  let buf = '';
+  const flush = () => { const t = buf.trim(); if(t.length >= 15) out.push(t); buf = ''; };
+  for(const line of lines){
+    const isStart = /^(\d+[\.\)]|Q\d*[\.\)]|[-•*])\s+\S/.test(line);
+    if(isStart){ flush(); buf = line; }
+    else if(/^(Section|Chapter|Group|Marks|Note|Section[- ]?[A-Z])\b/i.test(line)){ flush(); }
+    else if(buf){ buf += ' ' + line; }
+    else { buf = line; }
+  }
+  flush();
+  return out;
+}
+
+function _extractMarks(text){
+  const m1 = text.match(/\[([\d\.\+ ]+)\]/);
+  const m2 = text.match(/\(([\d\.\+ ]+)\)\s*marks?/i);
+  const m3 = text.match(/(\d+)\s*marks?/i);
+  const raw = (m1 && m1[1]) || (m2 && m2[1]) || (m3 && m3[1]);
+  if(!raw) return 10;
+  if(raw.includes('+')){
+    return Math.round(raw.split('+').reduce((a,b) => a + (parseFloat(b) || 0), 0));
+  }
+  const n = parseInt(raw, 10);
+  return (n >= 1 && n <= 40) ? n : 10;
+}
+
+window.SUBJ_SMART = {
+  preview(rawText){
+    const chunks = _splitRawTextIntoQuestions(rawText);
+    return chunks.map((text, idx) => {
+      const marks = _extractMarks(text);
+      const cleaned = text
+        .replace(/\[[^\]]+\]/g, '')
+        .replace(/\([^\)]+\)\s*marks?/gi, '')
+        .replace(/\d+\s*marks?/gi, '')
+        .replace(/^\d+[\.\)]\s*/, '')
+        .replace(/^Q\d*[\.\)]\s*/i, '')
+        .replace(/^[-•*]\s*/, '')
+        .trim();
+      const guess = _classifyQuestion(cleaned);
+      return {
+        idx,
+        question: cleaned,
+        marks,
+        suggestedChapter: guess ? guess.chapterId : null,
+        suggestedGroup:   guess ? guess.groupKey  : null,
+        confidence:       guess ? guess.score     : 0
+      };
+    });
+  },
+  classify: _classifyQuestion,
+  split:    _splitRawTextIntoQuestions,
+  extractMarks: _extractMarks
+};
+
+})();

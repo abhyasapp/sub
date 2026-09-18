@@ -1,27 +1,88 @@
 {
   "name": "Abhyas — Loksewa Civil Engineering Exam Prep",
   "short_name": "Abhyas",
-  "description": "Loksewa Civil Engineering exam prep for Nepal — practice Level 7 Engineering, General Knowledge, and IQ questions online or fully offline.",
-  "start_url": "./index.html",
-  "display": "standalone",
-  "background_color": "#F2F4F3",
-  "theme_color": "#F2F4F3",
-  "orientation": "portrait-primary",
+  "description": "Offline-first Nepal Engineering & PSC exam prep — practice Loksewa Civil Engineering, General Knowledge, and IQ questions online or fully offline.",
+  "lang": "en-NP",
+  "dir": "ltr",
   "scope": "./",
+  "start_url": "./index.html",
+  "id": "/abhyas",
+
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
+
+  "theme_color": "#F2F4F3",
+  "background_color": "#F2F4F3",
+
+  "categories": ["education", "productivity"],
+  "prefer_related_applications": false,
+
   "icons": [
     {
       "src": "icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
-  "categories": ["education"],
-  "lang": "en-NP"
+
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open your study dashboard",
+      "url": "./user.html",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Offline Cache",
+      "short_name": "Cache",
+      "description": "Manage cached question sets for offline study",
+      "url": "./user.html#offline",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Daily Question",
+      "short_name": "Daily Q",
+      "description": "Open today's subjective question",
+      "url": "./user.html#subjective",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "screenshot-mobile.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Abhyas study dashboard on mobile"
+    },
+    {
+      "src": "screenshot-desktop.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Abhyas study dashboard on desktop"
+    }
+  ]
 }

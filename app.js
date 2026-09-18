@@ -1,16 +1,24 @@
-/* ═══════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════
    APP.JS — Abhyas: Your path to mastery  (V1 – Cloud Sync)
-   ═══════════════════════════════════════════════════════════════ */
+   ─────────────────────────────────────────────────────────────────────
+   CORE — state, storage, sync, auth, PWA, weekly sets, home dashboard,
+          timetable, offline cache, progress tracking, data management,
+          tutorial, and app boot.
+   Companion modules loaded AFTER this file:
+     • objective.js  — MCQ quiz engine (QUIZ), online study (ON),
+                       local file (LOC), psycho mode (PSY), review
+                       lists (REV), count/progress helpers (CNT,
+                       ONPROG), scope utilities.
+     • subjective.js — daily question, subjective exam, topic list.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════ 1. CONFIG & CONSTANTS ═══════════════ */
-const APP_CONFIG = {
-  APPS_URL: "https://script.google.com/macros/s/AKfycbyZLZxf6VKNiMfhY6memPTKj-dGW7jxyX1c-9GI0OPG8TqazSZi_P-7Y-8DlpT0ZlrjHg/exec",
-};
+const APP_CONFIG = { APPS_URL: ABHYAS_CONFIG.GAS_URL };
 const APPS = APP_CONFIG.APPS_URL;
 
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const BK_TAGS = ['Need Check','Interesting','Debating','Confusing','Formulae'];
-const SR_INTERVALS = [1, 3, 7, 14]; // days for spaced repetition
+const SR_INTERVALS = [1, 3, 7, 14];   // days for spaced repetition
 
 // Weekly Sets exam window — once released, the student has this many
 // hours to take it as a timed, graded Exam. After the window closes,
@@ -28,11 +36,6 @@ const LS = {
   PROFILE:'abhyas_profile',
   CHAPSTATS:'abhyas_chapstats',
   LAST_USER:'abhyas_last_user',
-  // ═══ v1.04 ═══ Local mirror of the student's own Weekly Set attempts
-  // (keyed by weeklyId). Written locally FIRST (so a network failure
-  // can't lose the one submission), then pushed to the server. Not
-  // wiped by _resetUserScopedLocalDataIfDifferentUser — see that
-  // method's comment for why (attempts are immutable once submitted).
   WK_ATTEMPTS:'abhyas_weekly_attempts'
 };
 
@@ -51,11 +54,10 @@ const S = {
   stk: _load(LS.STK, {days:[],last:''}),
   fcount: _load(LS.FCOUNT, {}),
   chapStats: _load(LS.CHAPSTATS, {}),
-  // ═══ v1.04 ═══ { [weeklyId]: {weeklyId, answers[], total, correct,
-  //   pct, skipped, startedAt, submittedAt, durationSec, synced} }
   weeklyAttempts: _load(LS.WK_ATTEMPTS, {}),
   dpi: null,
   localQs: null,
+  // Quiz state — kept here because HOME/UI read S.quiz.active to gate nav.
   quiz: {qs:[],ans:[],mode:'',idx:0,timer:null,elapsed:0,left:0,active:false,ch:'',scope:null},
   cloud: _load(LS.CLOUD, {fid:''}),
   profile: _load(LS.PROFILE, {ver:1, id:''})
@@ -125,10 +127,7 @@ const QDB = (() => {
       });
       return true;
     } catch (e) {
-      // ═══ v1.04 ═══ This toast is now suppressed — callers decide
-      // whether a cache-write failure is worth surfacing. QUIZ._fetch
-      // (the main caller) warns once per session instead of once per
-      // fetch, which matters when CACHE.autoSync iterates 200 files.
+      // Callers decide whether a cache-write failure is worth surfacing.
       return false;
     }
   }
@@ -321,12 +320,9 @@ function closeMod(){document.getElementById('mbg').classList.remove('show')}
 
 function _anyModalOpen(){
   if(document.getElementById('mbg')?.classList.contains('show')) return true;
-  // ═══ v1.04 ═══ Visible-based check (offsetParent !== null) instead of
-  // mere DOM presence — the loader and error card are created once and
-  // only hidden, so the previous querySelector-based check permanently
-  // returned true after the first quiz load. That silently disabled
-  // every keyboard shortcut (A/B/C/D, 1-5, ←/→, Esc) from the first
-  // quiz onward.
+  // Visibility-based check — the loader/error cards are created once and
+  // only hidden, so a mere presence check would permanently return true
+  // after the first quiz load, silently disabling every keyboard shortcut.
   return [
     '#quiz-limit-modal','#exam-resume-modal','#quiz-exit-modal',
     '#quiz-error-card','#quiz-loader'
@@ -352,6 +348,28 @@ async function netFetch(url, opts, timeoutMs=20000){
     throw err;
   }
 }
+
+/* ── SEARCH — opens a new tab with the current question on Google ── */
+function _buildSearchQuery(){
+  const q = S.quiz?.qs?.[S.quiz.idx]; if(!q) return '';
+  const opts = (q.options||[]).map((o,i)=>String.fromCharCode(65+i)+') '+o).join('  ');
+  return ((q.q||'') + '  ' + opts).trim().slice(0, 400);
+}
+const SRCH = {
+  quickSearch(){
+    const text = _buildSearchQuery();
+    if(!text){ toast('No question to search'); return; }
+    SRCH._openGoogle(text);
+  },
+  go(){ SRCH.quickSearch(); },
+  toggle(){ SRCH.quickSearch(); },
+  _openGoogle(text){
+    const q = encodeURIComponent(text); if(!q) return;
+    const url = `https://www.google.com/search?q=${q}`;
+    const win = window.open(url, '_blank', 'noopener');
+    if(!win) window.location.href = url;
+  }
+};
 
 /* ═══════════════ 3b. NETCHECK ═══════════════ */
 const NETCHECK = {
@@ -453,17 +471,9 @@ const AUTH = {
   },
   _buildSession(prevSession, res){
     const user = res.user || {};
-    const access = {
-      level: res.permanentAccess || user.status === 'active' ? 'permanent'
-             : res.isTrial ? 'trial'
-             : res.needsPayment && user.status === 'payment_pending' ? 'pending_review'
-             : res.needsPayment ? 'expired'
-             : 'unknown',
-      trialExpiresAt: res.trialExpiresAt || user.trialExpiresAt,
-      permanent: !!(res.permanentAccess || user.status === 'active'),
-      accessType: res.accessType || user.accessType || 'permanent',
-      accessExpiresAt: res.accessExpiresAt || user.accessExpiresAt || ''
-    };
+    // Access-level computation lives in one place — shared.js's
+    // computeAccessLevel() — so index.html and app.js never drift.
+    const access = computeAccessLevel(res, user);
     return {
       ...prevSession,
       username: user.username || prevSession.username,
@@ -471,21 +481,11 @@ const AUTH = {
       email: user.email || prevSession.email,
       mobile: user.mobile || prevSession.mobile,
       access,
+      adminCapable: prevSession.adminCapable || !!res.adminCapable,
       lastVerified: Date.now()
     };
   },
-  _bounce(){
-    window.location.href = 'index.html';
-  },
-  // Wipes user-scoped local data if a DIFFERENT user logs in on this device.
-  // ═══ v1.04 ═══ LS.WK_ATTEMPTS is deliberately NOT in the wipe list.
-  // Weekly attempts are immutable facts about specific (username,
-  // weeklyId) pairs — user A's submitted attempt for week 5 must not
-  // be lost just because user B logs into the same device. The
-  // server-side fetch during WEEKLY.init() will re-hydrate B's own
-  // attempts anyway, and A's stale entries sit inert in localStorage
-  // until A logs back in (at which point they are simply confirmed
-  // by the server and kept).
+  _bounce(){ window.location.href = 'index.html'; },
   _resetUserScopedLocalDataIfDifferentUser(username){
     const lastUser = _load(LS.LAST_USER, '');
     if(lastUser && lastUser !== username){
@@ -513,7 +513,9 @@ const AUTH = {
     PSYNC.pullIfEmpty();
     TT._startReminderChecker();
     if(typeof PUSH!=='undefined') PUSH.silentRefresh();
-    WEEKLY.init();   // ═══ v1.04 ═══ now async (fetches sets AND attempts)
+    WEEKLY.init();
+    // Let the sidebar refresh its hints once everything is set.
+    if(typeof SB_HINTS !== 'undefined') setTimeout(() => SB_HINTS.refresh(), 200);
   },
   _updateSidebarCard(user){
     const nameEl = document.getElementById('sb-uname');
@@ -534,7 +536,6 @@ const AUTH = {
   },
   async logout(){
     if(!confirm('Log out?'))return;
-
     if(S.user && S.user.token && S.online && !S.forcedOffline && PSYNC._timer){
       let confirmed = false;
       try{
@@ -547,7 +548,6 @@ const AUTH = {
       }
       if(!confirmed) PSYNC._beaconSync();
     }
-
     localStorage.removeItem(LS.USER);
     window.location.href = 'index.html';
   },
@@ -604,9 +604,9 @@ const PSYNC = {
     const cfg = {
       idle:    {color:'var(--t3)', title:'Not synced yet this session', anim:false},
       pending: {color:'var(--amb)', title:'Sync pending…',              anim:false},
-      syncing: {color:'var(--sky)', title:'Syncing…',           anim:true},
+      syncing: {color:'var(--sky)', title:'Syncing…',                   anim:true},
       synced:  {color:'var(--grn)', title:'Progress backed up',         anim:false},
-      error:   {color:'var(--ros)', title:'Sync failed — will retry', anim:false}
+      error:   {color:'var(--ros)', title:'Sync failed — will retry',   anim:false}
     }[state] || {color:'var(--t3)', title:'', anim:false};
     dot.style.background = cfg.color;
     dot.style.animation = cfg.anim ? 'pulse 1s ease-in-out infinite' : 'none';
@@ -643,11 +643,6 @@ const PSYNC = {
   _capList(arr, max){
     return Array.isArray(arr) && arr.length > max ? arr.slice(-max) : arr;
   },
-  // ═══ v1.04 ═══ Streamlined trimming. The old loop rebuilt and
-  // re-stringified the entire payload up to 12 times per sync. This
-  // version tries 4 progressively-smaller caps (full, half, quarter,
-  // minimum) and stops at the first one that fits — usually the first
-  // or second attempt. Same end result, up to 10 fewer serializations.
   _syncPayload(){
     const build = (bkMax, flMax, wrMax, sessMax) => {
       const prog = (S.prog && S.prog.sessions && S.prog.sessions.length > sessMax)
@@ -740,7 +735,6 @@ const PSYNC = {
     }
   }
 };
-
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') PSYNC.flushOnHide(); });
 window.addEventListener('pagehide', ()=>PSYNC.flushOnHide());
 
@@ -849,10 +843,9 @@ const PWA = {
     });
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('./sw.js', {scope:'./'}).catch(()=>{});
-      // ═══ v1.04 ═══ Service Worker updated and new SW has claimed the
-      // page — show a reload prompt. Never auto-reload (that would blow
-      // away an in-progress quiz); just notify, and suppress during an
-      // active quiz so the toast doesn't collide with quiz toasts.
+      // Service Worker updated and new SW has claimed the page — show a
+      // reload prompt. Never auto-reload (that would blow away an
+      // in-progress quiz).
       navigator.serviceWorker.addEventListener('message', (e) => {
         if(e.data?.type === 'SW_ACTIVATED' && e.data.version !== (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '')){
           if(!S.quiz.active){
@@ -888,16 +881,9 @@ const PWA = {
 };
 
 /* ═══════════════ 5b. WEEKLY SETS ═══════════════
-   ═══ v1.04 ═══ Rewritten. Three big changes vs. the previous version:
-     1. init() now fetches attempts alongside sets, in parallel, so the
-        home card can render the correct per-set state on first paint.
-     2. open() is async and consults the attempt state to decide which
-        of three modes to enter (exam / scored review / unscored review).
-     3. A submission path exists (recordAttempt → syncAttempt with
-        retry) that captures the student's single attempt at each set.
-        Submission is local-first — the student's one-shot write must
-        survive a network failure, so localStorage gets it before the
-        server does. */
+   Only the state + fetch/attempt plumbing lives here — the render and
+   open() logic reads QUIZ, which loads in objective.js. Fine because
+   _renderHomeCard() only runs at runtime, after all scripts loaded. */
 const WEEKLY = {
   sets: [],
   attempts: S.weeklyAttempts || {},
@@ -908,10 +894,6 @@ const WEEKLY = {
     _save(LS.WK_ATTEMPTS, this.attempts);
   },
 
-  // Fetches sets AND the user's own attempts in parallel, merges server
-  // attempts in (never overwriting a local one that hasn't been synced
-  // yet — that local copy is the student's only record of their one
-  // submission until the push succeeds), then renders.
   async init(){
     if(!S.online || S.forcedOffline){ this._renderHomeCard(); this._startTick(); return; }
     try{
@@ -925,7 +907,7 @@ const WEEKLY = {
       if(attemptsRes.success && Array.isArray(attemptsRes.attempts)){
         for(const a of attemptsRes.attempts){
           const local = this.attempts[a.weeklyId];
-          if(local && !local.synced) continue;   // don't clobber an unsynced local submission
+          if(local && !local.synced) continue;
           this.attempts[a.weeklyId] = a;
         }
         this._saveAttempts();
@@ -966,7 +948,7 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Attempted — show recorded score. No countdown (nothing left to attempt).
+      // Attempted — show recorded score. No countdown.
       if(attempted){
         return `<div class="qb-btn ok" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.92" onclick='WEEKLY.open(${idJson})'>
           <span><i class="ph ph-check-circle"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
@@ -984,7 +966,7 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Not attempted, window closed — review only, no score possible.
+      // Not attempted, window closed — review only.
       return `<div class="qb-btn" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.75" onclick='WEEKLY.open(${idJson})'>
         <span><i class="ph ph-eye"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
         <span style="font-size:.62rem;opacity:.75">Review only</span>
@@ -1017,18 +999,11 @@ const WEEKLY = {
     }, 1000);
   },
 
-  // Entry point from the home card. Resolves to one of three modes:
-  //   - First attempt, window open → graded exam (QUIZ.load mode='exam')
-  //   - Already submitted → scored review (flashcard + preset answers)
-  //   - Window closed, never attempted → unscored review (flashcard,
-  //     no preset answers, correct answers still shown on reveal)
+  // Entry point from the home card. QUIZ lives in objective.js.
   async open(id){
     const s = this.sets.find(x=>x.id===id);
     if(!s || !s.released || !s.fileId){ toast('Not unlocked yet.'); return; }
 
-    // Prefer the local attempt — may be unsynced. Fetch from server
-    // only if the local cache is empty (fresh install, cleared storage,
-    // or another device got there first).
     let attempt = this.attempts[id];
     if(!attempt && S.online && !S.forcedOffline){
       try{
@@ -1056,10 +1031,6 @@ const WEEKLY = {
     }
 
     toast(`📝 Graded exam — you get ONE attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left.`, 5000);
-    // ═══ v1.04 ═══ scope.weeklyId triggers the shuffle-lock in
-    // QUIZ._doStart — see that function's comment for why the shuffle
-    // MUST be off for any weekly attempt (so the recorded answers[]
-    // array stays aligned with the source question file's order).
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
       weeklyId: s.id,
       weeklyTitle: s.title,
@@ -1067,10 +1038,6 @@ const WEEKLY = {
     });
   },
 
-  // Review mode. `attempt` may be null (window closed, never
-  // submitted) — in that case there's no preset answers array, but
-  // the correct answers still display on option reveal, exactly like a
-  // normal flashcard session.
   _startReview(s, attempt){
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'flashcard', s.title, {
       weeklyId: s.id,
@@ -1081,10 +1048,6 @@ const WEEKLY = {
   },
 
   // Called from QUIZ._showResults after a weekly exam completes.
-  // Local-first: the student's one submission must survive a network
-  // failure, so localStorage gets it before the server push. Then a
-  // best-effort server sync via _syncAttempt (which retries via
-  // retryUnsynced on next reconnect).
   async _recordAttempt(quiz, stats){
     const weeklyId = quiz.scope?.weeklyId;
     if(!weeklyId) return;
@@ -1125,14 +1088,10 @@ const WEEKLY = {
       }, 20000);
       const res = await r.json();
       if(res.success && res.attempt){
-        // Server may have normalized the payload — trust its copy.
         this.attempts[attempt.weeklyId] = res.attempt;
         this._saveAttempts();
         this._renderHomeCard();
       } else if(res.alreadyAttempted && res.attempt){
-        // Another device on this account beat us to the write. Server
-        // wins — replace the local copy so the student sees the real
-        // recorded score, and let them know why.
         this.attempts[attempt.weeklyId] = res.attempt;
         this._saveAttempts();
         this._renderHomeCard();
@@ -1164,17 +1123,14 @@ const UI = {
     const ni=document.getElementById('nav-'+v);
     if(ni)ni.classList.add('active');
 
-    // ═══ v1.04 ═══ Clear view-scoped intervals when leaving their view.
-    // Without this, HOME._clockTimer and TT._clockTimer kept running
-    // forever after a single visit — the naive "clear on next render"
-    // pattern never fires if you never return to that view.
+    // Clear view-scoped intervals when leaving their view. Without this,
+    // HOME._clockTimer and TT._clockTimer kept running forever after a
+    // single visit.
     if(UI.cur === 'home' && v !== 'home' && HOME._clockTimer){ clearInterval(HOME._clockTimer); HOME._clockTimer = null; }
     if(UI.cur === 'timetable' && v !== 'timetable' && TT._clockTimer){ clearInterval(TT._clockTimer); TT._clockTimer = null; }
 
     UI.cur=v;UI.sidebarClose();
-    // ═══ v1.04 ═══ scroll the correct container. #main is the actual
-    // scrolling pane (overflow-y:auto); window.scrollTo(0,0) was a
-    // no-op for the previous view's preserved scroll position.
+    // Scroll the actual scrolling pane (#main), not window.
     const mainEl = document.getElementById('main');
     if(mainEl) mainEl.scrollTop = 0;
     window.scrollTo(0,0);
@@ -1212,1255 +1168,9 @@ const UI = {
   }
 };
 
-/* ═══════════════ 7b. ONLINE STUDY ═══════════════ */
-const ON = {
-  onLv(){
-    const lv=document.getElementById('on-lv').value;
-    const cs=document.getElementById('on-ch');
-    cs.innerHTML='<option value="">📘 Select Chapter…</option>';cs.disabled=!lv;
-    const bs=document.getElementById('on-bk');bs.innerHTML='<option value="">📚 Select Book…</option>';bs.disabled=true;
-    const ts=document.getElementById('on-to');ts.innerHTML='<option value="">📑 Select Subtopic…</option>';ts.disabled=true;
-    if(lv){
-      Object.entries(ChapterData.chapters(lv)).forEach(([k,n])=>{
-        const fc=ChapterData.fileCount(lv,k);
-        const o=document.createElement('option');o.value=k;o.textContent=`Ch${k}: ${n}${fc?'':' (coming soon)'}`;cs.appendChild(o);
-      });
-    }
-    ONPROG.render();
-  },
-  onCh(){
-    const lv=document.getElementById('on-lv').value,ch=document.getElementById('on-ch').value;
-    const bs=document.getElementById('on-bk');
-    bs.innerHTML='<option value="">📚 Select Book…</option>';bs.disabled=true;
-    const ts=document.getElementById('on-to');ts.innerHTML='<option value="">📑 Select Subtopic…</option>';ts.disabled=true;
-    if(lv&&ch){
-      const books=ChapterData.books(lv,ch);
-      if(!Object.keys(books).length){
-        bs.innerHTML='<option value="">No books yet for this chapter</option>';
-        toast('ℹ️ This chapter has no question files yet');
-      } else {
-        Object.keys(books).forEach(book=>{
-          const fc=ChapterData.fileCount(lv,ch,book);
-          const o=document.createElement('option');o.value=book;o.textContent=`${book}${fc?'':' (coming soon)'}`;bs.appendChild(o);
-        });
-        bs.disabled=false;
-      }
-    }
-    ONPROG.render();
-  },
-  async onBook(){
-    const lv=document.getElementById('on-lv').value,ch=document.getElementById('on-ch').value,book=document.getElementById('on-bk').value;
-    const ts=document.getElementById('on-to');
-    ts.innerHTML='<option value="">📑 Select Subtopic…</option>';ts.disabled=true;
-    if(lv&&ch&&book){
-      const files=ChapterData.files(lv,ch,book);
-      if(!Object.keys(files).length){
-        ts.innerHTML='<option value="">No files yet for this book</option>';
-        toast('ℹ️ This book has no question files yet');
-      } else {
-        const isOfflineMode = !S.online || S.forcedOffline;
-        const cachedKeys = new Set(await QDB.keys());
-        let anyEnabled = false;
-        Object.entries(files).forEach(([n,id])=>{
-          if(!id)return;
-          const cacheKey = `${lv}_${ch}_${book}_${n}`;
-          const isCached = cachedKeys.has(cacheKey);
-          const o=document.createElement('option');
-          o.value=id;
-          o.dataset.key=cacheKey;
-          o.dataset.sub=n;
-          if(isOfflineMode && !isCached){
-            o.textContent = `🔒 ${n} (not cached)`;
-            o.disabled = true;
-            o.style.color = 'var(--t3)';
-          } else {
-            o.textContent = isCached ? `📦 ${n}` : n;
-            anyEnabled = true;
-          }
-          ts.appendChild(o);
-        });
-        ts.disabled=false;
-        if(isOfflineMode && !anyEnabled){
-          ts.innerHTML='<option value="">No cached files for this book</option>';
-          toast('📡 You\'re offline — no cached files in this book. Cache them first while online.');
-        }
-      }
-    }
-    ONPROG.render();
-  },
-  start(mode){
-    const ts=document.getElementById('on-to');
-    const fid=ts.value,opt=ts.options[ts.selectedIndex],key=opt?.dataset?.key;
-    const ch=document.getElementById('on-ch').value,lv=document.getElementById('on-lv').value,book=document.getElementById('on-bk').value;
-    if(!fid||!key){toast('Select a subtopic');return}
-    const sub=opt?.dataset?.sub||'';
-    const name=`${ChapterData.chapterName(lv,ch)} — ${book}`;
-    QUIZ.load(fid,key,mode,name,{lv,ch,book,sub,fid});
-  }
-};
-
-/* ═══════════════ 7c. LOCAL FILE ═══════════════ */
-const LOC = {
-  onFile(){
-    const f=document.getElementById('loc-file').files[0];if(!f)return;
-    const nameEl=document.getElementById('loc-file-name');
-    if(nameEl) nameEl.textContent=f.name;
-    const r=new FileReader();
-    r.onload=e=>{
-      try{
-        const qs2=normQ(JSON.parse(e.target.result),'local');
-        if(!qs2.length){toast('❌ No valid questions found in file');return}
-        S.localQs=qs2;
-        const info=document.getElementById('loc-info');
-        info.style.display='';info.textContent=`✅ ${pluralize(qs2.length,'question')} loaded from "${f.name}"`;
-        document.getElementById('loc-pr').disabled=false;
-        document.getElementById('loc-ex').disabled=false;
-        toast(`✅ ${pluralize(qs2.length,'question')} ready`);
-      }catch{toast('❌ Invalid JSON file')}
-    };
-    r.onerror=()=>toast('❌ Could not read file');
-    r.readAsText(f);
-  },
-  start(mode){
-    if(!S.localQs){toast('Load a JSON file first');return}
-    QUIZ.startWith([...S.localQs],mode,'Local File');
-  }
-};
-
-/* ═══════════════ 7d. PSYCHO MODE ═══════════════ */
-const PSY = {
-  LEVELS:[['level5','Level 5 — Diploma'],['level7','Level 7 — Civil Engineering'],['gk','General Knowledge']],
-  init(){
-    const box=document.getElementById('psy-levels');
-    box.innerHTML = PSY.LEVELS.map(([lv,label])=>{
-      const names=ChapterData.chapters(lv);
-      const items=Object.entries(names).map(([k,n])=>{
-        const fc=ChapterData.fileCount(lv,k);
-        return `<div class="ch-item" tabindex="0" role="button" onclick="this.querySelector('input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click()}">
-          <input type="checkbox" value="${k}" data-lv="${lv}" ${fc?'':'disabled'} onclick="event.stopPropagation();PSY._info()">
-          <div class="ch-num">${k}</div>
-          <div class="ch-name">${n}${fc?'':' <span style=\"color:var(--t3)\">(no files)</span>'}</div>
-          <div class="ch-cnt">${fc}f</div>
-        </div>`;
-      }).join('');
-      return `<div class="sb-lbl" style="margin-top:.7rem;display:flex;align-items:center;justify-content:space-between;padding-right:.2rem">
-          <span>${label}</span>
-          <span style="display:flex;gap:.3rem">
-            <button class="btn btn-sm btn-c" style="font-size:.56rem;padding:.15rem .4rem" onclick="PSY.allLv('${lv}')"><i class="ph ph-check"></i> All</button>
-            <button class="btn btn-sm btn-r" style="font-size:.56rem;padding:.15rem .4rem" onclick="PSY.noneLv('${lv}')">✕</button>
-          </span>
-        </div>
-        <div class="ch-list" id="psy-lv-${lv}">${items || '<div class="empty"><div class="empty-i"><i class="ph ph-book-open"></i></div><p>No chapters yet</p></div>'}</div>`;
-    }).join('');
-    PSY._info();
-  },
-  all(){document.querySelectorAll('#psy-levels input:not(:disabled)').forEach(c=>c.checked=true);PSY._info()},
-  none(){document.querySelectorAll('#psy-levels input').forEach(c=>c.checked=false);PSY._info()},
-  allLv(lv){document.querySelectorAll(`#psy-lv-${lv} input:not(:disabled)`).forEach(c=>c.checked=true);PSY._info()},
-  noneLv(lv){document.querySelectorAll(`#psy-lv-${lv} input`).forEach(c=>c.checked=false);PSY._info()},
-  _info(){
-    const n=document.querySelectorAll('#psy-levels input:checked').length;
-    document.getElementById('psy-info').textContent=n?`${n} chapter${n>1?'s':''} selected — ready to load`:'Select at least 1 chapter to continue';
-  },
-  async start(type){
-    const cbs=[...document.querySelectorAll('#psy-levels input:checked')];
-    if(!cbs.length){toast('Select at least one chapter');return}
-    // ═══ v1.04 ═══ Parallel fetch with concurrency 4. The previous
-    // version awaited every file strictly in sequence — for a full-level
-    // "All" run (~60 files) that turned into minutes of wall time on a
-    // slow connection, all while the loader said nothing. The API
-    // endpoint is rate-limited at 120/min; 4 concurrent leaves plenty
-    // of headroom.
-    const refs = [];
-    for(const cb of cbs){
-      const lv = cb.dataset.lv;
-      const ch = cb.value;
-      refs.push(...ChapterData.chapterFileRefs(lv, ch));
-    }
-    QUIZ._showLoader(`Loading ${pluralize(refs.length,'file')}…`);
-    const all=[];
-    let done=0, failed=0, i=0;
-    const loaderMsg = () => {
-      const el = document.getElementById('quiz-loader-msg');
-      if(el) el.textContent = `Loading files (${done}/${refs.length})…`;
-    };
-    async function worker(){
-      while(i < refs.length){
-        const ref = refs[i++];
-        try{
-          const raw = await QUIZ._fetch(ref.fid, ref.key);
-          all.push(...normQ(raw, ref.fid));
-        }catch(e){
-          failed++;
-        }
-        done++;
-        loaderMsg();
-      }
-    }
-    await Promise.all(Array.from({length: Math.min(4, refs.length)}, worker));
-    QUIZ._hideLoader();
-    if(!all.length){toast('❌ No questions loaded. Cache data first if offline.',5000);return}
-    if(failed>0) toast(`⚠️ ${failed} file${failed>1?'s':''} failed to load — starting with ${all.length} questions`);
-    let qsArr=shuf(all);
-    if(type==='exam')qsArr=qsArr.slice(0,100);
-    if(type==='weak'){
-      const wu=new Set(S.wr.map(w=>w.uid));
-      const weak=qsArr.filter(q=>wu.has(q.uid));
-      qsArr=weak.length?weak:qsArr.slice(0,50);
-      if(!weak.length)toast('ℹ️ No wrong answers yet — showing 50 random instead');
-    }
-    QUIZ.startWith(qsArr,type==='exam'?'exam':'flashcard','⚡ Psycho Mode');
-  }
-};
-
-/* ═══════════════ 8. REVIEW LISTS ═══════════════ */
-const REV = {
-  _store(kind){ return kind==='bk'?S.bk : kind==='fl'?S.fl : S.wr; },
-  _lsKey(kind){ return kind==='bk'?LS.BK : kind==='fl'?LS.FL : LS.WR; },
-  _listEl(kind){ return kind==='bk'?'bk-list' : kind==='fl'?'fl-list' : 'wr-list'; },
-
-  _stripHeavy(q){
-    if(!q || !q.img) return q;
-    const {img, imgCaption, ...rest} = q;
-    return rest;
-  },
-
-  toggle(kind, question){
-    const arr = REV._store(kind);
-    const i = arr.findIndex(x=>x.uid===question.uid);
-    if(i>-1){ arr.splice(i,1); toast(kind==='bk'?'⭐ Removed bookmark':'🚩 Removed flag'); }
-    else { arr.push(kind==='bk' ? {...REV._stripHeavy(question), tag:''} : REV._stripHeavy(question)); toast(kind==='bk'?'⭐ Bookmarked':'🚩 Flagged'); }
-    _save(REV._lsKey(kind), arr);
-    HOME.updateBadges();
-    return i===-1;
-  },
-  has(kind, uid){ return REV._store(kind).some(x=>x.uid===uid); },
-  getTag(uid){ return S.bk.find(x=>x.uid===uid)?.tag || ''; },
-  setTag(uid, tag, questionObj){
-    let item = S.bk.find(x=>x.uid===uid);
-    if(!item && questionObj){ item = {...REV._stripHeavy(questionObj), tag: ''}; S.bk.push(item); }
-    if(!item) return;
-    item.tag = tag;
-    _save(LS.BK, S.bk);
-    REV.renderList('bk');
-    HOME.updateBadges?.();
-  },
-
-  addWrong(question){
-    const existing = S.wr.find(x=>x.uid===question.uid);
-    if(existing){ existing._streak = 0; existing._nextDue = Date.now(); _save(LS.WR, S.wr); HOME.updateBadges(); return; }
-    S.wr.push({...REV._stripHeavy(question), _streak:0, _nextDue: Date.now()});
-    _save(LS.WR, S.wr);
-    HOME.updateBadges();
-  },
-  removeWrong(uid){
-    const i=S.wr.findIndex(x=>x.uid===uid);
-    if(i>-1){ S.wr.splice(i,1); _save(LS.WR, S.wr); HOME.updateBadges(); }
-  },
-  trackAnswer(question, isCorrect){
-    if(isCorrect){
-      const item = S.wr.find(x=>x.uid===question.uid);
-      if(!item) return;
-      item._streak = (item._streak||0) + 1;
-      if(item._streak >= SR_INTERVALS.length){ REV.removeWrong(question.uid); }
-      else {
-        const days = SR_INTERVALS[item._streak - 1];
-        item._nextDue = Date.now() + days*24*60*60*1000;
-        _save(LS.WR, S.wr);
-      }
-    } else {
-      REV.addWrong(question);
-    }
-  },
-  dueWrong(){ return S.wr.filter(x => (x._nextDue==null) || x._nextDue <= Date.now()); },
-  dueCount(){ return REV.dueWrong().length; },
-
-  renderList(kind){
-    let arr = REV._store(kind);
-    const el = document.getElementById(REV._listEl(kind));
-    if(!el)return;
-    if(!arr.length){
-      const copy = kind==='bk'
-        ? { i:'<i class="ph ph-star"></i>', t:'No bookmarks yet', s:'Tap the star on any question while studying to save it here.' }
-        : kind==='fl'
-        ? { i:'<i class="ph ph-flag"></i>', t:'No flagged questions yet', s:'Tap the flag on a question you want to come back to.' }
-        : { i:'<i class="ph ph-x-circle"></i>', t:'No wrong answers yet', s:'Questions you miss land here automatically, ready for spaced review.' };
-      el.innerHTML = `<div class="empty"><div class="empty-i">${copy.i}</div><p>${copy.t}</p><p style="font-size:.72rem;color:var(--t3);margin-top:.15rem">${copy.s}</p></div>`;
-      return;
-    }
-    if(kind==='wr'){
-      arr = [...arr].sort((a,b)=>(a._nextDue??0)-(b._nextDue??0));
-    }
-    el.innerHTML = arr.map((q,i)=>{
-      const opts=(q.options||[]).map((o,j)=>{
-        const c=String(j)===String(q.correct)||j===Number(q.correct);
-        return `<div class="eo${c?' shc':''}">${String.fromCharCode(65+j)}) ${esc(o)}</div>`;
-      }).join('');
-      const uidJson = JSON.stringify(String(q.uid||''));
-      const kindJson = JSON.stringify(kind);
-      const tagPicker = kind==='bk' ? `
-        <select class="sel-c" style="margin-top:.4rem;font-size:.7rem;padding:.25rem .4rem;width:auto" onchange='REV.setTag(${uidJson}, this.value)'>
-          <option value="">🏷 No tag</option>
-          ${BK_TAGS.map(t=>`<option value="${t}" ${q.tag===t?'selected':''}>${t}</option>`).join('')}
-        </select>` : '';
-      let srBadge = '';
-      if(kind==='wr'){
-        const isDue = (q._nextDue==null) || q._nextDue<=Date.now();
-        const streak = q._streak||0;
-        if(isDue){ srBadge = `<span class="ctag tr" style="margin-left:.3rem"><i class="ph ph-repeat"></i> Due now</span>`; }
-        else {
-          const daysLeft = Math.ceil((q._nextDue-Date.now())/(24*60*60*1000));
-          srBadge = `<span class="ctag ta" style="margin-left:.3rem">⏳ Due in ${daysLeft}d</span>`;
-        }
-        if(streak>0) srBadge += `<span class="ctag tg" style="margin-left:.3rem"><i class="ph ph-check"></i>×${streak}</span>`;
-      }
-      return `<div class="qcard" style="margin-bottom:.5rem">
-        <div class="qm"><span class="qn mono">#${i+1}</span>
-          ${q.tag ? `<span class="ctag ta" style="margin-left:.3rem"><i class="ph ph-tag"></i> ${esc(q.tag)}</span>` : ''}
-          ${srBadge}
-          ${qSearchHtml(q)}
-          <button class="ib" onclick='REV._removeOne(${kindJson},${uidJson})' title="Remove from review" aria-label="Remove from review"><i class="ph ph-trash"></i></button>
-        </div>
-        <div class="qt" style="font-size:.82rem">${esc(q.q)}</div>
-        ${qImgHtml(q)}
-        <div style="margin-top:.3rem">${opts}</div>
-        ${q.explanation?`<div class="expl show" style="margin-top:.45rem">${esc(q.explanation)}</div>`:''}
-        ${tagPicker}
-      </div>`;
-    }).join('');
-    renderMath(el);
-  },
-  _removeOne(kind, uid){
-    const arr=REV._store(kind);
-    const i=arr.findIndex(x=>x.uid===uid);
-    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();}
-  },
-  clearAll(kind){
-    const prev = JSON.parse(JSON.stringify(REV._store(kind)));
-    if(kind==='bk'){S.bk=[];_save(LS.BK,[]);}
-    else if(kind==='fl'){S.fl=[];_save(LS.FL,[]);}
-    else {S.wr=[];_save(LS.WR,[]);}
-    REV.renderList(kind); HOME.updateBadges();
-    toastUndo('🗑 List cleared', ()=>{
-      if(kind==='bk'){S.bk=prev;_save(LS.BK,prev);}
-      else if(kind==='fl'){S.fl=prev;_save(LS.FL,prev);}
-      else {S.wr=prev;_save(LS.WR,prev);}
-      REV.renderList(kind); HOME.updateBadges();
-      toast('↩️ Restored');
-    });
-  },
-  start(kind, mode, dueOnly){
-    let arr = [...REV._store(kind)];
-    if(kind==='wr' && dueOnly) arr = REV.dueWrong();
-    if(!arr.length){toast(dueOnly?'Nothing due for review right now 🎉':'Nothing to study here yet');return}
-    QUIZ.startWith(shuf(arr), mode, kind==='bk'?'⭐ Bookmarks':kind==='fl'?'🚩 Flagged':(dueOnly?'🔁 Wrong Bank (Due Today)':'❌ Wrong Bank'));
-  }
-};
-
-/* ═══════════════ 9. QUIZ ENGINE ═══════════════ */
-const QUIZ = {
-  async _fetch(fileId, cacheKey, attempt=1){
-    function _validCache(v){
-      if(!v) return false;
-      if(v && typeof v === 'object' && !Array.isArray(v) && v.success === false) return false;
-      return true;
-    }
-    if(!S.online){
-      const cached = await QDB.get(cacheKey);
-      if(_validCache(cached)) return cached;
-      if(cached && !_validCache(cached)) throw new Error('Cached data is invalid (a previous network error was stored). Go online to refresh it.');
-      throw new Error('You are offline and this set is not cached yet. Go to the Offline Cache tab to download it while online.');
-    }
-    try{
-      const timeoutMs = attempt === 1 ? 25000 : 15000;
-      const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId})}`, {redirect:'follow'}, timeoutMs);
-      const text = await r.text();
-      if(text.trim().startsWith('<')){
-        throw new Error('Server returned an HTML page instead of JSON — the Apps Script may be down or requires re-authorisation.');
-      }
-      let data;
-      try{ data = JSON.parse(text); }
-      catch(pe){ throw new Error('Could not parse server response. The file may be corrupted or the server returned an unexpected format.'); }
-      if(data && typeof data === 'object' && !Array.isArray(data) && data.success === true){
-        if(data.result !== undefined) data = data.result;
-        else if(data.data !== undefined) data = data.data;
-        else if(data.questions !== undefined) data = data.questions;
-      }
-      if(data && typeof data === 'object' && !Array.isArray(data) && data.success === false){
-        throw new Error(data.error || 'Server returned an error for this file.');
-      }
-      if(_validCache(data)){
-        // ═══ v1.04 ═══ The IndexedDB write is best-effort. Previously a
-        // storage-full failure THREW, even though the fetch had already
-        // succeeded and the data was in memory. That meant a user with
-        // a full IDB literally could not take a quiz online, which is
-        // nonsense — the offline cache is a nice-to-have, not the point
-        // of an online fetch. Warn once per session, keep the data.
-        const ok = await QDB.set(cacheKey, data);
-        if(!ok && !QUIZ._cacheWarned){
-          QUIZ._cacheWarned = true;
-          toast('⚠️ Device storage is full — quizzes still work, but new sets won\'t be saved for offline use. Clear some cached sets from the Offline Cache tab to free space.', 6000);
-        }
-      }
-      return data;
-    } catch(err){
-      const cached = await QDB.get(cacheKey);
-      if(_validCache(cached)){ toast('📦 Loaded from cache (network error)'); return cached; }
-      if(attempt < 2 && (err.message.includes('timed out') || err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))){
-        toast('⚠️ Slow connection — retrying…');
-        await new Promise(res => setTimeout(res, 1500));
-        return QUIZ._fetch(fileId, cacheKey, attempt + 1);
-      }
-      throw err;
-    }
-  },
-  _cacheWarned: false,
-
-  async load(fileId, cacheKey, mode, chapterName, scope=null){
-    if(!S.online || S.forcedOffline){
-      const cached = await QDB.get(cacheKey);
-      const isValid = cached && !(typeof cached === 'object' && !Array.isArray(cached) && cached.success === false);
-      if(!isValid){
-        QUIZ._showError('You are offline and this set is not cached yet. Go to the Offline Cache tab while online to download it.', null);
-        return;
-      }
-    }
-    QUIZ._showLoader('Connecting to server…');
-    const msgTimer = setTimeout(()=>{ QUIZ._showLoader('Still loading… (Apps Script may be warming up)'); }, 5000);
-    const msgTimer2 = setTimeout(()=>{ QUIZ._showLoader('Taking longer than usual… please wait or check your connection.'); }, 12000);
-    try{
-      const raw = await QUIZ._fetch(fileId, cacheKey);
-      clearTimeout(msgTimer); clearTimeout(msgTimer2);
-      const qsArr = normQ(raw, fileId);
-      QUIZ._hideLoader();
-      if(!qsArr.length){ toast('❌ No valid questions found in this file. Check the file format.'); return; }
-      QUIZ.startWith(qsArr, mode, chapterName, scope);
-    } catch(err){
-      clearTimeout(msgTimer); clearTimeout(msgTimer2);
-      QUIZ._hideLoader();
-      const msg = err.message==='OFFLINE'
-        ? 'You are offline and this set is not cached. Download it first from the Offline Cache tab.'
-        : err.message;
-      QUIZ._showError(msg, ()=>QUIZ.load(fileId, cacheKey, mode, chapterName, scope));
-    }
-  },
-
-  _showError(msg, retryFn){
-    let el = document.getElementById('quiz-error-card');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'quiz-error-card';
-      el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:1.5rem';
-      document.body.appendChild(el);
-    }
-    el._retry = retryFn || null;
-    el.innerHTML = `<div style="background:var(--c2);border:1px solid var(--bad-bd);border-radius:var(--r3);padding:1.4rem 1.5rem;max-width:380px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true">
-      <div style="font-size:1.4rem;margin-bottom:.5rem"><i class="ph ph-x-circle"></i></div>
-      <div style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--ros);margin-bottom:.6rem">Failed to Load</div>
-      <div style="font-size:.78rem;color:var(--t2);line-height:1.6;margin-bottom:1rem">${esc(msg)}</div>
-      <div style="display:flex;gap:.5rem">
-        <button id="quiz-err-retry" style="flex:1;padding:.58rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r1);color:var(--on-accent);font-weight:700;font-size:.82rem;cursor:pointer;font-family:var(--ff)"><i class="ph ph-arrow-clockwise"></i> Retry</button>
-        <button id="quiz-err-close" style="padding:.58rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.82rem;cursor:pointer;font-family:var(--ff)"><i class="ph ph-x"></i> Close</button>
-      </div>
-    </div>`;
-    el.style.display = 'flex';
-    document.getElementById('quiz-err-retry').onclick = ()=>{ el.remove(); if(el._retry) el._retry(); };
-    document.getElementById('quiz-err-close').onclick = ()=> el.remove();
-  },
-
-  _showLoader(msg){
-    let el = document.getElementById('quiz-loader');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'quiz-loader';
-      el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:1rem;backdrop-filter:blur(4px)';
-      el.innerHTML = '<div style="width:44px;height:44px;border:4px solid rgba(255,255,255,.2);border-top-color:var(--neon);border-radius:50%;animation:spin 0.8s linear infinite"></div><div id="quiz-loader-msg" style="color:#fff;font-size:.9rem;font-weight:600;text-align:center;padding:0 1.5rem"></div>';
-      document.body.appendChild(el);
-      if(!document.getElementById('quiz-loader-style')){
-        const st = document.createElement('style');
-        st.id = 'quiz-loader-style';
-        st.textContent = '@keyframes spin{to{transform:rotate(360deg)}}';
-        document.head.appendChild(st);
-      }
-    }
-    document.getElementById('quiz-loader-msg').textContent = msg || 'Loading…';
-    el.style.display = 'flex';
-  },
-  // ═══ v1.04 ═══ Now actually REMOVES the loader element rather than
-  // merely hiding it. The old "hide but keep in DOM" approach meant
-  // _anyModalOpen()'s presence-based check stayed true forever after the
-  // first quiz, permanently disabling every keyboard shortcut.
-  _hideLoader(){
-    const el = document.getElementById('quiz-loader');
-    if(el) el.remove();
-  },
-
-  startWith(qsArr, mode, chapterName, scope=null){
-    if(!qsArr || !qsArr.length){ toast('No questions to study'); return; }
-    QUIZ._stopTimer();
-    if(qsArr.length > 20){
-      QUIZ._showLimitPicker(qsArr, mode, chapterName, scope);
-      return;
-    }
-    QUIZ._doStart(qsArr, mode, chapterName, true, scope);
-  },
-
-  _showLimitPicker(qsArr, mode, chapterName, scope=null){
-    if(document.getElementById('quiz-limit-modal')) return;
-    const total = qsArr.length;
-    const presets = [10,20,30,50].filter(n=>n<total);
-    const modal = document.createElement('div');
-    modal.id = 'quiz-limit-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1.5rem;backdrop-filter:blur(4px)';
-    // ═══ v1.04 ═══ Shuffle checkbox default is now UNCHECKED in the
-    // markup AND the picker refuses to enable it for weekly sets —
-    // see _doStart's shuffle-lock comment for why.
-    const isWeekly = !!(scope && scope.weeklyId);
-    modal.innerHTML = `
-      <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.5rem;max-width:340px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true" aria-labelledby="qlm-title">
-        <div style="font-size:1.2rem;margin-bottom:.35rem">${mode==='exam'?'<i class="ph ph-note-pencil"></i>':'<i class="ph ph-lightning"></i>'}</div>
-        <div id="qlm-title" style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--t1);margin-bottom:.2rem">${esc(chapterName||'Quiz')}</div>
-        <div style="font-size:.74rem;color:var(--t3);margin-bottom:1rem">${pluralize(total,'question')} available — how many do you want to do?</div>
-        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem">
-          ${presets.map(n=>`<button data-qn="${n}" class="qlm-preset" style="padding:.35rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.76rem;cursor:pointer;font-family:var(--ff)">${n}</button>`).join('')}
-          <button data-qn="${total}" class="qlm-preset" style="padding:.35rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.76rem;cursor:pointer;font-family:var(--ff)">All ${total}</button>
-        </div>
-        <input id="qlm-inp" type="number" min="1" max="${total}" value="${isWeekly ? total : Math.min(20,total)}"
-          style="width:100%;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r2);padding:.5rem .75rem;color:var(--t1);font-size:.9rem;font-family:var(--ff);outline:none;box-sizing:border-box;margin-bottom:.6rem" ${isWeekly ? 'readonly' : ''}>
-        <label style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem;cursor:pointer;font-size:.8rem;color:var(--t2);${isWeekly?'opacity:.55':''}">
-          <input id="qlm-shuffle" type="checkbox" ${isWeekly?'disabled':''} style="width:16px;height:16px;accent-color:var(--amb);cursor:pointer">
-          <i class="ph ph-shuffle"></i> Shuffle question order
-        </label>
-        <div style="display:flex;gap:.4rem">
-          <button id="qlm-start" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:var(--on-accent);font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Start →</button>
-          <button id="qlm-cancel" style="padding:.62rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.83rem;cursor:pointer;font-family:var(--ff)"><i class="ph ph-x"></i></button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e=>{ if(e.target===modal) modal.remove(); });
-    document.querySelectorAll('#quiz-limit-modal .qlm-preset').forEach(btn=>{
-      btn.onclick = ()=>{ document.getElementById('qlm-inp').value = btn.dataset.qn; };
-    });
-    document.getElementById('qlm-cancel').onclick = ()=> modal.remove();
-    document.getElementById('qlm-start').onclick = ()=>{
-      const n = Math.min(total, Math.max(1, parseInt(document.getElementById('qlm-inp').value)||total));
-      const doShuffle = document.getElementById('qlm-shuffle').checked;
-      modal.remove();
-      const picked = doShuffle ? shuf(qsArr).slice(0,n) : qsArr.slice(0,n);
-      QUIZ._doStart(picked, mode, chapterName, false, scope);
-    };
-  },
-
-  _doStart(qsArr, mode, chapterName, doShuffle=true, scope=null){
-    // ═══ v1.04 ═══ Review mode + shuffle-lock.
-    //
-    // Review mode: pre-fill S.quiz.ans from the recorded attempt so the
-    // existing answered-option rendering (shc / bad2 classes) lights up
-    // the right options without any rendering changes. Set reviewOnly so
-    // fcAnswer/fcNav/fcFinish refuse to mutate state.
-    //
-    // Shuffle-lock: any quiz with a weeklyId in scope has its shuffle
-    // FORCED OFF regardless of what the picker said. This is the only
-    // way the stored answers[] array (indices into the shuffled order
-    // that was actually taken) can still align with the freshly-fetched
-    // question array on review. Without it, review mode would show
-    // correct-answer highlights against the wrong questions.
-    const isWeekly = !!(scope && scope.weeklyId);
-    const reviewMode = !!(scope && scope.weeklyReviewMode);
-    const effectiveShuffle = isWeekly ? false : doShuffle;
-
-    const presetAnswers = reviewMode && scope.weeklyAttempt
-      ? (scope.weeklyAttempt.answers || []).slice()
-      : null;
-
-    const modeLabel = reviewMode
-      ? '👁️ Review'
-      : (mode==='exam' ? '📝 Exam' : '⚡ Flashcard');
-    toast(`${modeLabel} — ${qsArr.length} question${qsArr.length!==1?'s':''} · ${chapterName||'Study'}`, 2500);
-
-    const examSeconds = (mode==='exam' && !reviewMode) ? qsArr.length*90 : 0;
-    S.quiz = {
-      qs: effectiveShuffle ? shuf(qsArr) : [...qsArr],
-      // If preset answers came from a different question count (the
-      // source file was edited after the attempt), fall back to a fresh
-      // array — review still renders, just without pre-filled state.
-      ans: (presetAnswers && presetAnswers.length === qsArr.length)
-        ? presetAnswers.slice()
-        : new Array(qsArr.length).fill(null),
-      mode: reviewMode ? 'flashcard' : mode,
-      idx:0, timer:null, elapsed:0,
-      left: examSeconds,
-      examEndAt: mode==='exam' ? Date.now() + examSeconds*1000 : 0,
-      active:true, ch: chapterName||'Study', scope, skipped:new Set(), shown:new Set(),
-      startedAt: Date.now(),
-      reviewOnly: reviewMode
-    };
-    document.getElementById('quiz-wrap').style.display='';
-    document.querySelectorAll('.view').forEach(e=>e.classList.remove('on'));
-    window.scrollTo(0,0);
-    try{
-      if(mode==='exam' && !reviewMode){
-        document.getElementById('fc-wrap').style.display='none';
-        document.getElementById('ex-wrap').style.display='';
-        document.getElementById('res-wrap').style.display='none';
-        QUIZ._renderExam();
-      } else {
-        document.getElementById('ex-wrap').style.display='none';
-        document.getElementById('fc-wrap').style.display='';
-        document.getElementById('res-wrap').style.display='none';
-        QUIZ._renderFlashcard();
-      }
-    } catch(err){
-      console.error('[QUIZ._doStart] render failed:', err);
-      S.quiz.active = false;
-      document.getElementById('quiz-wrap').style.display = 'none';
-      toast('❌ Could not display this quiz — one of the questions may be malformed. Try a different set.', 5000);
-      return;
-    }
-    if(!reviewMode) QUIZ._startTimer();
-    if(mode==='exam' && !reviewMode) QUIZ._snapshotExam(true);
-  },
-
-  daily(){
-    const refs = ChapterData.allFileRefs();
-    if(!refs.length){ toast('No content configured yet'); return; }
-    toast('⏳ Building today\'s challenge…');
-    (async()=>{
-      const picks = shuf(refs).slice(0, Math.min(10, refs.length));
-      const all = [];
-      let failed = 0;
-      for(const ref of picks){
-        try{
-          const raw = await QUIZ._fetch(ref.fid, ref.key);
-          const qs2 = normQ(raw, ref.fid);
-          all.push(...qs2);
-        }catch(e){
-          failed++;
-          console.warn('[daily] Failed to load', ref.key, e.message);
-        }
-      }
-      if(!all.length){ toast('❌ Could not load daily challenge — try caching data first'); return; }
-      if(failed>0) toast(`⚠️ ${failed} file(s) failed — challenge uses ${all.length} questions`);
-      const qsArr = shuf(all).slice(0,30);
-      QUIZ.startWith(qsArr, 'flashcard', '🌟 Daily Challenge');
-      STREAK.markToday();
-    })();
-  },
-
-  async adaptive(){
-    const TARGET = 25;
-    const seen = new Set();
-    const pool = [];
-    const addAll = list => { for(const q of list){ if(q && q.uid && !seen.has(q.uid)){ seen.add(q.uid); pool.push(q); } } };
-
-    addAll(REV.dueWrong());
-    addAll(S.bk.filter(q => q.tag==='Confusing' || q.tag==='Need Check'));
-
-    if(pool.length >= TARGET){
-      QUIZ.startWith(shuf(pool).slice(0,TARGET), 'flashcard', '🎯 Adaptive Practice');
-      return;
-    }
-
-    const refs = ChapterData.allFileRefs();
-    if(!refs.length){
-      if(pool.length){ QUIZ.startWith(shuf(pool), 'flashcard', '🎯 Adaptive Practice'); return; }
-      toast('No content configured yet'); return;
-    }
-    toast('⏳ Building your adaptive practice set…');
-    const need = TARGET - pool.length;
-    const picks = shuf(refs).slice(0, Math.min(8, refs.length));
-    let failed = 0;
-    const stopAt = pool.length + need*2;
-    for(const ref of picks){
-      if(pool.length >= stopAt) break;
-      try{
-        const raw = await QUIZ._fetch(ref.fid, ref.key);
-        addAll(normQ(raw, ref.fid));
-      }catch(e){
-        failed++;
-        console.warn('[adaptive] Failed to load', ref.key, e.message);
-      }
-    }
-    if(!pool.length){ toast('❌ Could not build a practice set — try caching data first'); return; }
-    if(failed>0) toast(`⚠️ ${failed} file(s) failed — practice set uses what loaded`);
-    QUIZ.startWith(shuf(pool).slice(0,TARGET), 'flashcard', '🎯 Adaptive Practice');
-  },
-
-  _startTimer(){
-    QUIZ._stopTimer();
-    S.quiz.timer = setInterval(()=>{
-      if(!S.quiz.active)return;
-      if(S.quiz.mode==='exam'){
-        S.quiz.left = Math.max(0, Math.round((S.quiz.examEndAt - Date.now())/1000));
-        const tEl=document.getElementById('ex-tmr'); if(tEl) tEl.textContent=fmt(S.quiz.left);
-        if(S.quiz.left<=0){ toast('⏰ Time\'s up!'); QUIZ.submitExam(); return; }
-        if(S.quiz.left % 15 === 0) QUIZ._snapshotExam();
-      } else {
-        S.quiz.elapsed++;
-        const tEl=document.getElementById('fc-tmr'); if(tEl) tEl.textContent=fmt(S.quiz.elapsed);
-      }
-    },1000);
-  },
-  _stopTimer(){ if(S.quiz.timer){ clearInterval(S.quiz.timer); S.quiz.timer=null; } },
-
-  _lastSnapAt: 0,
-  _SNAPSHOT_SIZE_CEILING: 2 * 1024 * 1024,
-  _snapshotExam(force){
-    if(!S.quiz || !S.quiz.active || S.quiz.mode!=='exam' || !S.user) return;
-    const now = Date.now();
-    if(!force && (now - QUIZ._lastSnapAt) < 3000) return;
-    QUIZ._lastSnapAt = now;
-    const header = {
-      username: S.user.username,
-      ch: S.quiz.ch,
-      ans: S.quiz.ans,
-      left: S.quiz.left,
-      scope: S.quiz.scope || null,
-      startedAt: S.quiz.startedAt || now,
-      savedAt: now
-    };
-    const fullSnap = { ...header, qs: S.quiz.qs };
-    let fullJson = null;
-    try{ fullJson = JSON.stringify(fullSnap); }catch(e){}
-    if(fullJson && fullJson.length < QUIZ._SNAPSHOT_SIZE_CEILING){
-      _save(LS.EXAM_SNAP, fullSnap);
-      return;
-    }
-    const liteQs = S.quiz.qs.map(q => { const { img, imgCaption, ...rest } = q; return rest; });
-    _save(LS.EXAM_SNAP, { ...header, qs: liteQs });
-  },
-  _clearExamSnapshot(){ localStorage.removeItem(LS.EXAM_SNAP); },
-
-  checkResumableExam(){
-    const snap = _load(LS.EXAM_SNAP, null);
-    if(!snap || !S.user || snap.username !== S.user.username || !snap.qs || !snap.qs.length){
-      if(snap) QUIZ._clearExamSnapshot();
-      return;
-    }
-    // ═══ v1.04 ═══ Weekly sets are one-attempt-only. If a snapshot
-    // exists for one, discard it silently — resuming would bypass the
-    // one-shot rule (the student already effectively "left" the exam,
-    // and the exam window is what defines their window to complete it).
-    if(snap.scope && snap.scope.weeklyId){
-      QUIZ._clearExamSnapshot();
-      return;
-    }
-    const elapsedSinceSave = Math.floor((Date.now() - snap.savedAt) / 1000);
-    const adjustedLeft = snap.left - elapsedSinceSave;
-
-    if(adjustedLeft <= 0){
-      QUIZ._resumeSnapshot(snap, 0);
-      toast('⏰ Your exam timer ran out while you were away — showing your results.');
-      QUIZ.submitExam();
-      return;
-    }
-
-    const answered = snap.ans.filter(a=>a!==null).length;
-    const modal = document.createElement('div');
-    modal.id = 'exam-resume-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1.5rem;backdrop-filter:blur(4px)';
-    modal.innerHTML = `
-      <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.5rem;max-width:340px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true">
-        <div style="font-size:1.2rem;margin-bottom:.35rem"><i class="ph ph-note-pencil"></i></div>
-        <div style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--t1);margin-bottom:.2rem">Unfinished exam found</div>
-        <div style="font-size:.78rem;color:var(--t3);margin-bottom:1rem">${esc(snap.ch)} — ${answered}/${snap.qs.length} answered, ${fmt(adjustedLeft)} left on the clock. This was probably interrupted by a reload or a closed tab.</div>
-        <div style="display:flex;gap:.4rem">
-          <button id="exam-resume-btn" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:var(--on-accent);font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">▶️ Resume</button>
-          <button id="exam-discard-btn" style="padding:.62rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.83rem;cursor:pointer;font-family:var(--ff)">Discard</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    document.getElementById('exam-resume-btn').onclick = ()=>{
-      modal.remove();
-      QUIZ._resumeSnapshot(snap, adjustedLeft);
-    };
-    document.getElementById('exam-discard-btn').onclick = ()=>{
-      if(!confirm(`Discard this exam? You'll lose ${answered}/${snap.qs.length} answered question${answered!==1?'s':''} — this can't be undone.`)) return;
-      modal.remove();
-      QUIZ._clearExamSnapshot();
-    };
-  },
-  _resumeSnapshot(snap, adjustedLeft){
-    const originalTotal = (snap.qs.length * 90);
-    const spentBeforeSnap = Math.max(0, originalTotal - (snap.left||0));
-    const startedAt = snap.startedAt || (snap.savedAt - spentBeforeSnap*1000) || Date.now();
-    S.quiz = {
-      qs: snap.qs, ans: snap.ans, mode:'exam', idx:0, timer:null, elapsed:0,
-      left: adjustedLeft,
-      examEndAt: Date.now() + adjustedLeft*1000,
-      active:true, ch: snap.ch, skipped:new Set(), shown:new Set(),
-      scope: snap.scope || null, startedAt,
-      reviewOnly: false
-    };
-    document.getElementById('quiz-wrap').style.display='';
-    document.querySelectorAll('.view').forEach(e=>e.classList.remove('on'));
-    document.getElementById('fc-wrap').style.display='none';
-    document.getElementById('ex-wrap').style.display='';
-    document.getElementById('res-wrap').style.display='none';
-    QUIZ._renderExam();
-    QUIZ._startTimer();
-    toast('▶️ Exam resumed');
-  },
-
-  quit(){
-    QUIZ._exitGuard(()=>{ UI._goRaw('home'); });
-  },
-
-  _exitGuard(afterQuit){
-    if(document.getElementById('quiz-exit-modal')) return;
-    const modal = document.createElement('div');
-    modal.id = 'quiz-exit-modal';
-    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1.5rem;backdrop-filter:blur(4px)';
-    const isExam = S.quiz.mode === 'exam';
-    const isReview = !!S.quiz.reviewOnly;
-    const answered = S.quiz.ans.filter(a=>a!==null).length;
-    const total = S.quiz.qs.length;
-    // ═══ v1.04 ═══ Weekly exams only get one shot, so the "leave the
-    // quiz?" dialog intentionally offers no "resume later" path (there
-    // isn't one) and warns that leaving abandons the single attempt.
-    const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
-    const heading = isReview
-      ? 'Exit review?'
-      : (isWeekly && isExam ? 'Leave this weekly exam?' : 'Leave this quiz?');
-    const body = isReview
-      ? `You're viewing your recorded results for ${esc(S.quiz.ch)}.`
-      : isWeekly && isExam
-        ? `You only get ONE attempt at this weekly set. Leaving now abandons your one shot — the exam window keeps running and you won't be able to start over. ${answered} of ${total} answered so far.`
-        : (isExam ? answered+' of '+total+' answered' : 'Question '+(S.quiz.idx+1)+' of '+total);
-    modal.innerHTML = `
-      <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.5rem;max-width:340px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true">
-        <div style="font-size:1.3rem;margin-bottom:.4rem"><i class="ph ph-warning"></i></div>
-        <div style="font-family:var(--fd);font-size:.95rem;font-weight:700;color:var(--t1);margin-bottom:.3rem">${heading}</div>
-        <div style="font-size:.76rem;color:var(--t3);margin-bottom:1.1rem">${body}</div>
-        <div style="display:flex;flex-direction:column;gap:.45rem">
-          ${isExam && !isReview ? '<button id="qem-finish" style="padding:.62rem;background:var(--ok-bg);border:1px solid var(--ok-bd);border-radius:var(--r2);color:var(--grn);font-weight:700;font-size:.83rem;cursor:pointer;font-family:var(--ff);text-align:left"><i class="ph ph-check-circle"></i> Submit & See Results — grade what I have answered so far</button>' : ''}
-          <button id="qem-quit" style="padding:.62rem;background:var(--bad-bg);border:1px solid var(--bad-bd);border-radius:var(--r2);color:var(--ros);font-weight:700;font-size:.83rem;cursor:pointer;font-family:var(--ff);text-align:left"><i class="ph ph-door"></i> ${isReview ? 'Exit review' : 'Quit — discard this session'}</button>
-          <button id="qem-cancel" style="padding:.62rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-weight:600;font-size:.83rem;cursor:pointer;font-family:var(--ff);text-align:left">↩ Cancel — keep studying</button>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-    const close = ()=> modal.remove();
-    if(isExam && !isReview){
-      document.getElementById('qem-finish').onclick = ()=>{ close(); QUIZ.submitExam(); };
-    }
-    document.getElementById('qem-quit').onclick = ()=>{
-      close();
-      QUIZ._stopTimer();
-      if(isExam && !isReview) QUIZ._clearExamSnapshot();
-      S.quiz.active = false;
-      document.getElementById('quiz-wrap').style.display = 'none';
-      if(afterQuit) afterQuit();
-    };
-    document.getElementById('qem-cancel').onclick = close;
-    modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
-  },
-
-  /* ── FLASHCARD MODE ── */
-  _renderFlashcard(){
-    const q = S.quiz.qs[S.quiz.idx];
-    if(!q)return;
-    try{
-      document.getElementById('fc-chip').textContent = '⚡ ' + S.quiz.ch;
-      document.getElementById('fc-ctr').textContent = `${S.quiz.idx+1}/${S.quiz.qs.length}`;
-      document.getElementById('fc-pf').style.width = `${((S.quiz.idx)/S.quiz.qs.length)*100}%`;
-      document.getElementById('fc-qn').textContent = 'Q'+(S.quiz.idx+1);
-      document.getElementById('fc-q').textContent = q.q;
-      const fcImgWrap = document.getElementById('fc-img-wrap');
-      const fcImg = document.getElementById('fc-img');
-      if(q.img && fcImgWrap && fcImg){ fcImg.src = q.img; fcImg.alt = q.imgCaption || 'Question figure'; fcImgWrap.style.display = ''; }
-      else if(fcImgWrap){ fcImgWrap.style.display = 'none'; }
-
-      const isStarred = REV.has('bk', q.uid), isFlagged = REV.has('fl', q.uid);
-      // ═══ v1.04 ═══ In review mode, bookmark/flag/tag controls are
-      // hidden entirely — the student is viewing a locked attempt, not
-      // studying the set for the first time. Search and report stay.
-      const reviewControls = S.quiz.reviewOnly ? '' : `
-        <button class="ib ${isStarred?'bk-on':''}" onclick="QUIZ._star()" title="Bookmark" aria-label="Bookmark this question" aria-pressed="${isStarred?'true':'false'}"><i class="ph ph-star"></i></button>
-        <button class="ib ${isFlagged?'fl-on':''}" onclick="QUIZ._flag()" title="Flag" aria-label="Flag this question" aria-pressed="${isFlagged?'true':'false'}"><i class="ph ph-flag"></i></button>
-      `;
-      document.getElementById('fc-acts').innerHTML = `
-        ${reviewControls}
-        <button class="ib" onclick="QUIZ._reportCurrent()" title="Report an issue with this question" aria-label="Report an issue with this question"><i class="ph ph-warning-circle"></i></button>
-        ${qSearchHtml(q)}
-        ${S.quiz.reviewOnly ? '' : `<select class="sel-c" style="font-size:.68rem;padding:.2rem .35rem;width:auto" onchange="QUIZ._tagCurrent(this.value)">
-          <option value="">🏷 Tag…</option>
-          ${BK_TAGS.map(t=>`<option value="${t}" ${REV.getTag(q.uid)===t?'selected':''}>${t}</option>`).join('')}
-        </select>`}
-      `;
-
-      const ansIdx = S.quiz.ans[S.quiz.idx];
-      const answered = ansIdx !== null;
-      const optsEl = document.getElementById('fc-opts');
-      optsEl.innerHTML = q.options.map((opt,i)=>{
-        let cls='eo';
-        let isSelected = false;
-        if(answered){
-          const isCorrect = isOk(i, q.correct);
-          isSelected = i===ansIdx;
-          if(isCorrect) cls += ' shc';
-          else if(isSelected) cls += ' bad2';
-        }
-        // Review mode: options are never clickable at all — pointer-events
-        // off and tabindex -1 so keyboard nav can't reach them either.
-        const blocked = answered || S.quiz.reviewOnly;
-        return `<div class="${cls}" role="button" tabindex="${blocked?-1:0}" aria-pressed="${isSelected}" aria-label="Option ${String.fromCharCode(65+i)}: ${esc(opt)}${isSelected?', selected':''}" onclick="${blocked?'':'QUIZ.fcAnswer('+i+')'}" onkeydown="if((event.key==='Enter'||event.key===' ')&&!${blocked}){event.preventDefault();QUIZ.fcAnswer(${i})}" style="${blocked?'cursor:default;pointer-events:none':''}">
-          <div class="ok">${String.fromCharCode(65+i)}</div><div>${esc(opt)}</div>
-        </div>`;
-      }).join('');
-
-      const expl = document.getElementById('fc-expl');
-      if(answered && q.explanation){ expl.textContent = q.explanation; expl.classList.add('show'); }
-      else { expl.classList.remove('show'); expl.textContent=''; }
-
-      document.getElementById('fc-hint').textContent = S.quiz.reviewOnly
-        ? 'Review mode — answers locked'
-        : (answered ? 'Use Next →' : 'Tap an option to answer');
-      document.getElementById('fc-prev').disabled = S.quiz.idx===0;
-      // ═══ v1.04 ═══ Review mode's forward button says "Exit Review"
-      // instead of "Finish ✔" so the student doesn't think they're
-      // submitting something.
-      document.getElementById('fc-next').textContent = S.quiz.reviewOnly
-        ? (S.quiz.idx===S.quiz.qs.length-1 ? 'Exit Review' : 'Next →')
-        : (S.quiz.idx===S.quiz.qs.length-1 ? 'Finish ✔' : 'Next →');
-
-      QUIZ._updateFcCounts();
-      renderMath(document.getElementById('fc-wrap'));
-    } catch(err){
-      console.error('[QUIZ._renderFlashcard] question at idx', S.quiz.idx, 'failed to render:', err, q);
-      toast('⚠️ Skipped a malformed question', 2000);
-      if(S.quiz.idx < S.quiz.qs.length-1){ S.quiz.idx++; QUIZ._renderFlashcard(); }
-      else QUIZ.fcFinish();
-    }
-  },
-  _updateFcCounts(){
-    let ok=0,bad=0,skip=0;
-    S.quiz.ans.forEach((a,i)=>{
-      if(a===null){ if(S.quiz.shown?.has(i)) skip++; return; }
-      if(isOk(a, S.quiz.qs[i].correct)) ok++; else bad++;
-    });
-    document.getElementById('fc-ok').textContent=ok;
-    document.getElementById('fc-bad').textContent=bad;
-    document.getElementById('fc-skip').textContent=skip;
-  },
-  fcAnswer(i){
-    // ═══ v1.04 ═══ Review mode is read-only — never overwrite a
-    // recorded answer. This is the primary guard; the click handler
-    // above is a defence-in-depth second layer.
-    if(S.quiz.reviewOnly) return;
-    if(S.quiz.ans[S.quiz.idx]!==null)return;
-    S.quiz.ans[S.quiz.idx]=i;
-    const q=S.quiz.qs[S.quiz.idx];
-    const correct=isOk(i,q.correct);
-    if(correct){ PROG.track(true); REV.trackAnswer(q, true); }
-    else { PROG.track(false); REV.trackAnswer(q, false); }
-    QUIZ._renderFlashcard();
-  },
-  fcNav(dir){
-    // ═══ v1.04 ═══ Review mode: don't track shown state (there's no
-    // "skipped" concept when every answer is pre-filled from the
-    // recorded attempt — showing them as skipped would be wrong).
-    if(!S.quiz.reviewOnly){
-      if(!S.quiz.shown) S.quiz.shown=new Set();
-      S.quiz.shown.add(S.quiz.idx);
-    }
-    const next = S.quiz.idx+dir;
-    if(next<0)return;
-    if(next>=S.quiz.qs.length){ QUIZ.fcFinish(); return; }
-    S.quiz.idx=next;
-    QUIZ._renderFlashcard();
-  },
-  _star(){
-    if(S.quiz.reviewOnly) return;
-    const q=S.quiz.qs[S.quiz.idx];
-    REV.toggle('bk', q);
-    QUIZ._renderFlashcard();
-  },
-  _flag(){
-    if(S.quiz.reviewOnly) return;
-    const q=S.quiz.qs[S.quiz.idx];
-    REV.toggle('fl', q);
-    QUIZ._renderFlashcard();
-  },
-  _reportCurrent(){
-    const q = S.quiz.qs?.[S.quiz.idx];
-    if(!q){ toast('No question to report.'); return; }
-    openMod('Report an issue', `
-      <div class="sf"><label for="qr-reason">What's wrong?</label>
-        <select id="qr-reason">
-          <option value="wrong_answer">The marked answer looks wrong</option>
-          <option value="unclear">The question or options are unclear</option>
-          <option value="typo">Typo or formatting issue</option>
-          <option value="other">Something else</option>
-        </select>
-      </div>
-      <div class="sf"><label for="qr-note">Details (optional)</label><textarea id="qr-note" rows="3" placeholder="Anything that would help — e.g. which option you think is actually correct"></textarea></div>
-      <button class="btn" id="qr-send-btn">Send Report</button>
-    `);
-    const sendBtn = document.getElementById('qr-send-btn');
-    if(sendBtn) sendBtn.onclick = ()=> QUIZ._submitReport(q.uid);
-  },
-  async _submitReport(uid){
-    const q = (S.quiz.qs||[]).find(x=>x.uid===uid) || S.quiz.qs?.[S.quiz.idx];
-    const reason = document.getElementById('qr-reason')?.value || 'other';
-    const note = (document.getElementById('qr-note')?.value || '').trim();
-    if(!S.user?.username || !S.user?.token){ toast('❌ Please log in again to report a question.'); return; }
-    closeMod();
-    toast('Sending report…');
-    try{
-      const r = await netFetch(`${APPS}?${qs({
-        action:'reportQuestion', username:S.user.username, token:S.user.token,
-        uid, reason, note, questionSnapshot: (q?.q||'').slice(0,1000)
-      })}`, {redirect:'follow'}, 15000);
-      const res = await r.json();
-      if(res.success) toast('✅ ' + (res.message || 'Thanks — report sent.'));
-      else toast('❌ ' + (res.error || 'Could not send report.'));
-    }catch(e){
-      toast('⚠️ Could not send report — check your connection and try again.');
-    }
-  },
-  _tagCurrent(tag){
-    if(S.quiz.reviewOnly) return;
-    const q=S.quiz.qs[S.quiz.idx];
-    if(!q) return;
-    REV.setTag(q.uid, tag, q);
-    QUIZ._renderFlashcard();
-  },
-  fcFinish(){
-    QUIZ._stopTimer();
-    S.quiz.active=false;
-    // ═══ v1.04 ═══ Review mode exits silently — no session recorded,
-    // no streak advanced, no results card. The student is looking at
-    // an already-recorded attempt; making that look like a new
-    // submission would corrupt their stats and (worse) their streak.
-    if(S.quiz.reviewOnly){
-      document.getElementById('quiz-wrap').style.display = 'none';
-      UI._goRaw('home');
-      return;
-    }
-    STREAK.markToday();
-    QUIZ._showResults();
-  },
-
-  /* ── EXAM MODE ── */
-  _renderExam(){
-    document.getElementById('ex-chip').textContent = '📝 ' + S.quiz.ch;
-    document.getElementById('ex-tmr').textContent = fmt(S.quiz.left);
-    const el = document.getElementById('ex-qs');
-    el.innerHTML = S.quiz.qs.map((q,qi)=>{
-      const savedAns = S.quiz.ans[qi];
-      return `
-      <div class="eqc${savedAns!==null?' answered':''}" id="eqc-${qi}">
-        <div class="qm"><span class="qn mono">Q${qi+1}</span>${qSearchHtml(q)}</div>
-        <div class="qt" style="font-size:.85rem">${esc(q.q)}</div>
-        ${qImgHtml(q)}
-        ${q.options.map((opt,oi)=>{
-          const sel = savedAns===oi;
-          return `<div class="eo${sel?' sel':''}" role="button" tabindex="0" aria-pressed="${sel}" aria-label="Option ${String.fromCharCode(65+oi)}: ${esc(opt)}" onclick="QUIZ.exAnswer(${qi},${oi})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();QUIZ.exAnswer(${qi},${oi})}" id="eo-${qi}-${oi}">
-            <div class="ok">${String.fromCharCode(65+oi)}</div><div>${esc(opt)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    `}).join('');
-    renderMath(el);
-    const answeredCount = S.quiz.ans.filter(a=>a!==null).length;
-    document.getElementById('ex-ctr').textContent = `${answeredCount}/${S.quiz.qs.length}`;
-    document.getElementById('ex-ans').textContent = answeredCount;
-    document.getElementById('ex-pf').style.width = `${(answeredCount/S.quiz.qs.length)*100}%`;
-    QUIZ._updateSkippedNav();
-  },
-  exAnswer(qi, oi){
-    if(!S.quiz.active)return;
-    S.quiz.ans[qi]=oi;
-    document.querySelectorAll(`#eqc-${qi} .eo`).forEach((e,i)=>{
-      const sel = i===oi;
-      e.classList.toggle('sel', sel);
-      e.setAttribute('aria-pressed', String(sel));
-    });
-    document.getElementById(`eqc-${qi}`).classList.add('answered');
-    const answered = S.quiz.ans.filter(a=>a!==null).length;
-    document.getElementById('ex-ctr').textContent = `${answered}/${S.quiz.qs.length}`;
-    document.getElementById('ex-ans').textContent = answered;
-    document.getElementById('ex-pf').style.width = `${(answered/S.quiz.qs.length)*100}%`;
-    QUIZ._snapshotExam();
-    QUIZ._updateSkippedNav();
-  },
-  _updateSkippedNav(){
-    const btn = document.getElementById('ex-skip-nav');
-    if(!btn) return;
-    const skippedCount = S.quiz.ans.filter(a=>a===null).length;
-    btn.style.display = skippedCount ? '' : 'none';
-    const countEl = document.getElementById('ex-skip-count');
-    if(countEl) countEl.textContent = skippedCount;
-  },
-  jumpToUnanswered(){
-    if(!S.quiz || !S.quiz.qs) return;
-    const total = S.quiz.qs.length;
-    const cards = S.quiz.qs.map((_,i)=>document.getElementById('eqc-'+i)).filter(Boolean);
-    const viewTop = window.scrollY + 80;
-    let startFrom = 0;
-    for(let i=0;i<cards.length;i++){ if(cards[i].offsetTop > viewTop){ startFrom = i; break; } }
-    for(let step=0; step<total; step++){
-      const idx = (startFrom + step) % total;
-      if(S.quiz.ans[idx]===null){
-        document.getElementById('eqc-'+idx)?.scrollIntoView({behavior:'smooth', block:'center'});
-        return;
-      }
-    }
-    toast('🎉 Nothing left unanswered');
-  },
-  submitExam(){
-    if(!S.quiz.active)return;
-    const unanswered = S.quiz.ans.filter(a=>a===null).length;
-    const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
-    // ═══ v1.04 ═══ Weekly exams get a much sterner confirmation —
-    // once submitted, the attempt is final and the student can only
-    // review. Standard exams keep the lenient confirm.
-    if(isWeekly && !confirm(
-      `Submit your WEEKLY SET attempt?\n\n` +
-      `You only get one attempt — after this you can only review your answers.\n` +
-      `${unanswered} question${unanswered===1?'':'s'} left unanswered.`
-    )) return;
-    if(!isWeekly && unanswered>0 && S.quiz.left>0 && !confirm(`${unanswered} question(s) unanswered. Submit anyway?`))return;
-    QUIZ._stopTimer();
-    QUIZ._clearExamSnapshot();
-    S.quiz.active=false;
-    STREAK.markToday();
-    S.quiz.qs.forEach((q,qi)=>{
-      document.querySelectorAll(`#eqc-${qi} .eo`).forEach((e,oi2)=>{
-        e.style.pointerEvents='none';
-        const correct = isOk(oi2,q.correct);
-        if(correct) e.classList.add('shc');
-        else if(oi2===S.quiz.ans[qi]) e.classList.add('bad2');
-      });
-      const correctPick = isOk(S.quiz.ans[qi], q.correct);
-      PROG.track(correctPick);
-      REV.trackAnswer(q, correctPick);
-    });
-    QUIZ._showResults();
-  },
-
-  /* ── RETRY ── */
-  retryWrong(){
-    // Weekly attempts are one-shot — no retry of any kind.
-    if(S.quiz.scope && S.quiz.scope.weeklyId){ toast('🔒 Weekly sets are one attempt only'); return; }
-    const wrongIdx = S.quiz.qs.map((q,i)=>({q,i})).filter(({i})=>!isOk(S.quiz.ans[i], S.quiz.qs[i].correct));
-    if(!wrongIdx.length){ toast('🎉 Nothing to retry — all correct!'); UI.go('home'); return; }
-    QUIZ.startWith(wrongIdx.map(x=>x.q), 'flashcard', S.quiz.ch + ' (Retry)');
-  },
-
-  /* ── RESULTS ── */
-  _showResults(){
-    document.getElementById('fc-wrap').style.display='none';
-    document.getElementById('ex-wrap').style.display='none';
-    document.getElementById('res-wrap').style.display='';
-    const total = S.quiz.qs.length;
-    let correct=0;
-    S.quiz.qs.forEach((q,i)=>{ if(isOk(S.quiz.ans[i], q.correct)) correct++; });
-    const wrong = S.quiz.ans.filter((a,i)=> a!==null && !isOk(a,S.quiz.qs[i].correct)).length;
-    const skipped = S.quiz.ans.filter(a=>a===null).length;
-    const pct = total ? Math.round((correct/total)*100) : 0;
-
-    document.getElementById('res-ring').style.setProperty('--p', pct+'%');
-    document.getElementById('res-pct').textContent = pct+'%';
-    document.getElementById('res-chap').textContent = S.quiz.ch;
-    const grade = pct>=90?'🏆 Outstanding!':pct>=75?'🎯 Great job!':pct>=50?'👍 Keep practicing':'📚 Needs more review';
-    document.getElementById('res-grade').textContent = grade;
-
-    document.getElementById('res-stats').innerHTML = `
-      <div class="sc"><div class="sv tcy">${total}</div><div class="stat-lbl">Total</div></div>
-      <div class="sc"><div class="sv tc2">${correct}</div><div class="stat-lbl">Correct</div></div>
-      <div class="sc"><div class="sv tb2">${wrong}</div><div class="stat-lbl">Wrong</div></div>
-      <div class="sc"><div class="sv ta2">${skipped}</div><div class="stat-lbl">Skipped</div></div>
-    `;
-
-    document.getElementById('res-review').innerHTML = S.quiz.qs.map((q,i)=>{
-      const a = S.quiz.ans[i];
-      const correctPick = isOk(a,q.correct);
-      return `<div class="qcard" style="border-left-color:${correctPick?'var(--ok)':'var(--bad)'}">
-        <div class="qm"><span class="qn mono">Q${i+1}</span><span class="ctag ${correctPick?'tg':'tr'}">${correctPick?'Correct':a===null?'Skipped':'Wrong'}</span>${qSearchHtml(q)}</div>
-        <div class="qt" style="font-size:.82rem">${esc(q.q)}</div>
-        ${qImgHtml(q)}
-        ${q.options.map((opt,oi)=>{
-          let cls='eo';
-          if(isOk(oi,q.correct)) cls+=' shc';
-          else if(oi===a) cls+=' bad2';
-          return `<div class="${cls}" style="cursor:default;pointer-events:none"><div class="ok">${String.fromCharCode(65+oi)}</div><div>${esc(opt)}</div></div>`;
-        }).join('')}
-        ${q.explanation?`<div class="expl show">${esc(q.explanation)}</div>`:''}
-      </div>`;
-    }).join('');
-    renderMath(document.getElementById('res-review'));
-
-    if(pct>=70 && window.confetti){ confetti({particleCount:90,spread:75,origin:{y:0.6}}); }
-    const qres = S.quiz.qs
-      .map((q,i)=> S.quiz.ans[i]===null ? null : {uid:q.uid, ok:isOk(S.quiz.ans[i], q.correct)})
-      .filter(Boolean);
-    const scope = S.quiz.scope || {};
-    const durationSec = S.quiz.startedAt
-      ? Math.min(3*60*60, Math.round((Date.now()-S.quiz.startedAt)/1000))
-      : 0;
-    // ═══ v1.04 ═══ Both chapter and chapterKey are stored now.
-    // chapter = display label ("Structural Engineering — Abhyas"),
-    // chapterKey = canonical key matching admin.html's chapter filter
-    // dropdown ("Structural Engineering"). This is what makes the
-    // admin Most-Missed-Questions chapter filter actually match.
-    // weeklyId / weeklyMode are new — they identify this session as a
-    // Weekly Set attempt for the admin aggregator.
-    const sessionObj = {
-      chapter:S.quiz.ch,
-      chapterKey: scope.ch ? (ChapterData.chapterName(scope.lv, scope.ch) || '') : '',
-      mode:S.quiz.mode,
-      total, correct, wrong, skipped, pct, at:Date.now(),
-      durationSec,
-      lv:scope.lv||'', ch:scope.ch||'', book:scope.book||'', sub:scope.sub||'', fid:scope.fid||'',
-      weeklyId: scope.weeklyId || '',
-      weeklyTitle: scope.weeklyTitle || '',
-      qres
-    };
-    PROG.recordSession(sessionObj);
-    CHAPSTATS.record(sessionObj);
-
-    // ═══ v1.04 ═══ Weekly set: capture the attempt now that the score
-    // is computed, then lock the retry button so the UI matches the
-    // server-enforced one-attempt rule.
-    const isWeekly = !!(scope.weeklyId);
-    if(isWeekly){
-      WEEKLY._recordAttempt(S.quiz, { total, correct, wrong, skipped, pct });
-      const retryBtn = document.querySelector('#res-wrap .btn-p');
-      if(retryBtn){
-        retryBtn.disabled = true;
-        retryBtn.innerHTML = '<i class="ph ph-lock-simple"></i> One attempt only — see Review from the home card';
-        retryBtn.style.opacity = '.55';
-        retryBtn.style.pointerEvents = 'none';
-      }
-    }
-  }
-};
-
-document.addEventListener('keydown', e=>{
-  if(!S.quiz.active) return;
-  if(document.getElementById('quiz-wrap').style.display==='none') return;
-  if(_anyModalOpen()) return;
-  const tag = (e.target && e.target.tagName) || '';
-  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-  if(e.key==='Escape'){ if(S.quiz.active) QUIZ.quit(); }
-  if(S.quiz.reviewOnly) return;   // review mode has no keyboard answering
-  if(S.quiz.mode!=='exam'){
-    if(e.key==='ArrowRight') QUIZ.fcNav(1);
-    if(e.key==='ArrowLeft') QUIZ.fcNav(-1);
-    if(['1','2','3','4','5'].includes(e.key)){
-      const i=Number(e.key)-1;
-      if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
-    }
-    const letterIdx = 'abcdABCD'.indexOf(e.key);
-    if(letterIdx > -1){
-      const i = letterIdx % 4;
-      if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
-    }
-  }
-});
-
-/* ═══════════════ 10a. PROGRESS TRACKING ═══════════════ */
+/* ═══════════════ 10a. PROGRESS TRACKING ═══════════════
+   PROG stays here — it's core data management, not quiz-specific. The
+   quiz engine calls into it, but that's a one-way dependency. */
 const PROG = {
   track(correct){
     S.prog.total = (S.prog.total || 0) + 1;
@@ -2580,354 +1290,6 @@ const PROG = {
         }).join('');
       }
     }
-
-    const overallEl = document.getElementById('prog-overall');
-    const sessions = S.prog.sessions||[];
-    if(overallEl){
-      if(!sessions.length){
-        overallEl.innerHTML = `<div class="empty"><div class="empty-i"><i class="ph ph-chart-line-up"></i></div><p>No study sessions yet</p><p style="font-size:.72rem;color:var(--t3);margin-top:.15rem">Complete a quiz to start tracking your progress.</p></div>`;
-      } else {
-        const totalQ = sessions.reduce((s,x)=>s+x.total,0);
-        const totalC = sessions.reduce((s,x)=>s+x.correct,0);
-        const overallPct = totalQ? Math.round((totalC/totalQ)*100):0;
-        const totalTime = sessions.reduce((s,x)=>s+(x.durationSec||0),0);
-        const hrs = Math.floor(totalTime/3600), mins = Math.floor((totalTime%3600)/60);
-        overallEl.innerHTML = `
-          <div class="stats-row">
-            <div class="sc"><div class="sv tcy">${sessions.length}</div><div class="stat-lbl">Sessions</div></div>
-            <div class="sc"><div class="sv tc2">${overallPct}%</div><div class="stat-lbl">Accuracy</div></div>
-            <div class="sc"><div class="sv tvi">${totalQ}</div><div class="stat-lbl">Questions</div></div>
-            <div class="sc"><div class="sv tsk">${hrs>0?hrs+'h ':''}${mins}m</div><div class="stat-lbl">Study Time</div></div>
-          </div>`;
-      }
-    }
-
-    const chapListEl = document.getElementById('prog-chapters');
-    if(chapListEl){
-      const entries = CHAPSTATS.entries();
-      if(!entries.length){
-        chapListEl.innerHTML = '<p style="font-size:.78rem;color:var(--t3);padding:.5rem 0">No chapter data yet.</p>';
-      } else {
-        chapListEl.innerHTML = entries.map(c=>{
-          const barColor = c.accuracy>=75?'var(--ok)':c.accuracy>=50?'var(--amb)':'var(--bad)';
-          return `<div style="margin-bottom:.6rem">
-            <div style="display:flex;justify-content:space-between;font-size:.78rem;margin-bottom:.2rem">
-              <span style="color:var(--t1);font-weight:600">${esc(c.chapter)}</span>
-              <span style="color:var(--t3)">${c.correct}/${c.attempted} · ${c.accuracy}%</span>
-            </div>
-            <div style="height:6px;background:var(--b0);border-radius:4px;overflow:hidden">
-              <div style="height:100%;width:${c.accuracy}%;background:${barColor};border-radius:4px;transition:width .3s ease"></div>
-            </div>
-          </div>`;
-        }).join('');
-      }
-    }
-
-    const recentEl = document.getElementById('prog-recent');
-    if(recentEl){
-      const recent = [...sessions].slice(0,15);
-      recentEl.innerHTML = recent.map(s=>{
-        const when = s.at ? new Date(s.at).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : '';
-        const modeIcon = s.mode==='exam' ? '<i class="ph ph-note-pencil"></i>' : '<i class="ph ph-lightning"></i>';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--b1);font-size:.78rem">
-          <div style="min-width:0;flex:1">
-            <div style="font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${modeIcon} ${esc(s.chapter)}</div>
-            <div style="font-size:.66rem;color:var(--t3)">${when}</div>
-          </div>
-          <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
-            <div style="font-weight:700;color:${s.pct>=70?'var(--ok)':s.pct>=40?'var(--amb)':'var(--bad)'}">${s.pct}%</div>
-            <div style="font-size:.64rem;color:var(--t3)">${s.correct}/${s.total}</div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-  }
-};
-
-/* ═══════════════ 10a2. SCOPE HELPERS ═══════════════ */
-function scopeLeaves(lv,ch,book,sub){
-  let refs;
-  if(!lv){ refs = ChapterData.allFileRefs(); }
-  else if(!ch){
-    refs = [];
-    Object.keys(ChapterData.chapters(lv)).forEach(c=>refs.push(...ChapterData.chapterFileRefs(lv,c)));
-  } else {
-    refs = ChapterData.chapterFileRefs(lv,ch);
-  }
-  if(book) refs = refs.filter(r=>r.book===book);
-  if(sub) refs = refs.filter(r=>r.subtopic===sub);
-  return refs;
-}
-
-const CNT_AUTO_LIMIT = 20;
-
-const CNT = {
-  async forFile(ref){
-    if(!ref.fid) return null;
-    if(S.fcount[ref.fid] != null) return S.fcount[ref.fid];
-    try{
-      const raw = await QUIZ._fetch(ref.fid, ref.key);
-      const n = normQ(raw, ref.fid).length;
-      S.fcount[ref.fid] = n;
-      _save(LS.FCOUNT, S.fcount);
-      return n;
-    }catch{ return null; }
-  },
-  knownTotal(leaves){
-    let sum = 0, unknown = 0;
-    leaves.forEach(ref=>{
-      const n = S.fcount[ref.fid];
-      if(n==null) unknown++; else sum += n;
-    });
-    return {total:sum, files:leaves.length, unknown};
-  },
-  async totalFor(lv,ch,book,sub,{force=false, onTick}={}){
-    const leaves = scopeLeaves(lv,ch,book,sub);
-    const known = CNT.knownTotal(leaves);
-    if(known.unknown===0) return known;
-    if(!force && leaves.length>CNT_AUTO_LIMIT) return {...known, needsConfirm:true};
-    let sum = 0, unknown = 0, done = 0;
-    const CONC = 4; let i = 0;
-    async function worker(){
-      while(i<leaves.length){
-        const ref = leaves[i++];
-        const n = await CNT.forFile(ref);
-        if(n==null) unknown++; else sum += n;
-        done++; onTick && onTick(done, leaves.length);
-      }
-    }
-    await Promise.all(Array.from({length:Math.max(1,Math.min(CONC,leaves.length))}, worker));
-    return {total:sum, files:leaves.length, unknown};
-  }
-};
-
-function fidFromUid(uid){
-  const i = uid.lastIndexOf('_');
-  return i > -1 ? uid.slice(0,i) : uid;
-}
-
-function fileStatsMap(leaves){
-  const map = new Map();
-  leaves.forEach(ref=>{ if(!map.has(ref.fid)) map.set(ref.fid, {practised:new Set(), attempted:0, correct:0, wrong:0}); });
-  S.prog.sessions.forEach(s=>{
-    (s.qres||[]).forEach(q=>{
-      if(!q || !q.uid) return;
-      const rec = map.get(fidFromUid(q.uid));
-      if(!rec) return;
-      rec.practised.add(q.uid);
-      rec.attempted++;
-      if(q.ok) rec.correct++; else rec.wrong++;
-    });
-  });
-  return map;
-}
-
-function scopedStats(leaves){
-  const fileMap = fileStatsMap(leaves);
-  const uids = new Set();
-  let attempted=0, correct=0, wrong=0;
-  fileMap.forEach(rec=>{
-    rec.practised.forEach(u=>uids.add(u));
-    attempted += rec.attempted; correct += rec.correct; wrong += rec.wrong;
-  });
-  return {practised:uids.size, attempted, correct, wrong, fileMap};
-}
-
-/* ═══════════════ 10a3. ONPROG ═══════════════ */
-const ONPROG = {
-  metric: 'practised',
-  filewiseOpen: false,
-  _seq: 0,
-  _lastLeaves: [],
-
-  setMetric(m){
-    ONPROG.metric = m;
-    document.querySelectorAll('#on-prog-tabs .mtab').forEach(b=>b.classList.toggle('active', b.dataset.m===m));
-    ONPROG.render();
-  },
-
-  toggleFilewise(){
-    ONPROG.filewiseOpen = !ONPROG.filewiseOpen;
-    ONPROG.render();
-  },
-
-  resetFile(fid){
-    if(!fid) return;
-    const ref = ONPROG._lastLeaves.find(l=>l.fid===fid);
-    const label = ref ? `${ref.book} — ${ref.subtopic}` : 'this file';
-    if(!confirm(`Reset practice progress for "${label}"?\n\nThis clears only the Practised/Attempted/Correct/Wrong counts for this one file. Bookmarks, flags, and your wrong-answer bank are not touched — and the question file itself is never modified.`)) return;
-    let removedTotal=0, removedCorrectTotal=0;
-    S.prog.sessions.forEach(s=>{
-      if(!s.qres || !s.qres.length) return;
-      const kept = [];
-      let removedHere=0, removedCorrectHere=0;
-      s.qres.forEach(q=>{
-        if(q && q.uid && fidFromUid(q.uid)===fid){
-          removedHere++;
-          if(q.ok) removedCorrectHere++;
-        } else kept.push(q);
-      });
-      if(removedHere){
-        s.qres = kept;
-        s.correct = Math.max(0,(s.correct||0) - removedCorrectHere);
-        s.wrong   = Math.max(0,(s.wrong||0)   - (removedHere - removedCorrectHere));
-        s.total   = Math.max(0,(s.total||0)   - removedHere);
-        removedTotal += removedHere;
-        removedCorrectTotal += removedCorrectHere;
-      }
-    });
-    S.prog.sessions = S.prog.sessions.filter(s => (s.qres && s.qres.length) || (s.total||0) > 0);
-    S.prog.total   = Math.max(0,(S.prog.total||0)   - removedTotal);
-    S.prog.correct = Math.max(0,(S.prog.correct||0) - removedCorrectTotal);
-    _save(LS.PROG, S.prog);
-    toast(removedTotal ? `✅ Reset "${label}" — ${removedTotal} record(s) cleared` : `Nothing to reset for "${label}"`);
-    ONPROG.render();
-    if(typeof HOME!=='undefined' && HOME.render) HOME.render();
-  },
-
-  _scope(){
-    const lv   = document.getElementById('on-lv')?.value   || '';
-    const ch   = document.getElementById('on-ch')?.value   || '';
-    const book = document.getElementById('on-bk')?.value   || '';
-    const ts   = document.getElementById('on-to');
-    const opt  = ts && ts.selectedIndex>=0 ? ts.options[ts.selectedIndex] : null;
-    const valid = opt && opt.dataset && opt.dataset.sub && !opt.disabled;
-    return {lv, ch, book, sub: valid?opt.dataset.sub:'', fid: valid?opt.value:''};
-  },
-
-  async render(force=false){
-    ONPROG._renderOldPreview();
-
-    const el      = document.getElementById('on-progress-card');
-    const titleEl = document.getElementById('on-prog-title');
-    const bodyEl  = document.getElementById('on-prog-body');
-    if(!el || !titleEl || !bodyEl) return;
-
-    const {lv,ch,book,sub,fid} = ONPROG._scope();
-    const mySeq = ++ONPROG._seq;
-
-    if(!lv){
-      titleEl.textContent = '📊 Overall Progress';
-      const total = S.prog.total, correct = S.prog.correct, wrong = total - correct;
-      const pct = total ? Math.round((correct/total)*100) : 0;
-      bodyEl.innerHTML = `
-        <div class="prog-grid">
-          <div class="sc"><div class="sv tcy">${total}</div><div class="stat-lbl">Attempted</div></div>
-          <div class="sc"><div class="sv tc2">${correct}</div><div class="stat-lbl">Correct</div></div>
-          <div class="sc"><div class="sv tb2">${wrong}</div><div class="stat-lbl">Wrong</div></div>
-        </div>
-        <div class="pb-w" style="margin-top:.6rem"><div class="pb-l"><span>Accuracy</span><span>${pct}%</span></div><div class="pb"><div class="pb-f" style="width:${pct}%"></div></div></div>
-        <div style="font-size:.68rem;color:var(--t3);margin-top:.5rem">Pick a Level, Chapter, Book or Subtopic above to see coverage for that scope.</div>`;
-      return;
-    }
-
-    const lvLabel = document.getElementById('on-lv').selectedOptions[0]?.textContent.replace(/^📖\s*/,'') || lv;
-    const label = fid  ? `${ChapterData.chapterName(lv,ch)} — ${book} — ${sub}`
-                : book ? `${ChapterData.chapterName(lv,ch)} — ${book}`
-                : ch   ? ChapterData.chapterName(lv,ch)
-                : lvLabel;
-    titleEl.textContent = `📊 ${label}`;
-
-    const leaves = scopeLeaves(lv,ch,book,sub);
-    ONPROG._lastLeaves = leaves;
-    const scoped = scopedStats(leaves);
-    const known = CNT.knownTotal(leaves);
-
-    const paint = (info)=>{
-      if(mySeq !== ONPROG._seq) return;
-      const total = info.total;
-      const vals = {practised:scoped.practised, attempted:scoped.attempted, correct:scoped.correct, wrong:scoped.wrong};
-      const metricVal = vals[ONPROG.metric];
-      const metricLabel = {practised:'Practised', attempted:'Attempted', correct:'Correct', wrong:'Wrong'}[ONPROG.metric];
-      const barColor = ONPROG.metric==='wrong' ? 'var(--ros)'
-                     : ONPROG.metric==='correct' ? 'var(--grn)'
-                     : 'var(--amb)';
-      const pct = total ? Math.min(100, Math.round((metricVal/total)*100)) : 0;
-      const unknownNote = info.unknown
-        ? `<div style="font-size:.66rem;color:var(--t3);margin-top:.45rem"><i class="ph ph-warning"></i> ${info.unknown} of ${info.files} file${info.files>1?'s':''} not counted yet (offline, or not cached)</div>`
-        : '';
-      const confirmBtn = info.needsConfirm
-        ? `<button class="btn btn-sm btn-a" style="margin-top:.5rem" onclick="ONPROG.render(true)"><i class="ph ph-list-numbers"></i> Count questions (${info.files} files)</button>`
-        : '';
-
-      let filewiseHtml = '';
-      if(leaves.length>1 && leaves.length<=100){
-        const showBook = !book;
-        const rows = leaves.map(ref=>{
-          const rec = scoped.fileMap.get(ref.fid) || {practised:new Set(), attempted:0, correct:0, wrong:0};
-          const fVals = {practised:rec.practised.size, attempted:rec.attempted, correct:rec.correct, wrong:rec.wrong};
-          const fVal = fVals[ONPROG.metric];
-          const fTotal = S.fcount[ref.fid];
-          const fPct = fTotal ? Math.min(100, Math.round((fVal/fTotal)*100)) : 0;
-          const rowLabel = showBook ? `${ref.book} — ${ref.subtopic}` : ref.subtopic;
-          return `<div class="pb-w fw-row">
-            <div class="pb-l">
-              <span>${esc(rowLabel)}</span>
-              <span class="fw-row-right">${fVal} / ${fTotal!=null?fTotal:'?'}${fTotal!=null?` (${fPct}%)`:''}
-                <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" onclick="event.stopPropagation();ONPROG.resetFile(${JSON.stringify(ref.fid)})"><i class="ph ph-trash"></i></button>
-              </span>
-            </div>
-            <div class="pb"><div class="pb-f" style="width:${fTotal!=null?fPct:0}%;background:${barColor}"></div></div>
-          </div>`;
-        }).join('');
-        filewiseHtml = `
-          <div class="fw-toggle" onclick="ONPROG.toggleFilewise()">
-            <span>${ONPROG.filewiseOpen?'▾':'▸'}</span> <i class="ph ph-folder"></i> Filewise breakdown (${leaves.length} files)
-          </div>
-          <div id="on-fw-list" style="display:${ONPROG.filewiseOpen?'block':'none'}">${rows}</div>`;
-      }
-
-      const scopeResetBtn = fid
-        ? ` <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" onclick="ONPROG.resetFile(${JSON.stringify(fid)})"><i class="ph ph-trash"></i></button>`
-        : '';
-
-      bodyEl.innerHTML = `
-        <div class="prog-grid">
-          <div class="sc"><div class="sv tcy">${scoped.practised}</div><div class="stat-lbl">Practised</div></div>
-          <div class="sc"><div class="sv ta2">${scoped.attempted}</div><div class="stat-lbl">Attempted</div></div>
-          <div class="sc"><div class="sv tc2">${scoped.correct}</div><div class="stat-lbl">Correct</div></div>
-          <div class="sc"><div class="sv tb2">${scoped.wrong}</div><div class="stat-lbl">Wrong</div></div>
-        </div>
-        ${info.needsConfirm ? confirmBtn : `
-          <div class="pb-w" style="margin-top:.65rem">
-            <div class="pb-l">
-              <span>${metricLabel} coverage (compiled)</span>
-              <span>${metricVal} / ${total||'?'} (${pct}%)${scopeResetBtn}</span>
-            </div>
-            <div class="pb"><div class="pb-f" style="width:${pct}%;background:${barColor}"></div></div>
-          </div>`}
-        ${unknownNote}
-        ${info.needsConfirm ? '' : filewiseHtml}
-      `;
-    };
-
-    if(known.unknown===0){ paint(known); return; }
-    bodyEl.innerHTML = `<div class="empty" style="padding:.8rem 0"><div class="empty-i">⏳</div><p>Counting questions…</p></div>`;
-    const info = await CNT.totalFor(lv,ch,book,sub,{
-      force,
-      onTick:(done,files)=>{
-        if(mySeq !== ONPROG._seq) return;
-        const p = bodyEl.querySelector('p');
-        if(p && files>1) p.textContent = `Counting questions… ${done}/${files} files`;
-      }
-    });
-    paint(info);
-  },
-
-  _renderOldPreview(){
-    const el = document.getElementById('on-progress-preview');
-    if(!el) return;
-    const lv   = document.getElementById('on-lv')?.value || '';
-    const ch   = document.getElementById('on-ch')?.value || '';
-    const book = document.getElementById('on-bk')?.value || '';
-    if(!lv || !ch){ el.innerHTML=''; return; }
-    const chapterLabel = ChapterData.chapterName(lv,ch) + (book? ' — '+book : '');
-    const match = CHAPSTATS.entries().find(c=>c.chapter===chapterLabel);
-    if(!match){
-      el.innerHTML = `<p style="font-size:.7rem;color:var(--t3);margin-top:.3rem">No attempts yet for this chapter.</p>`;
-      return;
-    }
-    el.innerHTML = `<p style="font-size:.7rem;color:var(--t3);margin-top:.3rem">📊 Your accuracy here so far: <strong style="color:${match.accuracy>=75?'var(--ok)':match.accuracy>=50?'var(--amb)':'var(--bad)'}">${match.accuracy}%</strong> (${match.correct}/${match.attempted})</p>`;
   }
 };
 
@@ -2942,7 +1304,6 @@ const STREAK = {
     _save(LS.STK, S.stk);
     HOME.render();
   },
-
   currentStreak(){
     const set = new Set(S.stk.days||[]);
     if(!set.size) return 0;
@@ -2958,9 +1319,7 @@ const STREAK = {
     }
     return n;
   },
-
   current(){ return STREAK.currentStreak(); },
-
   longest(){
     if(!S.stk.days || !S.stk.days.length) return 0;
     const sorted = [...new Set(S.stk.days)].sort();
@@ -2974,7 +1333,6 @@ const STREAK = {
     }
     return longest;
   },
-
   renderBar(){
     const el = document.getElementById('sk-bar');
     if(!el) return;
@@ -3011,25 +1369,6 @@ const HOME = {
     const gEl = document.getElementById('greeting');
     if(gEl) gEl.textContent = `${S.user?.name||S.user?.username||'Student'} — Nepal Engineering & PSC exam prep.`;
 
-    const oldGreet = document.getElementById('home-greeting');
-    if(oldGreet){
-      const fullGreet = h<5?'Burning midnight oil? 🌙':h<12?'Good morning ☀️':h<17?'Good afternoon 🌤':h<21?'Good evening 🌆':'Studying late? 🌙';
-      oldGreet.textContent = `${fullGreet}, ${S.user?.name||S.user?.username||'Student'}!`;
-    }
-    const oldStreak = document.getElementById('home-streak');
-    if(oldStreak){
-      const cur = STREAK.currentStreak();
-      oldStreak.innerHTML = cur>0
-        ? `<i class="ph ph-fire"></i> ${cur} day streak${cur>=STREAK.longest()&&cur>1?' <span style="opacity:.7">(personal best!)</span>':''}`
-        : `<i class="ph ph-fire"></i> Start your streak today`;
-    }
-    const dueBadgeOld = document.getElementById('home-due-badge');
-    if(dueBadgeOld){
-      const dueCount = REV.dueCount();
-      if(dueCount>0){ dueBadgeOld.style.display=''; dueBadgeOld.textContent = dueCount+' due'; }
-      else dueBadgeOld.style.display='none';
-    }
-
     HOME.updateStats();
     HOME.updateBadges();
     STREAK.renderBar();
@@ -3037,6 +1376,7 @@ const HOME = {
     HOME.tickClock();
 
     if(typeof WEEKLY!=='undefined') WEEKLY._renderHomeCard();
+    if(typeof SB_HINTS!=='undefined') SB_HINTS.refresh();
   },
 
   updateStats(){
@@ -3061,7 +1401,7 @@ const HOME = {
 
   updateBadges(){
     const set = (id,v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
-    const dueWr = REV.dueCount();
+    const dueWr = (typeof REV !== 'undefined' && REV.dueCount) ? REV.dueCount() : 0;
     set('bkc', S.bk.length); set('flc', S.fl.length); set('wrc', S.wr.length);
     const wrDueEl = document.getElementById('wrc-due');
     if(wrDueEl) wrDueEl.textContent = dueWr;
@@ -3150,13 +1490,11 @@ const TT = {
       toast('✅ Session added');
     }
   },
-
   remove(id){
     S.tt.sessions = (S.tt.sessions||[]).filter(s=>s.id!==id);
     _save(LS.TT, S.tt);
     TT.render();
   },
-
   _reminderTimer:null,
   _notifiedToday:null,
   _lastCheckedDay:null,
@@ -3183,13 +1521,11 @@ const TT = {
     TT._startReminderChecker();
     toast(enabled ? '🔔 Reminders on' : '🔕 Reminders off');
   },
-
   setLeadMinutes(mins){
     const n = Math.max(0, Math.min(60, Number(mins)||0));
     S.tt.reminders.leadMinutes = n;
     _save(LS.TT, S.tt);
   },
-
   _startReminderChecker(){
     if(TT._reminderTimer) clearInterval(TT._reminderTimer);
     if(!S.tt.reminders.enabled) return;
@@ -3197,18 +1533,14 @@ const TT = {
     TT._checkReminders();
     TT._reminderTimer = setInterval(TT._checkReminders, 20000);
   },
-
   _todayKey(){ return today(); },
-
   _loadNotifiedToday(){
     const saved = _load(LS.TT_NOTIFIED, {date:'', ids:[]});
     TT._notifiedToday = (saved.date === TT._todayKey()) ? new Set(saved.ids) : new Set();
   },
-
   _saveNotifiedToday(){
     _save(LS.TT_NOTIFIED, {date: TT._todayKey(), ids:[...TT._notifiedToday]});
   },
-
   async _checkReminders(){
     if(!S.tt.reminders.enabled) return;
     if(!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -3237,9 +1569,7 @@ const TT = {
       }
     }
   },
-
   _checkDue(){ return TT._checkReminders(); },
-
   async _fireReminder(s, lead){
     const name = s.name || s.label || 'Study session';
     const title = lead > 0 ? `Starting in ${lead} min: ${name}` : `Now: ${name}`;
@@ -3253,7 +1583,6 @@ const TT = {
       }
     }catch(e){ /* non-fatal */ }
   },
-
   _clockTimer:null,
   render(){
     const t1 = document.getElementById('tt-remind-toggle');   if(t1) t1.checked = !!S.tt.reminders.enabled;
@@ -3328,26 +1657,6 @@ const TT = {
         </div>
       `;
     }
-
-    const listEl = document.getElementById('tt-list');
-    if(listEl){
-      const sessions = S.tt.sessions||[];
-      if(!sessions.length){
-        listEl.innerHTML = `<div class="empty"><div class="empty-i"><i class="ph ph-calendar"></i></div><p>No study sessions scheduled</p></div>`;
-      } else {
-        listEl.innerHTML = DAYS.map((day,di)=>{
-          const daySessions = sessions.filter(s=>s.day===di).sort((a,b)=>sessionStart(a).localeCompare(sessionStart(b)));
-          if(!daySessions.length) return '';
-          return `<div style="margin-bottom:.7rem">
-            <div class="sb-lbl">${day}</div>
-            ${daySessions.map(s=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.5rem .6rem;background:var(--b0);border-radius:8px;margin-bottom:.3rem">
-              <div><span class="mono" style="font-weight:700">${esc(sessionStart(s))}</span> — ${esc(sessionName(s))}</div>
-              <button class="ib" onclick='TT.remove(${JSON.stringify(String(s.id))})' aria-label="Remove session"><i class="ph ph-trash"></i></button>
-            </div>`).join('')}
-          </div>`;
-        }).join('') || `<div class="empty"><div class="empty-i"><i class="ph ph-calendar"></i></div><p>No study sessions scheduled</p></div>`;
-      }
-    }
   },
 
   renderCurrentSessionWidget(elId){
@@ -3381,7 +1690,6 @@ const TT = {
     a.download = 'timetable.json';
     a.click();
   },
-
   importJ(){
     const inp = document.createElement('input');
     inp.type = 'file';
@@ -3460,7 +1768,6 @@ const CACHE = {
     CACHE.render();
     toast('🗑 Removed from offline cache');
   },
-
   async clearAll(){
     if(!confirm('Remove ALL cached question sets? You will need to be online to study again until you re-cache.')) return;
     await QDB.clear();
@@ -3533,12 +1840,6 @@ const CACHE = {
     else toast('✅ No stale cache entries found');
   },
 
-  // ═══ v1.04 ═══ Background top-up now gates on connection type.
-  // First launch on cellular no longer silently downloads every
-  // question set (potentially tens of MB) — a one-time toast offers
-  // the Offline Cache tab instead. Reconnects on WiFi proceed as
-  // before. The intent is that the app respects data plans, not that
-  // it stops caching content the user actually wants.
   async autoSync(){
     if(!S.online || S.forcedOffline) return;
     const cachedKeys = new Set(await QDB.keys());
@@ -3588,8 +1889,6 @@ const DATA = {
       prog: S.prog,
       chapStats: S.chapStats,
       bk: S.bk, fl: S.fl, wr: S.wr, stk: S.stk, tt: S.tt,
-      // ═══ v1.04 ═══ Weekly attempts included in export so a device
-      // switch preserves the record of any one-shot weekly submission.
       weeklyAttempts: S.weeklyAttempts
     };
     const blob = new Blob([JSON.stringify(payload,null,2)], {type:'application/json'});
@@ -3651,13 +1950,11 @@ const DATA = {
     if(data.wr){ S.wr = data.wr; _save(LS.WR, S.wr); }
     if(data.stk){ S.stk = data.stk; _save(LS.STK, S.stk); }
     if(data.tt){ S.tt = data.tt; if(!S.tt.reminders) S.tt.reminders = {enabled:false,leadMinutes:5}; _save(LS.TT, S.tt); }
-    // ═══ v1.04 ═══ Weekly attempts merge: never overwrite an existing
-    // local attempt — the local copy is the more recent submission.
     if(data.weeklyAttempts && typeof data.weeklyAttempts === 'object'){
       Object.entries(data.weeklyAttempts).forEach(([wid, a])=>{
         if(!S.weeklyAttempts[wid]) S.weeklyAttempts[wid] = a;
       });
-      WEEKLY.attempts = S.weeklyAttempts;
+      if(typeof WEEKLY !== 'undefined') WEEKLY.attempts = S.weeklyAttempts;
       _save(LS.WK_ATTEMPTS, S.weeklyAttempts);
     }
     toast('✅ Backup imported');
@@ -3707,76 +2004,51 @@ const TUTORIAL = {
   _seenKey: 'abhyas_tut_seen',
   _idx: 0,
   _steps: [
-    {
-      icon: '<i class="ph ph-hand-waving"></i>',
-      title: 'Welcome to Abhyas',
-      body: `<p>This is your Smart Study Hub for Nepal Engineering (Level 5/7) and PSC/Loksewa prep. Once a chapter is cached it works fully offline — handy for load-shedding or weak signal.</p>`
-    },
-    {
-      icon: '<i class="ph ph-key"></i>',
-      title: 'Your account status',
-      body: `
-        <p>Check the sidebar under your name for your current status:</p>
+    { icon: '<i class="ph ph-hand-waving"></i>', title: 'Welcome to Abhyas',
+      body: `<p>This is your Smart Study Hub for Nepal Engineering (Level 5/7) and PSC/Loksewa prep. Once a chapter is cached it works fully offline — handy for load-shedding or weak signal.</p>` },
+    { icon: '<i class="ph ph-key"></i>', title: 'Your account status',
+      body: `<p>Check the sidebar under your name for your current status:</p>
         <ul style="margin:0 0 0 1.1rem;padding:0">
           <li><b><i class="ph ph-hourglass"></i> Trial</b> — free access, counts down live. Pay anytime from the payment screen to go permanent.</li>
           <li><b><i class="ph ph-check-circle"></i> Permanent</b> — verified, unlimited access forever, fully usable offline.</li>
           <li><b><i class="ph ph-calendar-blank"></i> Yearly</b> — active until the renewal date shown in the sidebar.</li>
-        </ul>
-        <p style="margin-top:.5rem">Once you're Trial, Permanent, or active Yearly, you land straight here next time — no re-login needed on this device, even offline.</p>`
-    },
-    {
-      icon: '<i class="ph ph-house"></i>',
-      title: 'Your Dashboard',
-      body: `
-        <p>The Dashboard (<i class="ph ph-house"></i>) is home base:</p>
+        </ul>` },
+    { icon: '<i class="ph ph-house"></i>', title: 'Your Dashboard',
+      body: `<p>The Dashboard (<i class="ph ph-house"></i>) is home base:</p>
         <ul style="margin:0 0 0 1.1rem;padding:0">
           <li><b><i class="ph ph-star"></i> Daily Challenge</b> — 30 mixed questions, keeps your streak alive.</li>
           <li><b><i class="ph ph-lightning"></i> Adaptive Practice</b> — pulls the questions you're actually struggling with first.</li>
-          <li>Quick stats and Quick Action tiles for everything else in the app.</li>
-        </ul>`
-    },
-    {
-      icon: '<i class="ph ph-book-open"></i>',
-      title: 'Studying a chapter',
-      body: `
-        <p>Open <b>Online Study</b> or <b>Local File</b> from the sidebar, pick a chapter, choose how many questions and whether to shuffle, then pick a mode:</p>
+          <li>Quick stats and Quick Action tiles for everything else.</li>
+        </ul>` },
+    { icon: '<i class="ph ph-book-open"></i>', title: 'Studying a chapter',
+      body: `<p>Open <b>Online Study</b> or <b>Local File</b>, pick a chapter, choose how many questions and whether to shuffle, then pick a mode:</p>
         <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b>Practice</b> — instant feedback, no time pressure.</li>
-          <li><b><i class="ph ph-note-pencil"></i> Exam</b> — timed, graded at the end.</li>
-          <li><b><i class="ph ph-lightning"></i> Flashcard</b> — quick flip-through review.</li>
+          <li><b>Practice</b> — instant feedback.</li>
+          <li><b>Exam</b> — timed, graded at the end.</li>
+          <li><b>Flashcard</b> — quick flip-through review.</li>
         </ul>
-        <p style="margin-top:.5rem">Shortcuts while answering: <b>A/B/C/D</b> or <b>1–5</b> to pick an option, <b>←/→</b> between cards, <b>Esc</b> to quit.</p>`
-    },
-    {
-      icon: '<i class="ph ph-star"></i>',
-      title: 'Bookmarks, Flags & Wrong Bank',
-      body: `
-        <p>Tag any question while studying:</p>
+        <p style="margin-top:.5rem">Shortcuts: <b>A/B/C/D</b> or <b>1–5</b> to answer, <b>←/→</b> between cards, <b>Esc</b> to quit.</p>` },
+    { icon: '<i class="ph ph-star"></i>', title: 'Bookmarks, Flags & Wrong Bank',
+      body: `<p>Tag any question while studying:</p>
         <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b><i class="ph ph-star"></i> Bookmarks</b> — save with a label (Need Check, Interesting, Debating, Confusing, Formulae).</li>
-          <li><b><i class="ph ph-flag"></i> Flagged</b> — a quick "come back to this" marker.</li>
-          <li><b><i class="ph ph-x-circle"></i> Wrong Bank</b> — anything you get wrong lands here automatically, and needs two correct answers in a row, spaced a few days apart, before it's considered mastered.</li>
-        </ul>`
-    },
-    {
-      icon: '<i class="ph ph-calendar-check"></i>',
-      title: 'Weekly Sets',
-      body: `
-        <p>Every so often a fresh question set unlocks on the Dashboard. You get <b>exactly one attempt</b> — it's a graded exam, timed, and once you submit you can only review your answers.</p>
-        <p style="margin-top:.5rem">The home card shows a live countdown while the exam window is open. After it closes without you taking it, you can still review the questions and correct answers, but no score is recorded.</p>`
-    },
-    {
-      icon: '<i class="ph ph-calendar-blank"></i>',
-      title: 'Timetable & Progress',
-      body: `<p><b>Timetable</b> lets you block out study sessions by day/time — the Dashboard clock shows what's happening right now. <b>Progress</b> tracks your accuracy over time and predicts your likely exam marks from recent sessions.</p>`
-    },
-    {
-      icon: '<i class="ph ph-package"></i>',
-      title: 'Offline & installing the app',
-      body: `
-        <p>Chapters you open get cached automatically for offline use — check <b>Offline Cache</b> in the sidebar to manage what's stored on this device.</p>
-        <p style="margin-top:.5rem">Tap the <b><i class="ph ph-device-mobile"></i></b> icon in the top bar to install Abhyas to your home screen — it then opens like a normal app, even with no signal. You can reopen this tutorial anytime from the sidebar or the Dashboard's Quick Actions.</p>`
-    }
+          <li><b><i class="ph ph-star"></i> Bookmarks</b> — save with a label.</li>
+          <li><b><i class="ph ph-flag"></i> Flagged</b> — a quick "come back to this".</li>
+          <li><b><i class="ph ph-x-circle"></i> Wrong Bank</b> — auto-collected; needs two correct in a row, spaced apart, before it retires.</li>
+        </ul>` },
+    { icon: '<i class="ph ph-calendar-check"></i>', title: 'Weekly Sets',
+      body: `<p>Every so often a fresh question set unlocks on the Dashboard. You get <b>exactly one attempt</b> — a graded, timed exam. Once you submit, you can only review.</p>` },
+    { icon: '<i class="ph ph-pencil-line"></i>', title: 'Subjective',
+      body: `<p>Under <b>Subjective</b> in the sidebar, three panels:</p>
+        <ul style="margin:0 0 0 1.1rem;padding:0">
+          <li><b>Q of the Day</b> — one question, timed write, then a 5-minute PDF upload.</li>
+          <li><b>Proper Exam</b> — a full 100-mark paper on demand.</li>
+          <li><b>Question List</b> — topic-wise index.</li>
+        </ul>` },
+    { icon: '<i class="ph ph-calendar-blank"></i>', title: 'Timetable & Progress',
+      body: `<p><b>Timetable</b> blocks out study sessions by day/time — the Dashboard clock shows what's on now. <b>Progress</b> tracks accuracy and predicts likely exam marks.</p>` },
+    { icon: '<i class="ph ph-package"></i>', title: 'Offline & installing the app',
+      body: `<p>Chapters you open get cached automatically for offline use — check <b>Offline Cache</b> to manage what's stored.</p>
+        <p style="margin-top:.5rem">Tap the <b><i class="ph ph-device-mobile"></i></b> icon in the top bar to install Abhyas to your home screen.</p>` }
   ],
 
   maybeAutoOpen(user){
@@ -3882,7 +2154,7 @@ const APP = {
     _updateOfflineWarn();
     AUTH.startPeriodicRecheck();
     CACHE.autoSync();
-    QUIZ.checkResumableExam();
+    if(typeof QUIZ !== 'undefined' && QUIZ.checkResumableExam) QUIZ.checkResumableExam();
     if(typeof PUSH!=='undefined') PUSH.refreshButtonUI();
   }
 };
@@ -3907,7 +2179,6 @@ function _updateOfflineWarn(){
 
 function _updateNetBtn(){
   const effectivelyOnline = S.online && !S.forcedOffline;
-
   const btn = document.getElementById('net-mode-btn');
   if(btn){
     btn.innerHTML = `<i class="ph ${effectivelyOnline ? 'ph-wifi-high' : 'ph-wifi-slash'}"></i>`;
@@ -3919,13 +2190,8 @@ function _updateNetBtn(){
     btn.style.borderColor = effectivelyOnline ? 'rgba(34,197,94,.35)' : 'var(--bad-bd)';
     btn.style.background = effectivelyOnline ? 'rgba(34,197,94,.08)' : 'var(--bad-bg)';
     btn.classList.toggle('forced', S.forcedOffline);
-    // ═══ v1.04 ═══ aria-pressed — the button is a toggle, and screen
-    // readers should hear its state. Convention here is inverted from
-    // the visual label (aria-pressed=true means "forced offline mode
-    // is on", which is the toggle state, not the network state).
     btn.setAttribute('aria-pressed', String(!!S.forcedOffline));
   }
-
   const dot = document.getElementById('net-dot');
   const txt = document.getElementById('net-txt');
   if(dot) dot.className = 'net-dot' + (effectivelyOnline ? '' : ' off');
@@ -3938,7 +2204,6 @@ window.addEventListener('online', async ()=>{
   if(!S.forcedOffline){
     toast('🌐 Back online');
     if(PSYNC._timer) PSYNC.pushNow();
-    // ═══ v1.04 ═══ Push any weekly attempt that was captured offline.
     if(typeof WEEKLY !== 'undefined') WEEKLY.retryUnsynced();
   } else {
     toast('🌐 Network restored — still in forced offline mode');
@@ -3954,7 +2219,7 @@ window.addEventListener('offline', ()=>{
   _updateOfflineWarn();
 });
 
-/* ═══════════════ 12b. NET — manual online/offline toggle ═══════════════ */
+/* ═══════════════ 12b. NET — manual toggle ═══════════════ */
 const NET = {
   toggle(){
     if(!S.online && !S.forcedOffline){
@@ -3988,8 +2253,8 @@ function toggleForcedOffline(){
   }
 }
 
-/* ═══════════════ 13. UTILITY: pluralize ═══════════════ */
-function pluralize(n, word){ return `${n} ${word}${n===1?'':'s'}`; }
+/* ═══════════════ 13. pluralize ═══════════════ */
+function pluralize(n, word, pluralWord){ return `${n} ${n===1 ? word : (pluralWord || word + 's')}`; }
 
 /* ═══════════════ 14. BOOT SEQUENCE ═══════════════ */
 document.addEventListener('DOMContentLoaded', ()=>{
@@ -4002,32 +2267,16 @@ document.addEventListener('DOMContentLoaded', ()=>{
   NETCHECK.start();
   NETCHECK.ping();
   AUTH.restore();
-
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.visibilityState === 'hidden' && S.quiz && S.quiz.active && S.quiz.mode === 'exam'){
-      QUIZ._snapshotExam(true);
-    }
-  });
-  window.addEventListener('pagehide', ()=>{
-    if(S.quiz && S.quiz.active && S.quiz.mode === 'exam'){
-      QUIZ._snapshotExam(true);
-    }
-  });
 });
 
-/* ═══════════════ EXPLICIT GLOBAL EXPOSURE ═══════════════ */
+/* ═══════════════ GLOBAL EXPOSURE ═══════════════
+   Only core modules are exposed here; objective.js and subjective.js
+   expose their own (QUIZ, ON, LOC, PSY, REV, CNT, ONPROG, SUBJ). */
 window.AUTH = AUTH;
 window.NET = NET;
 window.UI = UI;
-window.ON = ON;
-window.LOC = LOC;
-window.PSY = PSY;
-window.REV = REV;
-window.QUIZ = QUIZ;
 window.PWA = PWA;
 window.PROG = PROG;
-window.ONPROG = ONPROG;
-window.CNT = CNT;
 window.HOME = HOME;
 window.STREAK = STREAK;
 window.TT = TT;
@@ -4039,14 +2288,8 @@ window.WEEKLY = WEEKLY;
 window.CHAPSTATS = CHAPSTATS;
 window.PSYNC = PSYNC;
 window.NETCHECK = NETCHECK;
+window.SRCH = SRCH;
 window.toggleForcedOffline = toggleForcedOffline;
 window.pluralize = pluralize;
 window.today = today;
 window.localDateOffset = localDateOffset;
-window.fidFromUid = fidFromUid;
-window.scopeLeaves = scopeLeaves;
-window.scopedStats = scopedStats;
-window.fileStatsMap = fileStatsMap;
-// CLOUD is exposed from cloud-sync.js (unused by v1.04 app code — kept
-// for backward compat with any external callers, will be pruned once
-// cloud-sync.js is removed entirely).

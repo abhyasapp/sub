@@ -4,35 +4,52 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#F2F4F3">
-<!-- Clickjacking mitigation — see admin.html for the full rationale.
-     GitHub Pages doesn't support custom HTTP headers, so this
-     client-side frame-bust is the best available option. -->
+<script src="config.js"></script>
+<!-- Pre-apply the dark-mode preference BEFORE design-system.css is
+     evaluated, so there's no flash of the wrong theme on load. Reads
+     the SAME 'abhyas_theme' key app.js / shared.js use, and applies
+     the SAME .dark class — on <html> here, since <body> doesn't exist
+     yet this early in <head>. See shared.js's getStoredTheme() for the
+     canonical read; this inline copy exists only to run before the
+     stylesheet, and the toggle button calls shared.js's version once
+     the page is interactive. -->
+<script>(function(){
+  try{
+    var raw = localStorage.getItem('abhyas_theme');
+    var t = raw ? JSON.parse(raw) : null;
+    if (t !== 'dark' && t !== 'light') {
+      t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    }
+    if (t === 'dark') {
+      document.documentElement.classList.add('dark');
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute('content', '#181B19');
+    }
+  } catch(e) { /* localStorage unavailable — default light applies */ }
+})();</script>
+<!-- Clickjacking mitigation — GitHub Pages has no custom headers, so
+     this client-side frame-bust is the best available option. Same
+     guard is on user.html and admin.html. -->
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 
-<title>Abhyas — Loksewa Civil Engineering Exam Prep (Online & Offline)</title>
+<title>Abhyas — Loksewa Civil Engineering Exam Prep (Online &amp; Offline)</title>
 <meta name="description" content="Abhyas is a free-to-start Loksewa Civil Engineering exam prep app for Nepal — practice thousands of Level 7 Engineering, General Knowledge, and IQ questions online or fully offline, track your progress, and build toward Lok Sewa Aayog exam success.">
 <meta name="keywords" content="abhyas app, loksewa, lok sewa aayog, loksewa civil engineering, loksewa engineering, civil engineering exam prep nepal, level 7 engineering, PSC nepal, loksewa online offline, engineering exam questions nepal">
 <link rel="canonical" href="https://app.mku.name.np/">
 
-<!-- Open Graph — how this looks when shared on Facebook, WhatsApp, Messenger, etc. -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="Abhyas — Loksewa Civil Engineering Exam Prep (Online & Offline)">
+<meta property="og:title" content="Abhyas — Loksewa Civil Engineering Exam Prep (Online &amp; Offline)">
 <meta property="og:description" content="Practice thousands of Loksewa Civil Engineering, GK, and IQ questions — online or fully offline. Free trial, track your progress, built for Lok Sewa Aayog exam success.">
 <meta property="og:url" content="https://app.mku.name.np/">
 <meta property="og:image" content="https://app.mku.name.np/icon-512.png">
 <meta property="og:locale" content="en_NP">
-
-<!-- Twitter Card — same purpose, for X/Twitter link previews -->
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Abhyas — Loksewa Civil Engineering Exam Prep">
 <meta name="twitter:description" content="Practice Loksewa Civil Engineering questions online or offline. Free trial available.">
 <meta name="twitter:image" content="https://app.mku.name.np/icon-512.png">
 
-<!-- Structured data — helps Google understand this is a real application,
-     not just a bare login form, and is eligible for richer search
-     result presentation (app name, description, category) as a result. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -50,16 +67,13 @@
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="design-system.css">
-<!-- Google Identity Services — powers the "Sign in with Google" button
-     below (see APP.initGoogleSignIn). Loaded async/defer so it never
-     blocks first paint; APP.initGoogleSignIn() polls for it to be ready
-     rather than assuming it has loaded by the time init() runs. -->
+<!-- Google Identity Services. Loaded async/defer so it never blocks
+     first paint; APP.initGoogleSignIn() polls for it to be ready. -->
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 :root{
-  /* Local aliases onto the shared token layer, so the rest of this
-     file's rules (unchanged names, so JS/markup below never has to
-     change) read from one place if the palette shifts later. */
+  /* Local aliases onto the shared design-system tokens, so the rest of
+     this file's rules read from one place if the palette shifts later. */
   --c0:var(--c-bg);--c1:var(--c-surface);--c2:var(--c-surface);--c3:var(--c-primary-light);--c4:var(--c-divider);
   --amb:var(--c-primary);--amb2:var(--c-primary-dark);--amb-glow:rgba(46,139,87,.18);
   --teal:var(--c-primary);--vio:var(--c-primary);--sky:var(--c-info);--grn:var(--c-primary);--ros:var(--c-danger);
@@ -72,17 +86,20 @@
 html{height:100%}
 body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;min-height:100vh;overflow-x:hidden}
 
-/* Background — calm, no blobs/grid in the fintech direction: a plain,
-   spacious off-white field lets the card carry all the visual weight. */
-.bg-blobs,.grid{display:none}
+/* Ambient background — two soft, low-opacity blurred blobs for quiet
+   depth. Deliberately restrained: this sits behind a login form, not a
+   marketing hero. */
+.bg-motif{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.bg-motif::before,.bg-motif::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);background:var(--c-primary)}
+.bg-motif::before{width:340px;height:340px;top:-90px;left:-110px;opacity:.06}
+.bg-motif::after{width:280px;height:280px;bottom:-70px;right:-90px;opacity:.05}
 
 /* Card */
 .card{position:relative;z-index:1;width:100%;max-width:440px;margin:1.2rem auto 3rem;background:var(--c-surface);border-radius:var(--r-xl);padding:2.25rem 2rem;box-shadow:var(--ne-lg);max-height:none;overflow:visible;animation:enter .35s var(--ease-spring)}
 @keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
 /* Intro/FAQ sections sit below the login card, wider than it so the
-   explanatory content has room to breathe, but still comfortably
-   readable (760px caps line length on desktop/PC). */
+   explanatory content has room to breathe (760px caps line length). */
 .wide-section{position:relative;z-index:1;max-width:760px;width:calc(100% - 2rem);margin:0 auto 2.5rem}
 .about-card{background:var(--c-surface);border-radius:var(--r-sm);padding:.9rem 1.1rem;box-shadow:var(--ne-sm);margin-bottom:.6rem}
 .about-card h3{font-size:.82rem;color:var(--c-text);margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
@@ -97,8 +114,7 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 
 /* "Your path to mastery" made literal: a small ascending trail of
    waypoints under the wordmark, the last one styled as the destination.
-   Kept deliberately small and quiet — this is a login form people want
-   to get through quickly, not a hero banner to admire. */
+   Kept deliberately small and quiet. */
 .path-motif{display:block;width:148px;height:auto;margin:.55rem auto .05rem}
 .path-motif-peak{animation:path-peak-pulse 2.8s ease-in-out infinite}
 @keyframes path-peak-pulse{
@@ -107,15 +123,7 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 }
 @media(prefers-reduced-motion:reduce){.path-motif-peak{animation:none}}
 
-/* Ambient background — two soft, low-opacity blurred blobs for quiet
-   depth. Deliberately restrained: this sits behind a login/payment form,
-   not a marketing hero, so it should be felt more than seen. */
-.bg-motif{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-.bg-motif::before,.bg-motif::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);background:var(--c-primary)}
-.bg-motif::before{width:340px;height:340px;top:-90px;left:-110px;opacity:.06}
-.bg-motif::after{width:280px;height:280px;bottom:-70px;right:-90px;opacity:.05}
-
-/* Net */
+/* Net status */
 .net{display:flex;align-items:center;justify-content:center;gap:.45rem;font-size:var(--fs-caption);color:var(--c-text-soft);font-weight:var(--fw-medium);margin-bottom:1.25rem;background:var(--c-bg);border-radius:var(--r-full);padding:.32rem .9rem;box-shadow:var(--ne-in-sm)}
 .ndot{width:7px;height:7px;border-radius:50%;background:var(--c-primary);animation:npulse 2s ease-in-out infinite;flex-shrink:0}
 .ndot.off{background:var(--c-danger);animation:none}
@@ -135,12 +143,9 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .fld input:focus,.fld select:focus{box-shadow:var(--ne-in-sm),0 0 0 3px rgba(46,139,87,.16)}
 .fld input::placeholder{color:var(--c-text-faint)}
 .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
-/* Custom file-upload control — same pattern as user.html/admin.html's
-   .file-up. The native <input type=file>'s "Choose File" button lives
-   in browser shadow DOM and can't be restyled by adjusting the outer
-   input's padding/color alone — it still rendered in the OS-native style
-   regardless. This hides the native control entirely (still fully
-   functional) behind a themed button + filename instead. */
+
+/* Custom file-upload control — native <input type=file> can't be
+   restyled, so it's hidden behind a themed button + filename. */
 .file-up{position:relative;display:flex;align-items:center;gap:.6rem;background:var(--c-bg);border-radius:var(--r-sm);padding:.6rem .9rem;cursor:pointer;box-shadow:var(--ne-in-sm)}
 .file-up input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .file-up .file-up-btn{flex-shrink:0;display:inline-flex;align-items:center;gap:.3rem;background:var(--c-surface);border:1px solid rgba(0,0,0,.08);border-radius:7px;padding:.3rem .6rem;font-size:.72rem;font-weight:700;color:var(--t2)}
@@ -149,9 +154,6 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .err{background:var(--c-danger-bg);border:1px solid rgba(193,67,60,.25);border-radius:var(--r-sm);padding:.6rem .9rem;color:var(--c-danger);font-size:var(--fs-caption);margin-bottom:.85rem;display:none;align-items:center;gap:.5rem;font-weight:var(--fw-medium)}
 .err::before{content:"";width:16px;height:16px;flex-shrink:0;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z'/%3E%3Cline x1='12' y1='9' x2='12' y2='13'/%3E%3Cline x1='12' y1='17' x2='12.01' y2='17'/%3E%3C/svg%3E") center/contain no-repeat}
 .err.show{display:flex}
-
-.ok-banner{background:var(--c-success-bg);border:1px solid rgba(54,139,79,.2);border-radius:var(--r-sm);padding:.75rem 1rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-primary-dark)}
-.ok-banner strong{color:var(--c-text);font-size:var(--fs-body)}
 
 /* Buttons */
 .btn{width:100%;padding:.85rem;background:linear-gradient(150deg,var(--c-primary),var(--c-primary-dark));border:none;border-radius:var(--r-sm);color:#0F1410;font-size:var(--fs-body);font-weight:var(--fw-semibold);font-family:var(--fd);cursor:pointer;transition:all var(--ease);box-shadow:var(--ne-sm);letter-spacing:.1px}
@@ -173,7 +175,7 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .link-btn-r{text-align:right;margin:-.4rem 0 .7rem}
 .link-btn-r button{background:none;border:none;color:var(--c-primary);font-size:.8rem;font-weight:var(--fw-semibold);cursor:pointer;font-family:var(--ff);padding:0}
 
-/* Payment / Trial / Status / Permanent pages */
+/* Payment / Trial / Status panels */
 .pay-box{display:none}
 .pay-box.on{display:block;animation:enter .3s var(--ease-spring)}
 .qr-wrap{text-align:center;margin:1rem 0;padding:1.1rem;background:var(--c-bg);border-radius:var(--r-lg);position:relative;box-shadow:var(--ne-in-sm)}
@@ -202,40 +204,33 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .status-card h2{font-size:var(--fs-section-title);font-weight:var(--fw-bold);margin-bottom:.35rem;color:var(--c-text)}
 .status-card p{font-size:var(--fs-caption);color:var(--t3);line-height:var(--lh-normal);margin-bottom:1.1rem}
 
-/* Auto-redirect screen for an already-permanent session — deliberately
-   the LIGHTEST screen in the whole file: a spinner and one line, no
-   buttons to read or tap, because a permanent user has already proven
-   who they are and shouldn't have to do anything else here at all. */
+/* Auto-redirect screen (permanent user handoff) — deliberately the
+   lightest screen in the whole file: a spinner and one line. */
 .redirect-card{text-align:center;padding:2.2rem .5rem 1rem}
 .redirect-card .spin-lg{width:34px;height:34px;border:3px solid var(--c-divider);border-top-color:var(--c-primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}
 .redirect-card p{font-size:var(--fs-body);color:var(--t2);margin-bottom:1.1rem}
 
-/* Mobile-number prompt — a compact inline nudge shown on the trial/
-   payment screens only (never on the auto-redirect screen, which is
-   intentionally too brief to interact with) when the account has no
-   mobile on file, e.g. a Google Sign-In account. */
+/* Mobile-number prompt — shown on trial/payment screens only, when the
+   account has no mobile on file (typical for Google Sign-In accounts). */
 .mobile-prompt{background:var(--c-info-bg);border:1px solid rgba(43,108,176,.18);border-radius:var(--r-sm);padding:.7rem .85rem;margin-bottom:1rem}
 .mobile-prompt p{font-size:.76rem;color:var(--c-info);margin-bottom:.55rem;line-height:1.4}
 .mobile-prompt .row{display:flex;gap:.5rem}
 .mobile-prompt input{flex:1;background:var(--c-surface);border:none;border-radius:var(--r-sm);padding:.55rem .75rem;font-size:.85rem;font-family:var(--ff);outline:none;box-shadow:var(--ne-in-sm)}
 .mobile-prompt.saved{display:none}
 
-/* Toast */
+/* ═══ TOASTS ═══
+   FIXED PANEL — always dark, always light text. Using var(--c-text) as
+   the background made the toast invisible in dark mode (white on white).
+   The toast panel is intentionally theme-independent. */
 #toasts{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.4rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
-.toast{background:var(--c-text);border-radius:var(--r-sm);padding:.6rem 1.1rem;font-size:var(--fs-caption);font-weight:var(--fw-medium);color:#fff;box-shadow:var(--sh-lg);animation:tin .18s var(--ease-spring);pointer-events:auto;max-width:100%;text-align:center}
+.toast{background:#111417;border:1px solid rgba(255,255,255,.10);border-radius:var(--r-sm);padding:.65rem 1.1rem;font-size:var(--fs-caption);font-weight:var(--fw-medium);color:#FFFFFF;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tin .18s var(--ease-spring);pointer-events:auto;max-width:100%;text-align:center}
 .toast.out{animation:tout .2s ease forwards}
 @keyframes tin{from{opacity:0;transform:translateY(10px) scale(.95)}to{opacity:1;transform:none}}
 @keyframes tout{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
 
-/* Google Sign-In block. IMPORTANT: hidden via visibility+height, never
+/* Google Sign-In block. hidden via visibility+height, NEVER
    display:none — Google's renderButton() measures its container at
-   render time, and a display:none parent gives it 0×0 to measure,
-   producing a broken/invisible button that stays broken even after
-   later being un-hidden. visibility:hidden keeps the container in the
-   normal layout tree (correctly sized) while still invisible and
-   non-interactive, so the button always renders correctly regardless
-   of whether Google's script finishes loading before or after the
-   current screen becomes login/signup. */
+   render time, and a display:none parent gives it 0×0 to measure. */
 #g-signin-wrap{margin:.7rem 0;visibility:visible;height:auto;overflow:visible;transition:opacity .15s ease}
 #g-signin-wrap.g-hidden{visibility:hidden;height:0;margin:0;overflow:hidden;pointer-events:none}
 #g-signin-wrap.g-busy{opacity:.55;pointer-events:none}
@@ -243,52 +238,41 @@ body{font-family:var(--ff);background:var(--c-bg);color:var(--t1);display:block;
 .g-or-div{display:flex;align-items:center;gap:.6rem;margin:.75rem 0;color:var(--t3);font-size:var(--fs-caption);font-weight:var(--fw-medium)}
 .g-or-div::before,.g-or-div::after{content:"";flex:1;height:1px;background:var(--c-divider)}
 
-/* ── TikTok-style vertical paging: login / about / faq as three
-   full-viewport "posts" you scroll (or swipe, on touch) between, same
-   mechanism on phone and PC — CSS scroll-snap needs no touch-specific
-   code at all, since browsers already turn a touch swipe into a scroll
-   gesture on an overflow-y:scroll container. ── */
+/* Offline badge */
+.offline-badge{display:none;background:var(--c-bg);border-radius:var(--r-sm);padding:.45rem .8rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-warning);font-weight:var(--fw-medium);box-shadow:var(--ne-in-sm)}
+.offline-badge.show{display:block}
+
+/* ═══ Vertical snap paging (login / about / faq) ═══ */
 html,body{height:100%}
 .snap-container{height:100vh;height:100svh;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch}
 .snap-post{min-height:100vh;min-height:100svh;scroll-snap-align:start;scroll-snap-stop:always;position:relative;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1.4rem 0;overflow-y:auto}
-/* The login post's own card is vertically centered by the flex parent
-   above; about/faq posts get a heading-first, top-aligned layout instead
-   since their content is a scrollable list of cards, not one centered
-   object. */
 .snap-post.top-aligned{justify-content:flex-start;padding-top:2.2rem}
 
-/* Page dots — a small, constant "you are 1 of 3" indicator, same idea
-   as TikTok's own vertical progress cue. Fixed to the viewport (not the
-   scroll container) so it stays put and reflects whichever post is
-   currently snapped, on phone or PC alike. Click a dot to jump straight
-   to that post. */
+/* Page dots — small "you are 1 of 3" indicator, fixed to the viewport
+   so it reflects whichever post is currently snapped. */
 .page-dots{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:.55rem}
 .page-dots button{width:8px;height:8px;border-radius:50%;border:none;background:var(--c-divider);padding:0;cursor:pointer;transition:all var(--ease);box-shadow:none}
 .page-dots button.active{background:var(--c-primary);height:22px;border-radius:5px}
 
-/* Bottom-of-first-post scroll hint — a quiet, self-dismissing nudge
-   ("there's more below") rather than a permanent fixture; it lives
-   inside the login post itself (not fixed to the viewport), so it
-   naturally scrolls away with that post and never has to be manually
-   hidden once the person reaches post 2. */
+/* Bottom-of-first-post scroll hint — quiet, self-dismissing nudge. */
 .scroll-hint{position:absolute;left:0;right:0;bottom:10px;display:flex;flex-direction:column;align-items:center;gap:.3rem;color:var(--c-text-faint);font-size:.72rem;font-weight:var(--fw-medium);z-index:2;transition:opacity .25s ease;pointer-events:none}
 .scroll-hint.hide{opacity:0}
 .scroll-hint svg{width:18px;height:18px;animation:hint-bounce 1.6s ease-in-out infinite}
 @keyframes hint-bounce{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(5px);opacity:1}}
 @media(prefers-reduced-motion:reduce){.scroll-hint svg{animation:none}}
-@media(max-height:640px){.scroll-hint{bottom:4px}}
 
-/* Offline badge */
-.offline-badge{display:none;background:var(--c-bg);border-radius:var(--r-sm);padding:.45rem .8rem;margin-bottom:1rem;text-align:center;font-size:var(--fs-caption);color:var(--c-warning);font-weight:var(--fw-medium);box-shadow:var(--ne-in-sm)}
-.offline-badge.show{display:block}
-
-/* Responsive — same card/layout on phone-sized "app" viewports and
-   full-width PC/desktop browsers; only the outer margins/padding shrink
-   below 480px, so nothing here needs separate app-vs-PC logic. */
+/* Responsive — same card on phone-sized and full-width viewports, only
+   the outer margins/padding shrink below 480px. */
 @media(max-width:480px){.card{padding:1.75rem 1.35rem;margin:.8rem;border-radius:var(--r-lg)}.fld-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+
+<a href="#snap-container" class="skip-link">Skip to content</a>
+
+<button class="theme-toggle" style="position:fixed;top:14px;right:14px;z-index:21" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+  <i class="ph ph-moon" aria-hidden="true"></i><i class="ph ph-sun" aria-hidden="true"></i>
+</button>
 
 <div class="bg-motif" aria-hidden="true"></div>
 
@@ -319,9 +303,8 @@ html,body{height:100%}
   <div class="offline-badge" id="offline-badge">Offline mode — using cached session</div>
 
   <!-- AUTO-REDIRECT — shown ONLY for an already-permanent session while
-       it hands off to user.html; see APP.enterDashboard(). Everything
-       else in this card stays hidden the whole time so a returning
-       permanent user never has to read or tap anything here. -->
+       it hands off to user.html. Everything else stays hidden so a
+       returning user never has to read or tap anything here. -->
   <div id="form-redirecting" class="pay-box" style="display:none">
     <div class="redirect-card">
       <div class="spin-lg"></div>
@@ -330,56 +313,48 @@ html,body{height:100%}
     </div>
   </div>
 
-  <!-- MODE TABS -->
   <div class="tabs" id="auth-tabs">
     <button class="tab active" onclick="APP.setMode('login')">Sign In</button>
     <button class="tab" onclick="APP.setMode('signup')">Create Account</button>
   </div>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6654137367323086"
-     crossorigin="anonymous"></script>
+
   <div class="err" id="err" role="alert" aria-live="assertive"></div>
 
-  <!-- Google Sign-In — works for both "Sign In" and "Create Account" tabs,
-       since a Google login on an unrecognized email creates a new trial
-       account server-side (see handleGoogleLogin in CODE.gs). Rendered
-       once here rather than duplicated per-tab; hidden entirely if the
-       client ID below is never configured, and on the forgot/reset
-       screens where "sign in with Google" wouldn't make sense. -->
+  <!-- Google Sign-In — works for both "Sign In" and "Create Account",
+       since Google login on an unrecognized email creates a new trial
+       server-side. Hidden entirely if the client ID is never configured. -->
   <div id="g-signin-wrap" class="g-hidden">
     <div id="g-signin-btn"></div>
     <div class="g-or-div">OR</div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       UNIFIED LOGIN — Single form routes to Admin OR User
-       ═══════════════════════════════════════════════════════════════ -->
+  <!-- UNIFIED LOGIN — routes to admin OR user world -->
   <div id="form-login">
     <div class="fld"><label for="in-user">Username</label><input type="text" id="in-user" placeholder="Enter username" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
-    <div class="fld"><label for="in-pass">Password</label><input type="password" id="in-pass" placeholder="Enter password" autocomplete="current-password"></div>
+    <div class="fld"><label for="in-pass">Password</label><div class="pw-field"><input type="password" id="in-pass" placeholder="Enter password" autocomplete="current-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
     <div class="link-btn-r"><button type="button" onclick="APP.setMode('forgot')">Forgot password?</button></div>
     <button class="btn" id="btn-login" onclick="APP.login()">Sign In →</button>
     <div class="link-row"><span>New here?</span><button onclick="APP.setMode('signup')">Create Account</button></div>
   </div>
 
-  <!-- FORGOT PASSWORD — request a reset code (username OR email) -->
+  <!-- FORGOT PASSWORD -->
   <div id="form-forgot" style="display:none">
-    <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Enter your username or the email on your account. If it matches an account, we'll email a reset code to it.</p>
+    <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Enter your username or the email on your account. If it matches, we'll email a reset code.</p>
     <div class="fld"><label for="fg-id">Username or Email</label><input type="text" id="fg-id" placeholder="Your username or email" autocapitalize="none" spellcheck="false"></div>
     <button class="btn" id="btn-forgot" onclick="APP.requestReset()">Send Reset Code →</button>
     <div class="link-row"><button onclick="APP.setMode('login')">Back to Sign In</button></div>
   </div>
 
-  <!-- RESET PASSWORD — consume the emailed code (pasted, or prefilled
-       from a ?resetToken= link if the person tapped it instead) -->
+  <!-- RESET PASSWORD -->
   <div id="form-reset" style="display:none">
     <p style="font-size:.8rem;opacity:.75;margin-bottom:.8rem">Paste the reset code from your email, then choose a new password.</p>
     <div class="fld"><label for="rs-code">Reset Code</label><input type="text" id="rs-code" placeholder="Paste the code from your email" autocapitalize="none" spellcheck="false"></div>
-    <div class="fld"><label for="rs-pass">New Password</label><input type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password"></div>
+    <div class="fld"><label for="rs-pass">New Password</label><div class="pw-field"><input type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
     <button class="btn" id="btn-reset" onclick="APP.confirmReset()">Reset Password →</button>
     <div class="link-row"><button onclick="APP.setMode('login')">Back to Sign In</button></div>
   </div>
 
-  <!-- SIGNUP FORM -->
+  <!-- SIGNUP -->
   <div id="form-signup" style="display:none">
     <div class="fld-row">
       <div class="fld"><label for="su-name">Full Name</label><input type="text" id="su-name" placeholder="Your name"></div>
@@ -388,8 +363,8 @@ html,body{height:100%}
     <div class="fld"><label for="su-email">Email Address</label><input type="email" id="su-email" placeholder="you@example.com"></div>
     <div class="fld"><label for="su-user">Username</label><input type="text" id="su-user" placeholder="Choose username" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
     <div class="fld-row">
-      <div class="fld"><label for="su-pass">Password</label><input type="password" id="su-pass" placeholder="Min 6 chars" autocomplete="new-password"></div>
-      <div class="fld"><label for="su-cpass">Confirm</label><input type="password" id="su-cpass" placeholder="Repeat password" autocomplete="new-password"></div>
+      <div class="fld"><label for="su-pass">Password</label><div class="pw-field"><input type="password" id="su-pass" placeholder="Min 6 chars" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
+      <div class="fld"><label for="su-cpass">Confirm</label><div class="pw-field"><input type="password" id="su-cpass" placeholder="Repeat password" autocomplete="new-password"><button type="button" class="pw-toggle" onclick="togglePwVisibility(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button></div></div>
     </div>
     <button class="btn" id="btn-signup" onclick="APP.signup()">Create Account →</button>
     <div class="link-row"><span>Have an account?</span><button onclick="APP.setMode('login')">Sign In</button></div>
@@ -411,7 +386,7 @@ html,body{height:100%}
     <button class="btn-sec" onclick="APP.logout()">Logout</button>
   </div>
 
-  <!-- PAYMENT FORM -->
+  <!-- PAYMENT -->
   <div id="form-payment" class="pay-box" style="display:none">
     <div class="expired-banner" id="pay-banner" style="display:none">
       <strong>Trial Expired</strong><br>Complete payment to unlock permanent access.
@@ -476,7 +451,7 @@ html,body{height:100%}
 
   <div class="about-card">
     <h3>What does Abhyas cover?</h3>
-    <p>Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating & Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections that appear alongside the technical paper.</p>
+    <p>Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating &amp; Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections that appear alongside the technical paper.</p>
   </div>
 
   <div class="about-card">
@@ -505,12 +480,12 @@ html,body{height:100%}
 
   <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
     <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">What subjects does Abhyas cover for Level 7 Civil Engineering?</summary>
-    <p style="margin-top:.4rem">Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating & Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections that appear alongside the technical paper.</p>
+    <p style="margin-top:.4rem">Structural Engineering, Engineering Survey, Construction Materials, Concrete Technology, Geotechnical Engineering, Construction Management, Estimating &amp; Costing, Engineering Drawing, Engineering Economics, and Professional Practices — plus General Knowledge and IQ/reasoning sections.</p>
   </details>
 
   <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
     <summary style="cursor:pointer;font-weight:600;color:var(--c-text)">Can I use Abhyas offline?</summary>
-    <p style="margin-top:.4rem">Yes. Once you've opened a chapter or subtopic while online, its questions are cached on your device — you can keep practicing the same content with no internet connection, including during load-shedding or while travelling. New or unopened content still needs a connection the first time.</p>
+    <p style="margin-top:.4rem">Yes. Once you've opened a chapter or subtopic while online, its questions are cached on your device — you can keep practicing with no internet connection, including during load-shedding or while travelling. New content still needs a connection the first time.</p>
   </details>
 
   <details style="margin-bottom:.5rem;background:var(--c-surface);border-radius:var(--r-sm);padding:.6rem .8rem;box-shadow:var(--ne-sm)">
@@ -557,106 +532,70 @@ html,body{height:100%}
   ]
 }
 </script>
-
 </main>
 
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
+<!-- Cookie/tracking notice — this page loads Google Identity Services,
+     which sets its own cookies. Accepting only dismisses the notice. -->
+<div class="cookie-banner" id="cookie-banner" hidden role="region" aria-label="Cookie notice">
+  <p>Abhyas uses cookies for sign-in and to show ads that help keep the app free. Continuing to use the site means you're okay with that.</p>
+  <button class="btn-accept" onclick="COOKIE_NOTICE.accept()">Got it</button>
+</div>
 
 <script src="version.js"></script>
 <script src="shared.js"></script>
 <script>
-/* ═════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════
    ABHYAS — UNIFIED GATEWAY
-   One login → Admin (admin.html) OR User (user.html)
-   Session schema designed for online + offline validation in user.html
-   ═════════════════════════════════════════════════════════════════════════════ */
+   One login → Admin (admin.html) OR User (user.html), and dual-role
+   accounts (username present in BOTH Users and Admins sheets with the
+   same password) get BOTH sessions written so the panel and the study
+   app are one click apart in either direction.
+   ═══════════════════════════════════════════════════════════════════════ */
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyZLZxf6VKNiMfhY6memPTKj-dGW7jxyX1c-9GI0OPG8TqazSZi_P-7Y-8DlpT0ZlrjHg/exec"; // ← REPLACE WITH YOUR DEPLOYED URL
+const GAS_URL = ABHYAS_CONFIG.GAS_URL; // single source of truth — see config.js
 
-// ⚠️ REPLACE with the SAME OAuth 2.0 Web Client ID configured as
-// GOOGLE_CLIENT_ID in CODE.gs — this is the public half (client IDs are
-// not secret and are meant to ship in frontend code); the backend uses it
-// only to confirm the ID token it receives was actually minted for this
-// app. In Google Cloud Console → Credentials → this OAuth Client →
-// Authorized JavaScript origins, add the exact origin(s) this page is
-// served from. Leave the placeholder as-is to hide Google Sign-In
-// entirely rather than show a button that can only fail.
+// ⚠️ Replace with the SAME OAuth 2.0 Web Client ID configured as
+// GOOGLE_CLIENT_ID in code.gs. Public half — client IDs are not secret.
 const GOOGLE_CLIENT_ID = "242226857075-hpkbjoqhlem95fu6vkf712e8ijs33sng.apps.googleusercontent.com";
 
-/* ═════════════════════════════════════════════════════════════════════════════
-   SESSION SCHEMA (stored in localStorage as 'abhyas_session')
-   ───────────────────────────────────────────────────────────────────────────
-   {
-     type: "user" | "admin",
-     username: string,
-     name: string,           // user only
-     email: string,          // user only
-     mobile: string,         // user only
-     token: string,          // session token from backend
-     access: {
-       level: "permanent" | "trial" | "pending_review" | "expired" | "unknown",
-       trialExpiresAt: "ISO date string", // if trial
-       permanent: boolean,
-       accessType: "permanent" | "yearly",
-       accessExpiresAt: "ISO date string or ''"
-     },
-     settings: {             // cached app settings
-       paymentAmount: "XXX",
-       contactPhone: "9863200285",
-       qrCodeUrl: "...",
-       paymentInstructions: "..."
-     },
-     lastVerified: timestamp,
-     createdAt: timestamp
-   }
-
-   FOR user.html DEVELOPERS:
-   ─────────────────────────
-   1. Read: const s = JSON.parse(localStorage.getItem('abhyas_session'));
-   2. If !s or s.type !== 'user' → redirect to gateway.
-   3. OFFLINE check:
-      - if s.access.level === 'permanent' → ALLOW
-      - if s.access.level === 'trial'  → check Date.now() < new Date(s.access.trialExpiresAt)
-      - if s.access.level === 'expired' or 'pending_review' or 'unknown' → BLOCK, redirect to gateway
-   4. ONLINE check (background):
-      - fetch(GAS_URL + '?action=checkSession&token=' + s.token)
-      - Update s.access if server state changed.
-   5. Call APP.logout() from gateway if you need global logout.
-   ═════════════════════════════════════════════════════════════════════════════ */
+/* ── STORAGE KEYS ──
+   'abhyas_session' — this page's unified user OR admin-only session.
+   'abhyas_admin'   — admin panel's own session (read by admin.html on
+                      boot to skip its login gate). A dual-role login
+                      writes BOTH so the switcher works without a second
+                      round-trip. */
+const LS_USER = 'abhyas_session';
+const LS_ADMIN = 'abhyas_admin';
 
 const APP = {
   mode: 'login',
   online: false,
   trialTimerId: null,
   fileData: null,
-  session: null, // in-memory copy
+  session: null,
 
   async init() {
-    this.checkNet(); // fire in the background — don't block rendering on a ping
+    this.checkNet(); // fire in background — don't block rendering
     setInterval(() => this.checkNet(), 15000);
     this.initGoogleSignIn();
     this.initPaging();
 
-    // A person who clicked the reset-code link from their email (see
-    // requestPasswordReset's emailed code in CODE.gs) can land here with
-    // either ?resetToken=... or ?reset=... in the URL — accept both
-    // param spellings so an older bookmarked/shared link still works.
-    // Prefilling and jumping straight to the reset form takes priority
-    // over resuming any existing saved session, since clicking that link
-    // means "I want to reset my password", not "resume whatever I was
-    // doing before".
+    // Password-reset email link lands here with ?resetToken=... or
+    // ?reset=... — accept both so older links still work. Takes priority
+    // over resuming any saved session.
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('resetToken') || params.get('reset');
     if (urlToken) {
-      history.replaceState(null, '', window.location.pathname); // don't leave the code sitting in the visible URL/history
+      history.replaceState(null, '', window.location.pathname);
       this.setMode('reset');
       const codeEl = document.getElementById('rs-code');
       if (codeEl) codeEl.value = urlToken;
       return;
     }
 
-    // Resume existing session
+    // Resume saved session if there is one.
     const saved = this.getSession();
     if (saved) {
       this.session = saved;
@@ -682,17 +621,13 @@ const APP = {
     const startedAt = Date.now();
     this.online = await pingBackend(GAS_URL);
     const roundTripMs = Date.now() - startedAt;
+
     if (this.online) {
-      // Online, but slow enough (Apps Script cold-starts and Sheets-as-DB
-      // reads can both add real latency) that a person might otherwise
-      // blame a broken app for what's actually just a slow round trip.
       const slow = roundTripMs > 3000;
       dot.className = slow ? 'ndot warn' : 'ndot';
       txt.textContent = slow ? 'Connected — slow response' : 'Backend connected';
       badge.classList.remove('show');
-      if (!wasOnline && this.mode === 'payment') {
-        this.loadPaymentUI();
-      }
+      if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
       if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_STALE_IF_ONLINE' });
       }
@@ -711,7 +646,7 @@ const APP = {
     btn.textContent = this.online ? 'Submit Payment →' : 'Offline — reconnect to pay';
   },
 
-  /* ── TikTok-style paging (login / about / faq) ── */
+  /* ── Vertical snap paging (login / about / faq) ── */
   initPaging() {
     const container = document.getElementById('snap-container');
     const dots = Array.from(document.querySelectorAll('#page-dots button'));
@@ -725,12 +660,13 @@ const APP = {
       });
     });
 
-    const posts = ['post-login', 'post-about', 'post-faq'].map(id => document.getElementById(id)).filter(Boolean);
+    const posts = ['post-login', 'post-about', 'post-faq']
+      .map(id => document.getElementById(id)).filter(Boolean);
+
     const observer = new IntersectionObserver((entries) => {
-      // Pick whichever observed post has the most of itself currently
-      // visible — during a smooth-scroll transition more than one entry
-      // can cross the 0.5 threshold in the same callback, so "most
-      // visible" is a steadier signal than "first one seen".
+      // Pick whichever post is most visible — during a smooth-scroll
+      // transition, more than one entry can cross the threshold in the
+      // same callback, so "most visible" is steadier than "first seen".
       let best = null;
       entries.forEach(entry => {
         if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
@@ -747,10 +683,8 @@ const APP = {
 
     posts.forEach(post => observer.observe(post));
 
-    // Belt-and-suspenders: also dismiss the hint on the very first manual
-    // scroll inside the container, so it never lingers a beat after
-    // someone's clearly already found their way to post 2/3 via a fast
-    // swipe the observer's 0.5 threshold hasn't caught up to yet.
+    // Also dismiss the hint on the very first manual scroll, in case a
+    // fast swipe outruns the observer's threshold.
     container.addEventListener('scroll', () => {
       if (container.scrollTop > 40 && hint) hint.classList.add('hide');
     }, { passive: true });
@@ -759,23 +693,33 @@ const APP = {
   /* ── Session helpers ── */
   getSession() {
     try {
-      const raw = localStorage.getItem('abhyas_session');
-      if (!raw) return null;
-      return JSON.parse(raw);
+      const raw = localStorage.getItem(LS_USER);
+      return raw ? JSON.parse(raw) : null;
     } catch (e) {
-      localStorage.removeItem('abhyas_session');
+      localStorage.removeItem(LS_USER);
       return null;
     }
   },
-
   saveSession(obj) {
     this.session = obj;
-    localStorage.setItem('abhyas_session', JSON.stringify(obj));
+    try { localStorage.setItem(LS_USER, JSON.stringify(obj)); } catch (e) {}
   },
-
   clearSession() {
     this.session = null;
-    localStorage.removeItem('abhyas_session');
+    try { localStorage.removeItem(LS_USER); } catch (e) {}
+  },
+
+  /* Persist the admin token where admin.html reads it on boot. Without
+     this, an admin who logs in here would have to log in again on the
+     admin panel — the two pages keep separate localStorage keys. */
+  saveAdminToken(username, adminToken, ttlMs) {
+    try {
+      localStorage.setItem(LS_ADMIN, JSON.stringify({
+        user: username,
+        token: adminToken,
+        expires: Date.now() + (ttlMs || 24 * 60 * 60 * 1000)
+      }));
+    } catch (e) { /* non-fatal; admin.html will fall back to its gate */ }
   },
 
   /* ── UI Mode Switcher ── */
@@ -796,11 +740,11 @@ const APP = {
       el.style.display = show ? 'block' : 'none';
       if (show) el.classList.add('on'); else el.classList.remove('on');
     });
-    // Google Sign-In only makes sense on the login/signup tabs — not on
-    // forgot/reset (the person is explicitly dealing with a plain-password
-    // account there) and not on the redirect/trial/payment/status screens.
+
+    // Google Sign-In only makes sense on login/signup tabs.
     const gWrap = document.getElementById('g-signin-wrap');
     if (gWrap) gWrap.classList.toggle('g-hidden', !(this._gReady && (m === 'login' || m === 'signup')));
+
     this.hideErr();
     if (m !== 'trial') this.clearTrialTimer();
 
@@ -839,40 +783,31 @@ const APP = {
       } catch (e) {
         return { success: false, error: 'Network error. Check connection or CORS settings.' };
       }
-    } else {
-      try {
-        const r = await fetch(GAS_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ action, ...params })
-        });
-        return await r.json();
-      } catch (e) {
-        return { success: false, error: 'Network error. Check connection or CORS settings.' };
-      }
+    }
+    try {
+      const r = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action, ...params })
+      });
+      return await r.json();
+    } catch (e) {
+      return { success: false, error: 'Network error. Check connection or CORS settings.' };
     }
   },
 
-  /* ═════════════════════════════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════════════════════════
      GOOGLE SIGN-IN
-     Renders Google's own button (its look/text is controlled by Google, not
-     styleable via our CSS — that's intentional, it's a trust signal people
-     recognize). On success, Google hands back a signed ID token; that token
-     goes to our backend's googleLogin action, which verifies it server-side
-     and returns the exact same shape as a normal login.
-     ═════════════════════════════════════════════════════════════════════════════ */
+     ═══════════════════════════════════════════════════════════════════ */
   initGoogleSignIn() {
-    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('REPLACE_WITH_')) return; // not configured — hide the option entirely rather than show a button that can only fail
+    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('REPLACE_WITH_')) return;
     let attempts = 0;
     const tryInit = () => {
       if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-        // gsi/client script loads async — wait for it rather than racing it.
-        // Capped at ~20s total: a network/CDN block means it's genuinely
-        // not coming, not just slow, and endlessly polling forever would
-        // otherwise silently keep a timer running for the rest of the
-        // session.
+        // Capped at ~20s — if the GSI script never arrives (blocked CDN,
+        // offline, origin not whitelisted), stop polling.
         if (++attempts > 100) {
-          console.warn('[APP] Google Identity Services never became available (script blocked, offline, or this origin lacks network access to accounts.google.com) — hiding Sign in with Google.');
+          console.warn('[APP] Google Identity Services unavailable — hiding Sign in with Google.');
           return;
         }
         setTimeout(tryInit, 200);
@@ -881,7 +816,7 @@ const APP = {
       google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: (response) => this.onGoogleCredential(response),
-        itp_support: true // Safari's Intelligent Tracking Prevention needs this to keep the flow working (redirect-based fallback) rather than silently failing
+        itp_support: true // Safari ITP needs this to keep the flow working
       });
       const btnHost = document.getElementById('g-signin-btn');
       google.accounts.id.renderButton(btnHost, {
@@ -891,17 +826,12 @@ const APP = {
       if (this.mode === 'login' || this.mode === 'signup') {
         document.getElementById('g-signin-wrap').classList.remove('g-hidden');
       }
-      // Google's SDK doesn't call an error callback when it declines to
-      // render — the most common cause by far is this origin not being
-      // in the OAuth client's "Authorized JavaScript origins" list (see
-      // Google Cloud Console → Credentials), and the ONLY symptom is a
-      // console.error from Google itself plus an empty container. A
-      // short delay is enough for renderButton's iframe to have appeared
-      // if it's going to; if nothing showed up, replace the empty gap
-      // with an honest, visible explanation instead of silence.
+      // If Google's SDK declined to render (most often because this
+      // origin isn't in the OAuth client's Authorized JavaScript
+      // origins), replace the empty container with an honest note.
       setTimeout(() => {
         if (!btnHost.hasChildNodes()) {
-          console.warn('[APP] Google rendered nothing into #g-signin-btn — check the browser console just above this line for a Google [GSI_LOGGER] error, and confirm this exact origin (' + window.location.origin + ') is listed under this OAuth client\u2019s Authorized JavaScript origins.');
+          console.warn('[APP] Google rendered nothing into #g-signin-btn — check origin whitelist. Origin: ' + window.location.origin);
           btnHost.innerHTML = '<div style="font-size:.74rem;color:var(--c-text-faint);text-align:center;padding:.5rem 0">Google Sign-In isn\u2019t available on this address — use username/password below.</div>';
         }
       }, 1200);
@@ -912,21 +842,20 @@ const APP = {
   async onGoogleCredential(response) {
     const wrap = document.getElementById('g-signin-wrap');
     if (!response || !response.credential) return this.showErr('Google sign-in did not return a token. Please try again.');
-    if (wrap) wrap.classList.add('g-busy'); // block a double-tap while the token is being verified server-side
+    if (wrap) wrap.classList.add('g-busy');
     this.setLoading('btn-login', true);
     const res = await this.api('googleLogin', { idToken: response.credential }, 'POST');
     this.setLoading('btn-login', false);
     if (wrap) wrap.classList.remove('g-busy');
     if (!res.success) return this.showErr(res.error || 'Google sign-in failed.');
-    // handleGoogleLogin always returns a plain user (never isAdmin) — no
-    // admin-routing branch needed here, unlike the password login() below.
     this.toast('👋 Signed in with Google');
     this.handleUserAuth(res);
   },
 
-  /* ═════════════════════════════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════════════════════════
      UNIFIED LOGIN
-     ═════════════════════════════════════════════════════════════════════════════ */
+     Routes to admin world, user world, or BOTH for dual-role accounts.
+     ═══════════════════════════════════════════════════════════════════ */
   async login() {
     const u = document.getElementById('in-user').value.trim();
     const p = document.getElementById('in-pass').value;
@@ -940,25 +869,46 @@ const APP = {
     if (!res.success) return this.showErr(res.error || 'Login failed.');
 
     if (res.isAdmin) {
-      this.saveSession({
-        type: 'admin',
-        username: u,
-        token: res.token || res.adminToken,
-        lastVerified: Date.now()
-      });
+      // v1.07 — persist the admin token where admin.html reads it on
+      // boot, so a fresh admin login from this page opens the panel
+      // straight to the dashboard, no second login.
+      this.saveAdminToken(u, res.adminToken, res.expiresInMs);
+
+      // Dual-role: same username is ALSO in Users, and its password was
+      // verified by the backend. Save the user session too, then go to
+      // user.html — the "Switch to Admin" button lives there and reads
+      // the admin token we just saved. No round-trip needed.
+      if (res.user && res.token) {
+        const access = computeAccessLevel(res, res.user);
+        this.saveSession({
+          type: 'user',
+          username: res.user.username || u,
+          name: res.user.name || '',
+          email: res.user.email || '',
+          mobile: res.user.mobile || '',
+          token: res.token,
+          access,
+          settings: res.settings || {},
+          lastVerified: Date.now(),
+          adminCapable: true
+        });
+        this.toast('🛡️ Signed in — admin + user access');
+        setTimeout(() => { window.location.href = 'user.html'; }, 400);
+        return;
+      }
+
+      // Admin-only account — go straight to the admin panel.
       this.toast('🛡️ Welcome, Administrator!');
-      setTimeout(() => this.goAdmin(), 500);
+      setTimeout(() => { window.location.href = 'admin.html'; }, 400);
       return;
     }
 
     this.handleUserAuth(res);
   },
 
-  /* ═════════════════════════════════════════════════════════════════════════════
-     PASSWORD RESET (code-based — matches requestPasswordReset/resetPassword
-     in CODE.gs, which email a short one-time CODE to paste, not a magic
-     link the person just clicks through)
-     ═════════════════════════════════════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════════════════════════
+     PASSWORD RESET
+     ═══════════════════════════════════════════════════════════════════ */
   async requestReset() {
     const id = document.getElementById('fg-id').value.trim();
     if (!id) return this.showErr('Enter your username or email.');
@@ -967,11 +917,8 @@ const APP = {
     const res = await this.api('requestPasswordReset', { identifier: id }, 'POST');
     this.setLoading('btn-forgot', false);
 
-    // The backend deliberately always returns success:true here (see
-    // requestPasswordReset's own comment in CODE.gs) — a specific
-    // "no account found" error would let anyone probe which usernames/
-    // emails are registered, so this client can't and shouldn't try to
-    // show anything more specific than the generic message either.
+    // Backend always returns success:true here (would otherwise leak
+    // which usernames exist). Client can't be more specific either.
     if (!res.success) return this.showErr(res.error || 'Something went wrong — try again.');
     this.toast('📧 ' + (res.message || 'If that account exists, a reset code has been emailed to it.'), 6000);
     this.setMode('reset');
@@ -994,9 +941,9 @@ const APP = {
     this.setMode('login');
   },
 
-  /* ═════════════════════════════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════════════════════════
      SIGNUP
-     ═════════════════════════════════════════════════════════════════════════════ */
+     ═══════════════════════════════════════════════════════════════════ */
   async signup() {
     const name = document.getElementById('su-name').value.trim();
     const email = document.getElementById('su-email').value.trim();
@@ -1019,13 +966,9 @@ const APP = {
     if (!res.success) return this.showErr(res.error || 'Signup failed.');
 
     this.toast('🎉 Account created! 24-hour trial started.');
-
-    const session = {
+    this.saveSession({
       type: 'user',
-      username: user,
-      name,
-      email,
-      mobile,
+      username: user, name, email, mobile,
       token: res.token,
       access: {
         level: 'trial',
@@ -1034,28 +977,19 @@ const APP = {
       },
       settings: {},
       lastVerified: Date.now()
-    };
-    this.saveSession(session);
+    });
     this.startTrialTimer(new Date(res.trialExpiresAt));
     this.setMode('trial');
   },
 
-  /* ═════════════════════════════════════════════════════════════════════════════
-     USER AUTH ROUTING (after login, signup, Google sign-in, or resume)
-     ═════════════════════════════════════════════════════════════════════════════ */
+  /* ═══════════════════════════════════════════════════════════════════
+     USER AUTH ROUTING
+     ═══════════════════════════════════════════════════════════════════ */
   handleUserAuth(res) {
     const user = res.user || {};
-    const access = {
-      level: res.permanentAccess || user.status === 'active' ? 'permanent'
-             : res.isTrial ? 'trial'
-             : res.needsPayment && user.status === 'payment_pending' ? 'pending_review'
-             : res.needsPayment ? 'expired'
-             : 'unknown',
-      trialExpiresAt: res.trialExpiresAt || user.trialExpiresAt,
-      permanent: !!(res.permanentAccess || user.status === 'active'),
-      accessType: res.accessType || user.accessType || 'permanent',
-      accessExpiresAt: res.accessExpiresAt || user.accessExpiresAt || ''
-    };
+    // Access-level computation lives in one place — shared.js's
+    // computeAccessLevel() — so index.html and app.js never drift.
+    const access = computeAccessLevel(res, user);
 
     const session = {
       type: 'user',
@@ -1066,15 +1000,14 @@ const APP = {
       token: res.token,
       access,
       settings: res.settings || {},
-      lastVerified: Date.now()
+      lastVerified: Date.now(),
+      adminCapable: !!res.adminCapable
     };
     this.saveSession(session);
 
-    // A FRESH login/signup/Google-signin that already resolves to
+    // Fresh login/signup/Google-signin that already resolves to
     // permanent access gets the same zero-friction handoff a resumed
-    // session gets — see enterDashboard() below. There is no reason to
-    // make someone who just proved they're a paid user sit through a
-    // "Welcome back" card and an extra button tap.
+    // session gets.
     if (access.level === 'permanent') {
       this.enterDashboard();
     } else if (access.level === 'trial') {
@@ -1102,22 +1035,17 @@ const APP = {
         const when = p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '';
         msgEl.textContent = `TXN ${p.txId} submitted${when ? ' on ' + when : ''} — waiting for admin verification. You'll get full access as soon as it's approved.`;
       }
-    } catch (e) { console.warn('[APP] getPaymentStatus poll failed, status display may be stale:', e); }
+    } catch (e) { console.warn('[APP] getPaymentStatus poll failed:', e); }
   },
 
-  /* Resumes a saved session with the LEAST work possible for the common
-     cases: permanent and active-trial are both resolved entirely from the
-     cached session, online or offline, with no network round trip at all —
-     this is what makes both of those work fully offline, on phone or PC.
-     Only a genuinely ambiguous state falls through to an online
-     checkSession() call at the bottom. */
+  /* Resume a saved session with the LEAST work possible for the common
+     cases. Permanent and active-trial both resolve entirely from the
+     cached session, online or offline, no network round trip. Only a
+     genuinely ambiguous state falls through to an online checkSession(). */
   async resumeUserSession(saved) {
     if (saved.access && saved.access.level === 'permanent') {
       this.enterDashboard(saved.name || saved.username);
-      // Best-effort, non-blocking: confirm nothing changed server-side
-      // (e.g. an admin revoked access) without ever delaying the redirect
-      // above on it — permanent access is never gated on this check.
-      this.syncSessionQuietly(saved);
+      this.syncSessionQuietly(saved); // background reconciliation
       return;
     }
     if (saved.access && saved.access.level === 'trial' && saved.access.trialExpiresAt) {
@@ -1127,10 +1055,9 @@ const APP = {
         this.setMode('trial');
         this.syncSessionQuietly(saved);
         return;
-      } else {
-        saved.access.level = 'expired';
-        this.saveSession(saved);
       }
+      saved.access.level = 'expired';
+      this.saveSession(saved);
     }
     if (saved.access && saved.access.level === 'expired') {
       this.settings = saved.settings || {};
@@ -1159,17 +1086,11 @@ const APP = {
     this.handleUserAuth(res);
   },
 
-  // Background-only reconciliation with the server — never blocks or
-  // delays anything the person is already looking at. Flips a cached
-  // trial session over to permanent the moment payment is verified
-  // server-side (so the person doesn't have to log out/in to notice);
-  // for an already-permanent session it's purely a "did access get
-  // revoked" check with nothing to update on success.
   async syncSessionQuietly(saved) {
     if (!this.online) return;
     try {
       const res = await this.api('checkSession', { token: saved.token, username: saved.username });
-      if (!res.success) return; // session actually invalid — let the NEXT foreground action discover that and redirect, rather than yanking the screen out from under someone mid-read
+      if (!res.success) return; // let the next foreground action discover this
       if (res.user) {
         const updated = { ...saved, access: { ...saved.access }, mobile: res.user.mobile || saved.mobile, lastVerified: Date.now() };
         if ((res.permanentAccess || res.user.status === 'active') && saved.access.level !== 'permanent') {
@@ -1183,15 +1104,12 @@ const APP = {
           this.saveSession(updated);
         }
       }
-    } catch (e) { /* silent — this is a quiet background check, not a user-facing action */ }
+    } catch (e) { /* silent */ }
   },
 
-  /* ── Zero-friction handoff for permanent access ──
-     The one place in this whole file whose entire job is to do as
-     little as possible: show a spinner for a beat (purely so the
-     transition doesn't feel like a glitch) and leave. Works fully
-     offline, since it never depends on anything but the cached
-     session already proven valid. */
+  /* Zero-friction handoff for permanent access. Spinner for a beat, then
+     user.html. Works fully offline — it only needs the cached session
+     already proven valid. */
   enterDashboard(displayName) {
     const nameEl = document.getElementById('redir-name');
     if (nameEl) nameEl.textContent = displayName ? ', ' + displayName : '';
@@ -1224,33 +1142,21 @@ const APP = {
     tick();
     this.trialTimerId = setInterval(tick, 1000);
   },
-
   clearTrialTimer() {
-    if (this.trialTimerId) {
-      clearInterval(this.trialTimerId);
-      this.trialTimerId = null;
-    }
+    if (this.trialTimerId) { clearInterval(this.trialTimerId); this.trialTimerId = null; }
   },
 
-  /* ── Mobile-number prompt (updateOwnMobile) ──
-     Shown only on the trial/payment screens (the two places a person
-     actually pauses on this page) and only when the account has no
-     mobile on file — the normal case for a Google Sign-In account, since
-     Google never hands one over. Payment review contacts people by
-     phone, so this closes that gap without forcing it during signup. */
+  /* ── Mobile-number prompt ── */
   renderMobilePrompt(elId) {
     const el = document.getElementById(elId);
     if (!el) return;
     const hasMobile = !!(this.session && this.session.mobile);
     el.style.display = hasMobile ? 'none' : 'block';
   },
-
   async saveMobile(inputId) {
     const input = document.getElementById(inputId);
     const mobile = input.value.trim();
-    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) {
-      return this.showErr('Invalid Nepali mobile number. Use 10 digits starting with 98/97/96/99.');
-    }
+    if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return this.showErr('Invalid Nepali mobile number. Use 10 digits starting with 98/97/96/99.');
     if (!this.session || !this.online) return this.showErr('You need an internet connection to save this.');
 
     const res = await this.api('updateOwnMobile', { username: this.session.username, token: this.session.token, mobile }, 'POST');
@@ -1271,31 +1177,15 @@ const APP = {
     if (this.online) {
       try {
         const r = await this.api('getSettings', {});
-        if (r.success) {
-          s = r.settings || {};
-        } else {
-          fetchFailed = true;
-          console.warn('getSettings returned success:false —', r.error || '(no error message)');
-        }
+        if (r.success) s = r.settings || {};
+        else { fetchFailed = true; console.warn('getSettings returned success:false —', r.error || '(no error message)'); }
       } catch (e) {
         fetchFailed = true;
         console.warn('getSettings request threw —', e);
       }
     }
-    if (Object.keys(s).length === 0 && this.session && this.session.settings) {
-      s = { ...this.session.settings };
-    }
+    if (Object.keys(s).length === 0 && this.session && this.session.settings) s = { ...this.session.settings };
     if (this.session) { this.session.settings = s; this.saveSession(this.session); }
-
-    const qrVal = s.qrCodeUrl || '';
-    console.log('%c[Payment Settings]', 'color:#F5A623;font-weight:bold', {
-      source: fetchFailed ? 'fetch failed — using cached/default' : (this.online ? 'live from backend' : 'offline cache'),
-      paymentAmount: s.paymentAmount,
-      contactPhone: s.contactPhone,
-      qrCodeUrl_length: qrVal.length,
-      qrCodeUrl_validFormat: qrVal.startsWith('data:image') || qrVal.startsWith('http'),
-      qrCodeUrl_preview: qrVal ? qrVal.slice(0, 40) + '…' : '(empty — no QR uploaded yet)'
-    });
 
     document.getElementById('pay-amt').textContent = s.paymentAmount || '100';
     document.getElementById('pay-phone').textContent = s.contactPhone || '9863200285';
@@ -1362,7 +1252,6 @@ const APP = {
 
     this.session.access.level = 'pending_review';
     this.saveSession(this.session);
-
     this.toast('✅ Payment submitted! Waiting for admin verification.');
     this.setMode('status');
   },
@@ -1389,6 +1278,9 @@ const APP = {
   },
 
   goAdmin() {
+    // The 'abhyas_session' with type=admin exists for the resume path;
+    // the actual admin token lives under 'abhyas_admin' — which we wrote
+    // at login time in login()/saveAdminToken().
     if (!this.session || this.session.type !== 'admin') {
       this.showErr('Admin session invalid.');
       return;
@@ -1399,6 +1291,9 @@ const APP = {
   logout() {
     this.clearTrialTimer();
     this.clearSession();
+    // Also drop the admin token — a fresh login should not resume
+    // silently into the admin panel.
+    try { localStorage.removeItem(LS_ADMIN); } catch (e) {}
     this.fileData = null;
     ['in-user','in-pass','su-name','su-mobile','su-email','su-user','su-pass','su-cpass','pay-txn','pay-rem','pay-file','fg-id','rs-code','rs-pass','mp-trial-mobile','mp-pay-mobile'].forEach(id => {
       const el = document.getElementById(id);
@@ -1435,6 +1330,22 @@ const APP = {
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 220); }, durationMs);
   }
 };
+
+/* Notice-only cookie banner — this page loads Google Identity Services,
+   which sets its own cookies. Persisted so it only shows once. */
+const COOKIE_NOTICE = {
+  KEY: 'abhyas_cookie_ack',
+  init() {
+    try { if (localStorage.getItem(this.KEY) === '1') return; }
+    catch (e) { return; /* can't persist — don't nag every load */ }
+    document.getElementById('cookie-banner').hidden = false;
+  },
+  accept() {
+    try { localStorage.setItem(this.KEY, '1'); } catch (e) {}
+    document.getElementById('cookie-banner').hidden = true;
+  }
+};
+COOKIE_NOTICE.init();
 
 APP.init();
 </script>
