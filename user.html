@@ -79,8 +79,8 @@ body{font-family:var(--ff);background:var(--c0);color:var(--t1);min-height:100vh
 ::selection{background:rgba(var(--amb-rgb),.22);color:var(--t1)}
 button{font-family:var(--ff)}
 
-/* ═══ APP SHELL ═══ */
-#app{display:none;flex-direction:column;min-height:100vh}
+/* ═══ APP SHELL — independent scroll panes ═══ */
+#app{display:none;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
 #app.on{display:flex}
 .off-bar{background:linear-gradient(90deg,#7C1D1D,#9B2323);color:#fff;text-align:center;font-size:.69rem;font-weight:700;padding:.32rem 1rem;display:none;letter-spacing:.4px;border-bottom:1px solid rgba(255,255,255,.12)}
 .off-bar.show{display:block}
@@ -107,8 +107,6 @@ button{font-family:var(--ff)}
 .tb-btn:active{transform:translateY(0) scale(.97)}
 .tb-btn.danger{color:var(--ros);border-color:var(--bad-bd)}
 .tb-btn.danger:hover{background:var(--bad-bg)}
-.tb-btn.amber{color:var(--amb);border-color:var(--warn-bd)}
-.tb-btn.amber:hover{background:var(--warn-bg)}
 .tb-btn.admin-portal{color:var(--vio);border-color:rgba(var(--vio-rgb),.35);background:rgba(var(--vio-rgb),.08)}
 .tb-btn.admin-portal:hover{background:var(--vio);color:#fff;box-shadow:0 0 18px var(--vio-glow)}
 @media(max-width:360px){.tb-btn{height:28px;padding:.22rem .32rem;font-size:.62rem}.tb-r{gap:.2rem}.tb-brand{gap:.4rem}}
@@ -141,7 +139,7 @@ button{font-family:var(--ff)}
 .sel-c:focus{box-shadow:var(--ne-in-sm),0 0 0 3px rgba(46,139,87,.16)}
 .sel-c option{background:var(--c1)}
 
-#main{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 1.8rem}
+#main{flex:1;overflow-y:auto;padding:1.1rem 1.1rem 1.8rem;overscroll-behavior:contain}
 @media(max-width:960px){#main{padding:.85rem .75rem calc(var(--bn-h) + var(--safe-b) + .75rem)}}
 .view{display:none}
 .view.on{display:block;animation:vfade .22s var(--eout)}
@@ -280,7 +278,7 @@ button{font-family:var(--ff)}
 .qb-btn.ok{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--grn)}
 .qb-btn.ok:hover{background:var(--grn);color:#fff;box-shadow:0 0 0 3px var(--grn-glow)}
 
-/* ═══ SUBJECTIVE — 3 swiping panels ═══ */
+/* ═══ SUBJECTIVE ═══ */
 .subj-tabs{display:flex;gap:.28rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);padding:.28rem;margin-bottom:.85rem;box-shadow:var(--ne-in-sm)}
 .subj-tab{flex:1;padding:.55rem .3rem;background:transparent;border:none;border-radius:var(--r1);font-family:var(--ff);font-size:.72rem;font-weight:600;color:var(--t3);cursor:pointer;transition:all var(--ease);text-align:center;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:.28rem}
 .subj-tab i{font-size:.85rem}
@@ -457,7 +455,7 @@ button{font-family:var(--ff)}
 .ci-s{display:flex;align-items:center;gap:.3rem;font-size:.66rem;color:var(--t3)}
 .cd{width:8px;height:8px;border-radius:50%;background:var(--ros)}.cd.y{background:var(--grn)}
 
-/* ═══ TOASTS — FIXED DARK PANEL ═══ */
+/* ═══ TOASTS ═══ */
 #toasts{position:fixed;bottom:1.8rem;left:50%;transform:translateX(-50%);z-index:9000;display:flex;flex-direction:column;align-items:center;gap:.3rem;pointer-events:none;width:calc(100vw - 2rem);max-width:340px}
 @media(max-width:960px){#toasts{bottom:calc(var(--bn-h) + 1rem + var(--safe-b))}}
 .toast{background:#111417;border:1px solid rgba(255,255,255,.10);border-radius:var(--r2);padding:.6rem .95rem;font-size:.76rem;font-weight:600;color:#FFFFFF;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tin .22s var(--spring);pointer-events:auto;max-width:100%}
@@ -508,11 +506,11 @@ input[type=file]:hover{border-color:var(--amb)}
 @keyframes netpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(var(--ros-rgb),.2)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 
-/* ═══ ADMIN PORTAL PROMO (in sidebar) ═══ */
+/* ═══ SIDEBAR ADMIN PROMO ═══ */
 .sb-admin-promo{
   background:linear-gradient(135deg,rgba(var(--vio-rgb),.14),rgba(var(--amb-rgb),.08));
   border:1px solid rgba(var(--vio-rgb),.28);
-  border-radius:var(--r2);padding:.6rem .7rem;margin-bottom:.4rem;
+  border-radius:var(--r2);padding:.6rem .7rem;margin-bottom:.5rem;
 }
 .sb-admin-promo h4{font-size:.72rem;font-weight:700;color:var(--vio);display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem}
 .sb-admin-promo p{font-size:.62rem;color:var(--t3);line-height:1.4;margin-bottom:.45rem}
@@ -567,35 +565,28 @@ input[type=file]:hover{border-color:var(--amb)}
     <div id="sb">
       <button class="sb-close" onclick="UI.sidebarClose()" aria-label="Close menu"><i class="ph ph-x"></i></button>
 
-      <!-- User card -->
-      <div class="card" style="padding:.65rem .75rem;margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
+      <div class="card" style="padding:.6rem .7rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
         <div style="min-width:0">
           <div id="sb-uname" style="font-size:.8rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Student</div>
-          <div id="sb-ustatus" style="font-size:.64rem;color:var(--t3)">—</div>
+          <div id="sb-ustatus" style="font-size:.62rem;color:var(--t3)">—</div>
         </div>
         <button class="ib" onclick="AUTH.logout()" title="Log out" aria-label="Log out" style="flex-shrink:0"><i class="ph ph-power"></i></button>
       </div>
 
-      <!-- Admin portal promo (hidden unless adminCapable) -->
       <div class="sb-admin-promo" id="sb-admin-promo" style="display:none">
         <h4><i class="ph ph-shield-check"></i> Admin Access</h4>
-        <p>You have admin privileges on this account. Open the admin panel to manage users, payments, weekly sets, and subjective grading.</p>
-        <button onclick="APP_SWITCH.toAdmin()"><i class="ph ph-arrow-square-out"></i> Open Admin Portal</button>
+        <p>Open the admin panel to manage users, payments, and grading.</p>
+        <button onclick="APP_SWITCH.toAdmin()"><i class="ph ph-arrow-square-out"></i> Go to Admin Portal</button>
       </div>
 
-      <!-- Dashboard -->
-      <div class="sb-sec">
-        <div class="sb-lbl">Dashboard</div>
-        <button type="button" class="sb-item active" id="nav-home" onclick="UI.go('home')">
-          <div class="sb-ic"><i class="ph ph-house"></i></div>
-          <div style="flex:1;min-width:0"><span>Home</span></div>
-        </button>
-      </div>
+      <button type="button" class="sb-item active" id="nav-home" onclick="UI.go('home')">
+        <div class="sb-ic"><i class="ph ph-house"></i></div>Home
+      </button>
 
-      <!-- Today (Qn of Day + Weekly Sets hints) -->
       <div class="sb-sec">
         <div class="sb-lbl">Today</div>
-        <button type="button" class="sb-item" id="nav-subjective" onclick="UI.go('subjective')">
+        <button type="button" class="sb-item" id="nav-online" onclick="UI.go('online')"><div class="sb-ic"><i class="ph ph-cloud"></i></div>Online Study</button>
+        <button type="button" class="sb-item" id="nav-subj-qotd" onclick="UI.go('subj-qotd')">
           <div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;gap:.35rem"><span>Qn of the Day</span><span class="sb-badge amb" id="subj-qotd-badge" style="display:none">!</span></div>
@@ -605,50 +596,43 @@ input[type=file]:hover{border-color:var(--amb)}
         <button type="button" class="sb-item" id="nav-weekly" onclick="UI.go('weekly')">
           <div class="sb-ic"><i class="ph ph-calendar-check"></i></div>
           <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:.35rem"><span>Weekly Sets</span><span class="sb-badge amb" id="weekly-badge" style="display:none">LIVE</span></div>
+            <div style="display:flex;align-items:center;gap:.35rem"><span>Weekly Test</span><span class="sb-badge amb" id="weekly-badge" style="display:none">LIVE</span></div>
             <div class="sb-sub" id="weekly-hint">No sets yet</div>
           </div>
         </button>
       </div>
 
-      <!-- Objective group -->
       <div class="sb-sec">
-        <div class="sb-lbl">Objective (MCQ)</div>
-        <button type="button" class="sb-item" id="nav-online"  onclick="UI.go('online')"><div class="sb-ic"><i class="ph ph-cloud"></i></div>Online Study</button>
-        <button type="button" class="sb-item" id="nav-local"   onclick="UI.go('local')"><div class="sb-ic"><i class="ph ph-folder-open"></i></div>Local File</button>
-        <button type="button" class="sb-item" id="nav-psycho"  onclick="UI.go('psycho')"><div class="sb-ic"><i class="ph ph-lightning"></i></div>Psycho Mode<span class="sb-badge amb">HOT</span></button>
+        <div class="sb-lbl">Objective</div>
+        <button type="button" class="sb-item" id="nav-local" onclick="UI.go('local')"><div class="sb-ic"><i class="ph ph-folder-open"></i></div>Local File</button>
+        <button type="button" class="sb-item" id="nav-psycho" onclick="UI.go('psycho')"><div class="sb-ic"><i class="ph ph-lightning"></i></div>Psycho Mode</button>
         <button type="button" class="sb-item" id="nav-bookmarks" onclick="UI.go('bookmarks')"><div class="sb-ic"><i class="ph ph-star"></i></div>Bookmarks<span class="sb-badge ok" id="bkc">0</span></button>
-        <button type="button" class="sb-item" id="nav-flagged"   onclick="UI.go('flagged')"><div class="sb-ic"><i class="ph ph-flag"></i></div>Flagged<span class="sb-badge" id="flc">0</span></button>
-        <button type="button" class="sb-item" id="nav-wrong"     onclick="UI.go('wrong')"><div class="sb-ic"><i class="ph ph-x-circle"></i></div>Wrong Bank<span class="sb-badge" id="wrc">0</span></button>
+        <button type="button" class="sb-item" id="nav-flagged" onclick="UI.go('flagged')"><div class="sb-ic"><i class="ph ph-flag"></i></div>Flagged<span class="sb-badge" id="flc">0</span></button>
+        <button type="button" class="sb-item" id="nav-wrong" onclick="UI.go('wrong')"><div class="sb-ic"><i class="ph ph-x-circle"></i></div>Wrong Bank<span class="sb-badge" id="wrc">0</span></button>
       </div>
 
-      <!-- Subjective group -->
       <div class="sb-sec">
         <div class="sb-lbl">Subjective</div>
-        <button type="button" class="sb-item" id="nav-subj-qotd" onclick="UI.go('subj-qotd')"><div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>Question of the Day</button>
         <button type="button" class="sb-item" id="nav-subj-exam" onclick="UI.go('subj-exam')"><div class="sb-ic"><i class="ph ph-note-pencil"></i></div>Proper Exam</button>
         <button type="button" class="sb-item" id="nav-subj-list" onclick="UI.go('subj-list')"><div class="sb-ic"><i class="ph ph-list-dashes"></i></div>Question List</button>
       </div>
 
-      <!-- Progress -->
       <div class="sb-sec">
         <div class="sb-lbl">Progress</div>
         <button type="button" class="sb-item" id="nav-progress" onclick="UI.go('progress')"><div class="sb-ic"><i class="ph ph-chart-bar"></i></div>Overview</button>
         <button type="button" class="sb-item" id="nav-server-progress" onclick="UI.go('server-progress')"><div class="sb-ic"><i class="ph ph-database"></i></div>Server Progress</button>
       </div>
 
-      <!-- File Management -->
       <div class="sb-sec">
         <div class="sb-lbl">File Management</div>
-        <button type="button" class="sb-item" id="nav-offline"   onclick="UI.go('offline')"><div class="sb-ic"><i class="ph ph-package"></i></div>Offline Cache</button>
-        <button type="button" class="sb-item" id="nav-data"      onclick="UI.go('data')"><div class="sb-ic"><i class="ph ph-floppy-disk"></i></div>Data Backup</button>
+        <button type="button" class="sb-item" id="nav-offline" onclick="UI.go('offline')"><div class="sb-ic"><i class="ph ph-package"></i></div>Offline Cache</button>
+        <button type="button" class="sb-item" id="nav-data" onclick="UI.go('data')"><div class="sb-ic"><i class="ph ph-floppy-disk"></i></div>Data Backup</button>
       </div>
 
-      <!-- Tools -->
       <div class="sb-sec">
         <div class="sb-lbl">Tools</div>
         <button type="button" class="sb-item" id="nav-timetable" onclick="UI.go('timetable')"><div class="sb-ic"><i class="ph ph-calendar-blank"></i></div>Timetable</button>
-        <button type="button" class="sb-item" id="nav-tutorial"  onclick="TUTORIAL.open()"><div class="sb-ic"><i class="ph ph-question"></i></div>Tutorial</button>
+        <button type="button" class="sb-item" id="nav-tutorial" onclick="TUTORIAL.open()"><div class="sb-ic"><i class="ph ph-question"></i></div>Tutorial</button>
       </div>
 
       <div style="text-align:center;font-size:.62rem;color:var(--t3);opacity:.6;padding:.6rem 0 .2rem;margin-top:auto" id="sb-version"></div>
@@ -657,7 +641,7 @@ input[type=file]:hover{border-color:var(--amb)}
     <!-- MAIN -->
     <div id="main">
 
-      <!-- ═══════════════ DASHBOARD ═══════════════ -->
+      <!-- DASHBOARD -->
       <div class="view on" id="view-home">
         <div id="home-marquee" class="marquee-bar" style="display:none" role="status" aria-live="polite" aria-label="Active notifications">
           <i class="ph ph-speaker-high marquee-icon" aria-hidden="true"></i>
@@ -701,7 +685,7 @@ input[type=file]:hover{border-color:var(--amb)}
         <div class="qa-row">
           <button class="qa-tile qt-sky" onclick="UI.go('online')"><span class="qa-ic"><i class="ph ph-cloud"></i></span>Online Study</button>
           <button class="qa-tile qt-vio" onclick="UI.go('psycho')"><span class="qa-ic"><i class="ph ph-lightning"></i></span>Psycho Mode</button>
-          <button class="qa-tile qt-amb" onclick="UI.go('subjective')"><span class="qa-ic"><i class="ph ph-sun-horizon"></i></span>Qn of the Day</button>
+          <button class="qa-tile qt-amb" onclick="UI.go('subj-qotd')"><span class="qa-ic"><i class="ph ph-sun-horizon"></i></span>Qn of the Day</button>
           <button class="qa-tile qt-ros" onclick="UI.go('wrong')"><span class="qa-ic"><i class="ph ph-x-circle"></i></span>Wrong Bank</button>
           <button class="qa-tile qt-grn" onclick="UI.go('bookmarks')"><span class="qa-ic"><i class="ph ph-star"></i></span>Bookmarks</button>
           <button class="qa-tile qt-amb" onclick="UI.go('timetable')"><span class="qa-ic"><i class="ph ph-calendar-blank"></i></span>Timetable</button>
@@ -720,9 +704,9 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ WEEKLY SETS ═══════════════ -->
+      <!-- WEEKLY SETS -->
       <div class="view" id="view-weekly">
-        <div class="pg-head"><h2><i class="ph ph-calendar-check"></i> Weekly Sets</h2><p>One graded attempt per set · timed window · then review-only</p></div>
+        <div class="pg-head"><h2><i class="ph ph-calendar-check"></i> Weekly Test</h2><p>One graded attempt per set · timed window · then review-only</p></div>
         <div class="on-card-banner" style="background:linear-gradient(135deg,rgba(var(--sky-rgb),.1),rgba(var(--vio-rgb),.07));border-color:rgba(var(--sky-rgb),.2)">
           <span><i class="ph ph-info"></i></span>
           Each set unlocks on schedule and stays open for a limited exam window. You get <b>one attempt</b> — after that, it's review-only.
@@ -738,7 +722,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ SUBJECTIVE — Qn of the Day ═══════════════ -->
+      <!-- SUBJECTIVE — Qn of the Day -->
       <div class="view" id="view-subj-qotd">
         <div class="pg-head"><h2><i class="ph ph-sun-horizon"></i> Question of the Day</h2><p>Same question for everyone · timed write · 5-min PDF upload</p></div>
         <div id="subj-qotd-body">
@@ -749,9 +733,41 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ SUBJECTIVE — Proper Exam ═══════════════ -->
+      <!-- SUBJECTIVE — Proper Exam -->
       <div class="view" id="view-subj-exam">
-        <div class="pg-head"><h2><i class="ph ph-note-pencil"></i> Proper Exam</h2><p>A full 100-mark paper on demand — 3 hours, one PDF upload</p></div>
+        <div class="pg-head"><h2><i class="ph ph-note-pencil"></i> Proper Exam</h2><p>Build your own paper from the question bank · 3 hours · one PDF upload</p></div>
+
+        <div class="card" id="exam-builder">
+          <div class="card-hd"><h3><i class="ph ph-sliders-horizontal"></i> Build Your Own Paper</h3><span class="ctag tp">Custom</span></div>
+          <p style="font-size:.76rem;color:var(--t3);margin:0 0 .65rem;line-height:1.5">Pick chapters and a total-marks target. A fresh paper is built from the random question pool.</p>
+
+          <div style="font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:.35rem">Chapters</div>
+          <div id="exam-builder-chapters" style="display:flex;flex-direction:column;gap:.2rem;max-height:220px;overflow-y:auto;padding:.35rem .1rem;background:var(--c1);border:1px solid var(--b1);border-radius:var(--r1);margin-bottom:.65rem"></div>
+          <div class="bg" style="margin-bottom:.6rem">
+            <button class="btn btn-sm btn-c" onclick="SUBJ_BUILDER.selectAll()">Select all</button>
+            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SUBJ_BUILDER.clear()">Clear</button>
+          </div>
+
+          <div class="g2" style="margin-bottom:.6rem">
+            <div class="sf" style="margin-bottom:0">
+              <label for="exam-builder-marks">Total marks</label>
+              <input type="number" id="exam-builder-marks" value="100" min="20" max="150" step="5">
+            </div>
+            <div class="sf" style="margin-bottom:0">
+              <label for="exam-builder-mode">Include 5/10-mark Qs</label>
+              <select id="exam-builder-mode">
+                <option value="both">Both</option>
+                <option value="5">5-mark only</option>
+                <option value="10">10-mark only</option>
+              </select>
+            </div>
+          </div>
+
+          <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ_BUILDER.generate()">
+            <i class="ph ph-shuffle"></i> Generate Custom Paper
+          </button>
+        </div>
+
         <div id="subj-exam-body">
           <div class="card" style="text-align:center;padding:2rem 1rem">
             <div class="empty-i" style="opacity:.6"><i class="ph ph-note-pencil" style="font-size:2rem"></i></div>
@@ -760,9 +776,17 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ SUBJECTIVE — Question List ═══════════════ -->
+      <!-- SUBJECTIVE — Question List -->
       <div class="view" id="view-subj-list">
-        <div class="pg-head"><h2><i class="ph ph-list-dashes"></i> Question List</h2><p>Topic-wise index of every subjective question</p></div>
+        <div class="pg-head"><h2><i class="ph ph-list-dashes"></i> Question List</h2><p>Browse every subjective question from the bank</p></div>
+
+        <div class="toolbar" style="margin-bottom:.6rem">
+          <input type="text" id="subj-list-search" placeholder="Search question text…" oninput="SUBJ._filterList(this.value)" style="flex:1;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none">
+          <select id="subj-list-chapter" onchange="SUBJ._filterList()" aria-label="Filter by chapter" style="min-width:140px;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none">
+            <option value="">All Chapters</option>
+          </select>
+        </div>
+
         <div id="subj-list-body">
           <div class="card" style="text-align:center;padding:2rem 1rem">
             <div class="empty-i" style="opacity:.6"><i class="ph ph-list-dashes" style="font-size:2rem"></i></div>
@@ -771,7 +795,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Online Study ═══════════════ -->
+      <!-- OBJECTIVE — Online Study -->
       <div class="view" id="view-online">
         <div class="pg-head"><h2><i class="ph ph-cloud"></i> Online Study</h2><p>Level → Chapter → Book → Subtopic → Mode</p></div>
         <div class="on-card-banner"><span><i class="ph ph-broadcast"></i></span> Questions stream from Google Drive and cache automatically for offline use.</div>
@@ -807,7 +831,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Local File ═══════════════ -->
+      <!-- OBJECTIVE — Local File -->
       <div class="view" id="view-local">
         <div class="pg-head"><h2><i class="ph ph-folder-open"></i> Local File</h2><p>Load a JSON question bank — works fully offline</p></div>
         <div class="card">
@@ -827,7 +851,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Psycho Mode ═══════════════ -->
+      <!-- OBJECTIVE — Psycho -->
       <div class="view" id="view-psycho">
         <div class="pg-head"><h2><i class="ph ph-lightning"></i> Psycho Mode</h2><p>Mix chapters · randomise · target weak spots</p></div>
         <div class="psy-hero"><div class="psy-hero-ic"><i class="ph ph-lightning"></i></div><div class="psy-hero-text"><h4>Multi-chapter Gauntlet</h4><p>Crunch-time training — mix levels, exam pressure, weak-area targeting.</p></div></div>
@@ -846,7 +870,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Bookmarks ═══════════════ -->
+      <!-- OBJECTIVE — Bookmarks -->
       <div class="view" id="view-bookmarks">
         <div class="pg-head"><h2><i class="ph ph-star"></i> Bookmarks</h2><p>Questions saved for focused revision</p></div>
         <div class="card"><div class="card-hd"><h3>Saved Questions</h3>
@@ -854,7 +878,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="bk-list"></div></div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Flagged ═══════════════ -->
+      <!-- OBJECTIVE — Flagged -->
       <div class="view" id="view-flagged">
         <div class="pg-head"><h2><i class="ph ph-flag"></i> Flagged</h2><p>Questions marked for follow-up</p></div>
         <div class="card"><div class="card-hd"><h3>Flagged Questions</h3>
@@ -862,7 +886,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="fl-list"></div></div>
       </div>
 
-      <!-- ═══════════════ OBJECTIVE — Wrong Bank ═══════════════ -->
+      <!-- OBJECTIVE — Wrong Bank -->
       <div class="view" id="view-wrong">
         <div class="pg-head"><h2><i class="ph ph-x-circle"></i> Wrong Bank</h2><p>Spaced repetition: <span id="wrc-due">0</span> due for review right now</p></div>
         <div class="card"><div class="card-hd"><h3>Wrong Answers</h3>
@@ -870,7 +894,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="wr-list"></div></div>
       </div>
 
-      <!-- ═══════════════ PROGRESS — Overview ═══════════════ -->
+      <!-- PROGRESS — Overview -->
       <div class="view" id="view-progress">
         <div class="pg-head"><h2><i class="ph ph-chart-bar"></i> Progress</h2><p>Overall performance &amp; chapter breakdown</p></div>
         <div class="g4" id="prog-stats" style="margin-bottom:.85rem"></div>
@@ -889,7 +913,7 @@ input[type=file]:hover{border-color:var(--amb)}
 
         <div class="card">
           <div class="card-hd"><h3>Personal Drive Backup</h3><span class="ctag tp">Optional</span></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Keep your own snapshot in your Google Drive — independent of the Abhyas server. Only this app can read or write it; it doesn't appear in your normal Drive.</p>
+          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Keep your own snapshot in your Google Drive — independent of the Abhyas server.</p>
           <div id="cloud-status" style="font-size:.75rem;color:var(--t3);margin-bottom:.6rem">Sign in with Google to enable.</div>
           <div class="bg" id="cloud-btn-row">
             <button class="btn btn-p" id="cloud-signin-btn" onclick="CLOUD_UI.signIn()"><i class="ph ph-google-logo"></i> Sign in with Google</button>
@@ -905,7 +929,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ PROGRESS — Server (per-file) ═══════════════ -->
+      <!-- PROGRESS — Server (per-file) -->
       <div class="view" id="view-server-progress">
         <div class="pg-head"><h2><i class="ph ph-database"></i> Server Progress</h2><p>Per-file progress pulled from the server — how much of each question file you've worked through.</p></div>
 
@@ -918,13 +942,14 @@ input[type=file]:hover{border-color:var(--amb)}
             </div>
           </div>
 
-          <div class="toolbar">
-            <select id="srv-filter-level" onchange="SERVER_PROG.render()" aria-label="Filter by level" style="min-width:auto">
+          <div class="toolbar" style="margin-bottom:.6rem">
+            <select id="srv-filter-level" onchange="SERVER_PROG.render()" aria-label="Filter by level" style="background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none;min-width:auto">
               <option value="">All Levels</option>
             </select>
-            <input type="text" id="srv-search" placeholder="Search chapter, book, subtopic…" oninput="SERVER_PROG.render()">
-            <label class="inline">Only started
-              <input type="checkbox" id="srv-only-started" onchange="SERVER_PROG.render()">
+            <input type="text" id="srv-search" placeholder="Search chapter, book, subtopic…" oninput="SERVER_PROG.render()" style="flex:1;background:var(--c1);border:1.5px solid var(--b1);border-radius:var(--r1);padding:.4rem .65rem;color:var(--t1);font-size:.76rem;font-family:var(--ff);outline:none">
+            <label style="display:flex;align-items:center;gap:.3rem;font-size:.68rem;color:var(--t3);font-weight:600;white-space:nowrap">
+              Only started
+              <input type="checkbox" id="srv-only-started" onchange="SERVER_PROG.render()" style="accent-color:var(--amb)">
             </label>
           </div>
 
@@ -933,7 +958,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ FILE MGMT — Offline Cache ═══════════════ -->
+      <!-- FILE MGMT — Offline Cache -->
       <div class="view" id="view-offline">
         <div class="pg-head"><h2><i class="ph ph-package"></i> Offline Cache</h2><p>Download all question sets for offline study</p></div>
         <div class="card">
@@ -951,7 +976,7 @@ input[type=file]:hover{border-color:var(--amb)}
         <div class="card"><div class="card-hd"><h3>Cached Sets</h3></div><div id="cache-list"></div></div>
       </div>
 
-      <!-- ═══════════════ FILE MGMT — Data ═══════════════ -->
+      <!-- FILE MGMT — Data Backup -->
       <div class="view" id="view-data">
         <div class="pg-head"><h2><i class="ph ph-floppy-disk"></i> Data Backup</h2><p>Export/import your local data as a JSON file</p></div>
         <div class="card">
@@ -971,7 +996,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ TIMETABLE ═══════════════ -->
+      <!-- TIMETABLE -->
       <div class="view" id="view-timetable">
         <div class="pg-head"><h2><i class="ph ph-calendar-blank"></i> Timetable</h2><p>Plan your weekly study sessions</p></div>
         <div class="g2" style="align-items:start">
@@ -1006,7 +1031,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- ═══════════════ QUIZ WRAPPER ═══════════════ -->
+      <!-- QUIZ WRAPPER -->
       <div id="quiz-wrap" style="display:none">
         <div id="fc-wrap">
           <div class="qbar">
@@ -1087,10 +1112,10 @@ input[type=file]:hover{border-color:var(--amb)}
 
   <!-- BOTTOM NAV -->
   <nav id="bnav">
-    <button class="bn-item active" id="bn-home"       onclick="UI.go('home')"><div class="bn-ic"><i class="ph ph-house"></i></div>Home</button>
-    <button class="bn-item"        id="bn-online"     onclick="UI.go('online')"><div class="bn-ic"><i class="ph ph-cloud"></i></div>Study</button>
-    <button class="bn-item"        id="bn-subjective" onclick="UI.go('subjective')"><div class="bn-ic"><i class="ph ph-sun-horizon"></i></div>Subj</button>
-    <button class="bn-item"        id="bn-progress"   onclick="UI.go('progress')"><div class="bn-ic"><i class="ph ph-chart-bar"></i></div>Progress</button>
+    <button class="bn-item active" id="bn-home" onclick="UI.go('home')"><div class="bn-ic"><i class="ph ph-house"></i></div>Home</button>
+    <button class="bn-item" id="bn-online" onclick="UI.go('online')"><div class="bn-ic"><i class="ph ph-cloud"></i></div>Study</button>
+    <button class="bn-item" id="bn-subjective" onclick="UI.go('subj-qotd')"><div class="bn-ic"><i class="ph ph-sun-horizon"></i></div>Subj</button>
+    <button class="bn-item" id="bn-progress" onclick="UI.go('progress')"><div class="bn-ic"><i class="ph ph-chart-bar"></i></div>Progress</button>
     <button class="bn-item bn-more" onclick="_bnavMore()" aria-label="More options"><div class="bn-ic"><i class="ph ph-list"></i></div>More<div class="bn-badge" id="bn-badge" style="display:none"></div></button>
   </nav>
 </div>
@@ -1122,8 +1147,6 @@ input[type=file]:hover{border-color:var(--amb)}
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
    PATCH LAYER — user.html
-   Hooks UI. Anything that touches business state lives in app.js /
-   objective.js / subjective.js.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
@@ -1194,7 +1217,7 @@ let _tx=0,_ty=0;
 document.addEventListener('touchstart',e=>{_tx=e.touches[0].clientX;_ty=e.touches[0].clientY;},{passive:true});
 document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-_tx,dy=Math.abs(e.changedTouches[0].clientY-_ty);if(_tx<22&&dx>60&&dy<70)UI.sidebarToggle();},{passive:true});
 
-/* ── 3. Keyboard: Escape + Ctrl+F search ── */
+/* ── 3. Keyboard ── */
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     UI.sidebarClose();
@@ -1207,7 +1230,7 @@ document.addEventListener('keydown',e=>{
   }
 });
 
-/* ── 4. Bottom nav helpers ── */
+/* ── 4. Bottom nav ── */
 function _updateBottomNav(v){
   document.querySelectorAll('.bn-item').forEach(e=>e.classList.remove('active'));
   const map = {
@@ -1223,7 +1246,7 @@ window._bnavMore=function(){
   openMod('More', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.42rem;padding:.1rem 0">
       ${[
-        ['<i class="ph ph-calendar-check"></i>','Weekly Sets','weekly'],
+        ['<i class="ph ph-calendar-check"></i>','Weekly Test','weekly'],
         ['<i class="ph ph-folder-open"></i>','Local File','local'],
         ['<i class="ph ph-lightning"></i>','Psycho Mode','psycho'],
         ['<i class="ph ph-star"></i>','Bookmarks','bookmarks'],
@@ -1238,13 +1261,10 @@ window._bnavMore=function(){
   `);
 };
 
-/* ── 5. UI.go wrapper — dispatches the new views ── */
+/* ── 5. UI.go wrapper ── */
 const _uigoraw = UI._goRaw.bind(UI);
 UI._goRaw = function(v){
-  // Map grouped nav aliases to real view IDs
-  const aliasMap = {
-    'subjective':'subj-qotd'   // legacy: sidebar "subjective" opens Qn of the Day view
-  };
+  const aliasMap = { 'subjective':'subj-qotd' };
   const real = aliasMap[v] || v;
 
   _uigoraw(real);
@@ -1257,8 +1277,6 @@ UI._goRaw = function(v){
     if(outer && empty) empty.style.display = (outer.style.display === 'none') ? '' : 'none';
   }
 
-  // Subjective sub-views: init the module once, then let individual
-  // views render themselves (they already do their own render on entry).
   if((real === 'subj-qotd' || real === 'subj-exam' || real === 'subj-list') && typeof SUBJ !== 'undefined'){
     if(typeof SUBJ.ready === 'function' && SUBJ.ready()){
       if(typeof SUBJ._renderQotd === 'function') SUBJ._renderQotd();
@@ -1267,7 +1285,6 @@ UI._goRaw = function(v){
     } else {
       SUBJ.init();
     }
-    // Reflect the current sub-view in the sidebar active state
     document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
     const active = $('nav-' + real);
     if(active) active.classList.add('active');
@@ -1285,7 +1302,74 @@ UI._goRaw = function(v){
   setTimeout(_refreshHints, 50);
 };
 
-/* ── 6. Subject panel snapping (IntersectionObserver) ── */
+/* ── 6. Exam builder + Question list chapter options ── */
+window.SUBJ_BUILDER = {
+  _populated: false,
+  _populate(){
+    if(this._populated) return;
+    const box = document.getElementById('exam-builder-chapters');
+    if(!box) return;
+    const refs = (window.SUBJECTIVE_FILE_REFS || []).filter(r => r.fileId && !/^REPLACE_WITH/.test(r.fileId));
+    if(!refs.length){
+      box.innerHTML = '<p style="font-size:.74rem;color:var(--t3);padding:.4rem .5rem">No chapters configured yet.</p>';
+      this._populated = true;
+      return;
+    }
+    const byGroup = {};
+    refs.forEach(r => {
+      const g = r.group || 'A';
+      (byGroup[g] = byGroup[g] || []).push(r);
+    });
+    let html = '';
+    Object.keys(byGroup).sort().forEach(gk => {
+      html += `<div style="font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--t3);padding:.35rem .5rem .1rem">Group ${esc(gk)}</div>`;
+      byGroup[gk].forEach(r => {
+        html += `<label style="display:flex;align-items:center;gap:.5rem;padding:.3rem .55rem;font-size:.76rem;cursor:pointer;border-radius:6px">
+          <input type="checkbox" class="eb-ch" value="${escAttrJs(r.chapterId)}" checked style="accent-color:var(--amb);width:15px;height:15px">
+          <span>${r.icon || ''} ${esc(r.name)}</span>
+        </label>`;
+      });
+    });
+    box.innerHTML = html;
+    this._populated = true;
+  },
+  selectAll(){ document.querySelectorAll('#exam-builder-chapters input.eb-ch').forEach(c => c.checked = true); },
+  clear(){ document.querySelectorAll('#exam-builder-chapters input.eb-ch').forEach(c => c.checked = false); },
+  generate(){
+    const ids = [...document.querySelectorAll('#exam-builder-chapters input.eb-ch:checked')].map(c => c.value);
+    if(!ids.length) return toast('Pick at least one chapter');
+    const marks = parseInt(document.getElementById('exam-builder-marks').value, 10) || 100;
+    const mode = document.getElementById('exam-builder-mode').value;
+    if(typeof SUBJ === 'undefined' || typeof SUBJ._buildCustomExam !== 'function'){
+      return toast('❌ Question bank not loaded yet — try again in a moment');
+    }
+    SUBJ._buildCustomExam(ids, marks, mode);
+  }
+};
+
+const _uigorawBuilders = UI._goRaw.bind(UI);
+UI._goRaw = function(v){
+  _uigorawBuilders(v);
+  if(v === 'subj-exam'){
+    setTimeout(() => SUBJ_BUILDER._populate(), 80);
+  }
+  if(v === 'subj-list'){
+    setTimeout(() => {
+      const sel = document.getElementById('subj-list-chapter');
+      if(sel && sel.options.length <= 1){
+        const refs = (window.SUBJECTIVE_FILE_REFS || []).filter(r => r.fileId && !/^REPLACE_WITH/.test(r.fileId));
+        refs.forEach(r => {
+          const o = document.createElement('option');
+          o.value = r.chapterId;
+          o.textContent = (r.icon || '') + ' ' + r.name;
+          sel.appendChild(o);
+        });
+      }
+    }, 80);
+  }
+};
+
+/* ── 7. Subject panel snapping ── */
 (function(){
   const scroller = document.getElementById('subj-scroller');
   if(!scroller) return;
@@ -1319,7 +1403,7 @@ UI._goRaw = function(v){
   }
 })();
 
-/* ── 7. Sidebar hints + marquee ── */
+/* ── 8. Sidebar hints + marquee ── */
 window.SB_HINTS = {
   refresh(){
     const qHint = $('subj-qotd-hint');
@@ -1404,12 +1488,19 @@ setInterval(_refreshHints, 30000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') _refreshHints(); });
 setTimeout(() => { _refreshHints(); }, 800);
 
-/* ── 8. APP_SWITCH — direct handoff to admin.html ── */
+/* ── 9. APP_SWITCH ── */
 window.APP_SWITCH = {
   _capable: false,
   async refresh(){
-    if(!window.S || !S.user || !S.user.token){ this._setVisible(false); return; }
-    if(!S.online || S.forcedOffline) return;
+    if(!window.S || !S.user){ this._setVisible(false); return; }
+
+    // PRIMARY: trust the cached session flag.
+    const cached = !!S.user.adminCapable;
+    console.log('[APP_SWITCH] cached adminCapable =', cached, 'user =', S.user.username);
+    if(cached) this._setVisible(true);
+
+    // SECONDARY: verify with server, only upgrade visibility — never hide on failure.
+    if(!S.online || S.forcedOffline || !S.user.token) return;
     try{
       const url = (window.ABHYAS_CONFIG && ABHYAS_CONFIG.GAS_URL) || '';
       if(!url) return;
@@ -1423,9 +1514,12 @@ window.APP_SWITCH = {
         })
       });
       const data = await r.json();
-      this._capable = !!(data && data.success && data.adminCapable);
-      this._setVisible(this._capable);
-    }catch(e){ /* non-critical */ }
+      console.log('[APP_SWITCH] server checkAdminCapable =', data);
+      if(data && data.success && data.adminCapable){
+        this._capable = true;
+        this._setVisible(true);
+      }
+    }catch(e){ /* keep cached value */ }
   },
   _setVisible(v){
     const b = $('tb-admin-btn');
@@ -1484,7 +1578,7 @@ if(typeof AUTH !== 'undefined' && AUTH._enter){
   };
 }
 
-/* ── 9. Focus trap for the shared modal ── */
+/* ── 10. Focus trap ── */
 (function(){
   const mbg = document.getElementById('mbg');
   if(!mbg) return;
@@ -1523,7 +1617,7 @@ if(typeof AUTH !== 'undefined' && AUTH._enter){
   }).observe(mbg, { attributes:true, attributeFilter:['class'] });
 })();
 
-/* ── 10. Sidebar version label fallback ── */
+/* ── 11. Sidebar version label ── */
 (function(){
   try{
     const el = document.getElementById('sb-version');
@@ -1534,7 +1628,7 @@ if(typeof AUTH !== 'undefined' && AUTH._enter){
   }catch(e){}
 })();
 
-/* ── 11. CLOUD_UI — button-state manager for Personal Drive Backup ── */
+/* ── 12. CLOUD_UI ── */
 window.CLOUD_UI = (function(){
   function $(id){ return document.getElementById(id); }
   function render(){
@@ -1608,17 +1702,12 @@ document.addEventListener('click', function warm(e){
   }
 });
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   SERVER_PROG — Per-file progress pulled from the server's Progress sheet.
-   Reads the user's own stored progress JSON, walks every session's qres
-   array, groups by fileId, and renders a table of { file, practised,
-   attempted, correct, wrong, % covered }. Unlike Wrong Bank / Bookmarks,
-   this shows how much of each file you've actually worked through.
-   ═══════════════════════════════════════════════════════════════════════════ */
+/* ── 13. SERVER_PROG ── */
 const SERVER_PROG = {
   _loaded: false,
   _loading: false,
-  _sort: 'most',   // 'most' | 'least' | 'name'
+  _sort: 'most',
+  _rows: [],
 
   toggleSort(){
     this._sort = this._sort === 'most' ? 'least' : this._sort === 'least' ? 'name' : 'most';
@@ -1660,10 +1749,8 @@ const SERVER_PROG = {
     this.render();
   },
 
-  _rows: [],
   _compute(data){
     const sessions = (data && data.prog && Array.isArray(data.prog.sessions)) ? data.prog.sessions : [];
-    // fileId → { attempted, correct, wrong, practisedSet }
     const byFile = new Map();
     sessions.forEach(sess => {
       const qres = Array.isArray(sess.qres) ? sess.qres : [];
@@ -1678,7 +1765,6 @@ const SERVER_PROG = {
       });
     });
 
-    // Build rows with metadata from ChapterData
     const rows = [];
     byFile.forEach(rec => {
       let meta = { lv:'', ch:'', book:'', subtopic:'', name:rec.fid };
@@ -1715,7 +1801,6 @@ const SERVER_PROG = {
       return;
     }
 
-    // Populate level filter once
     if(levelSel && levelSel.options.length <= 1 && typeof ChapterData !== 'undefined'){
       const levels = [...new Set(this._rows.map(r => r.lv).filter(Boolean))].sort();
       levels.forEach(lv => {
@@ -1735,12 +1820,10 @@ const SERVER_PROG = {
     if(search) rows = rows.filter(r => (r.name || '').toLowerCase().includes(search));
     if(onlyStarted) rows = rows.filter(r => r.practised > 0);
 
-    // Sorting
     if(this._sort === 'most') rows.sort((a,b) => (b.pct ?? -1) - (a.pct ?? -1) || b.practised - a.practised);
     else if(this._sort === 'least') rows.sort((a,b) => (a.pct ?? 999) - (b.pct ?? 999) || a.practised - b.practised);
     else rows.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
 
-    // Summary stats
     const totalFiles = this._rows.length;
     const startedFiles = this._rows.filter(r => r.practised > 0).length;
     const completedFiles = this._rows.filter(r => r.pct !== null && r.pct >= 100).length;
