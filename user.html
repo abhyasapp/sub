@@ -20,7 +20,6 @@
 <link rel="stylesheet" href="design-system.css">
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
-/* ═══ TOKENS ═══ */
 :root{
   --c0:#F2F4F3;--c1:#EBEEEC;--c2:#FFFFFF;--c3:#FFFFFF;--c4:#E4EFE8;--c5:#E7EAE8;
   --b0:rgba(26,26,26,.035);--b1:#E7EAE8;--b2:rgba(26,26,26,.11);--b3:rgba(26,26,26,.16);
@@ -35,7 +34,6 @@
   --ok:var(--grn);--ok-bg:rgba(var(--grn-rgb),.09);--ok-bd:rgba(var(--grn-rgb),.28);
   --bad:var(--ros);--bad-bg:rgba(var(--ros-rgb),.08);--bad-bd:rgba(var(--ros-rgb),.26);
   --warn:var(--amb);--warn-bg:rgba(46,139,87,.09);--warn-bd:rgba(46,139,87,.26);
-  --neon:var(--sky);--neon2:var(--vio);--neon3:var(--grn);--neon4:var(--amb);--neon5:var(--ros);
   --bg0:var(--c0);--bg1:var(--c1);--bg2:var(--c2);
   --surf:var(--c3);--surf2:var(--c4);--surf3:var(--c5);
   --bd:var(--b1);--bd2:var(--b2);
@@ -48,8 +46,6 @@
   --ne-in-sm:inset -3px -3px 7px var(--ne-light),inset 3px 3px 7px var(--ne-dark);
   --ne-in-md:inset -4px -4px 10px var(--ne-light),inset 4px 4px 10px var(--ne-dark);
   --sh1:var(--ne-sm);--sh2:var(--ne-md);--sh3:var(--ne-lg);
-  --gsky:0 0 0 3px var(--sky-glow);--gvio:0 0 0 3px var(--vio-glow);
-  --ggrn:0 0 0 3px var(--grn-glow);--gros:0 0 0 3px var(--ros-glow);--gamb:0 0 0 3px var(--amb-glow);
   --t1:var(--c-text);--t2:var(--c-text-soft);--t3:var(--c-text-faint);
   --ease:.15s cubic-bezier(.4,0,.2,1);--spring:.22s cubic-bezier(.34,1.56,.64,1);--eout:.2s cubic-bezier(0,0,.2,1);
   --safe-b:env(safe-area-inset-bottom,0px);
@@ -95,7 +91,7 @@ button{font-family:var(--ff)}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(1.3)}}
 
 /* ═══ TOPBAR ═══ */
-#tb{height:var(--tb-h);background:rgba(242,244,243,.9);backdrop-filter:blur(20px) saturate(1.3);-webkit-backdrop-filter:blur(20px) saturate(1.3);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 .9rem 0 1rem;position:sticky;top:0;z-index:500;flex-shrink:0}
+#tb{height:var(--tb-h);background:rgba(242,244,243,.9);backdrop-filter:blur(20px) saturate(1.3);border-bottom:1px solid var(--b1);display:flex;align-items:center;justify-content:space-between;padding:0 .9rem 0 1rem;position:sticky;top:0;z-index:500;flex-shrink:0}
 .dark #tb{background:rgba(8,11,20,.92)}
 .tb-brand{display:flex;align-items:center;gap:.55rem;font-family:var(--fd);font-size:.95rem;font-weight:700;letter-spacing:-.2px;cursor:pointer;color:var(--t1);user-select:none;transition:opacity var(--ease);background:transparent;border:none;padding:0;text-align:left}
 .tb-brand:hover{opacity:.8}
@@ -113,6 +109,8 @@ button{font-family:var(--ff)}
 .tb-btn.danger:hover{background:var(--bad-bg)}
 .tb-btn.amber{color:var(--amb);border-color:var(--warn-bd)}
 .tb-btn.amber:hover{background:var(--warn-bg)}
+.tb-btn.admin-portal{color:var(--vio);border-color:rgba(var(--vio-rgb),.35);background:rgba(var(--vio-rgb),.08)}
+.tb-btn.admin-portal:hover{background:var(--vio);color:#fff;box-shadow:0 0 18px var(--vio-glow)}
 @media(max-width:360px){.tb-btn{height:28px;padding:.22rem .32rem;font-size:.62rem}.tb-r{gap:.2rem}.tb-brand{gap:.4rem}}
 .uchip{background:var(--b0);border:1px solid var(--b1);border-radius:30px;padding:.26rem .68rem;font-size:.68rem;font-weight:600;color:var(--t2);display:flex;align-items:center;gap:.26rem}
 @media(max-width:600px){.uchip{display:none}}
@@ -126,7 +124,8 @@ button{font-family:var(--ff)}
 .sb-close{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin:0 0 .6rem auto;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.85rem;cursor:pointer}
 @media(max-width:960px){.sb-close{display:flex}}
 .sb-sec{margin-bottom:.35rem}
-.sb-lbl{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);padding:.3rem .48rem .15rem;margin-bottom:.1rem}
+.sb-lbl{font-size:.55rem;font-weight:800;text-transform:uppercase;letter-spacing:1.4px;color:var(--t3);padding:.5rem .48rem .15rem;margin-bottom:.1rem}
+.sb-lbl:first-child{padding-top:0}
 .sb-item{display:flex;align-items:center;gap:.55rem;padding:.42rem .5rem;border-radius:var(--r1);font-size:.78rem;font-weight:500;color:var(--t2);cursor:pointer;transition:all var(--ease);margin-bottom:.3rem;border:1px solid transparent;background:transparent;width:100%;text-align:left;font-family:var(--ff)}
 .sb-item:hover{background:var(--c2);color:var(--t1);box-shadow:var(--ne-sm)}
 .sb-item.active{background:var(--c2);color:var(--amb);font-weight:600;box-shadow:var(--ne-in-sm)}
@@ -148,12 +147,12 @@ button{font-family:var(--ff)}
 .view.on{display:block;animation:vfade .22s var(--eout)}
 @keyframes vfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .pg-head{margin-bottom:1rem}
-.ph h2,.pg-head h2{font-family:var(--fd);font-size:1.15rem;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:.42rem;color:var(--t1)}
+.pg-head h2{font-family:var(--fd);font-size:1.15rem;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:.42rem;color:var(--t1)}
 .pg-head p{font-size:.74rem;color:var(--t2);margin-top:.18rem;line-height:1.5}
 
 /* ═══ CARDS ═══ */
 .card{background:var(--c2);border-radius:var(--r3);padding:1rem 1.05rem;box-shadow:var(--ne-sm);margin-bottom:.8rem;transition:box-shadow var(--ease)}
-.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:1px solid var(--b1)}
+.card-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:.85rem;padding-bottom:.65rem;border-bottom:1px solid var(--b1);flex-wrap:wrap;gap:.4rem}
 .card-hd h3{font-family:var(--fd);font-size:.88rem;font-weight:600;display:flex;align-items:center;gap:.38rem}
 .ctag{font-size:.59rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;padding:.14rem .5rem;border-radius:20px;display:inline-flex;align-items:center;gap:.22rem}
 .tc{background:rgba(var(--sky-rgb),.12);color:var(--sky)}.tp{background:rgba(var(--vio-rgb),.13);color:var(--vio)}
@@ -165,15 +164,15 @@ button{font-family:var(--ff)}
 .btn:active:not(:disabled){transform:translateY(0)}
 .btn:disabled{opacity:.42;cursor:not-allowed}
 .btn-c{background:rgba(var(--sky-rgb),.1);color:var(--sky);border-color:rgba(var(--sky-rgb),.25)}
-.btn-c:hover:not(:disabled){background:var(--sky);color:#fff;box-shadow:var(--gsky)}
+.btn-c:hover:not(:disabled){background:var(--sky);color:#fff;box-shadow:0 0 0 3px var(--sky-glow)}
 .btn-p{background:rgba(var(--vio-rgb),.11);color:var(--vio);border-color:rgba(var(--vio-rgb),.26)}
-.btn-p:hover:not(:disabled){background:var(--vio);color:#fff;box-shadow:var(--gvio)}
+.btn-p:hover:not(:disabled){background:var(--vio);color:#fff;box-shadow:0 0 0 3px var(--vio-glow)}
 .btn-g{background:var(--ok-bg);color:var(--grn);border-color:var(--ok-bd)}
-.btn-g:hover:not(:disabled){background:var(--grn);color:#fff;box-shadow:var(--ggrn)}
+.btn-g:hover:not(:disabled){background:var(--grn);color:#fff;box-shadow:0 0 0 3px var(--grn-glow)}
 .btn-a{background:var(--warn-bg);color:var(--amb);border-color:var(--warn-bd)}
-.btn-a:hover:not(:disabled){background:var(--amb);color:#000;box-shadow:var(--gamb)}
+.btn-a:hover:not(:disabled){background:var(--amb);color:#000;box-shadow:0 0 0 3px var(--amb-glow)}
 .btn-r{background:var(--bad-bg);color:var(--ros);border-color:var(--bad-bd)}
-.btn-r:hover:not(:disabled){background:var(--ros);color:#fff;box-shadow:var(--gros)}
+.btn-r:hover:not(:disabled){background:var(--ros);color:#fff;box-shadow:0 0 0 3px var(--ros-glow)}
 .btn-solid{background:linear-gradient(150deg,var(--amb),var(--amb2));color:var(--on-accent);border-color:transparent;box-shadow:var(--ne-sm)}
 .btn-solid:hover:not(:disabled){box-shadow:var(--ne-md)}
 .btn-sm{padding:.26rem .58rem;font-size:.68rem}
@@ -238,7 +237,8 @@ button{font-family:var(--ff)}
 .tcy{color:var(--sky)}.tc2{color:var(--grn)}.tb2{color:var(--ros)}.ta2{color:var(--amb)}.tvi{color:var(--vio)}.tsk{color:var(--sky)}
 
 /* ═══ QUICK TILES ═══ */
-.qa-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.55rem;margin-bottom:.85rem}
+.qa-row{display:grid;grid-template-columns:repeat(4,1fr);gap:.55rem;margin-bottom:.85rem}
+@media(max-width:560px){.qa-row{grid-template-columns:1fr 1fr}}
 .qa-tile{background:var(--c2);border:1px solid transparent;border-radius:var(--r2);padding:.72rem .35rem;display:flex;flex-direction:column;align-items:center;gap:.26rem;cursor:pointer;font-family:var(--ff);font-size:.61rem;font-weight:600;color:var(--t2);text-align:center;transition:all var(--spring);position:relative;overflow:hidden;box-shadow:var(--ne-sm)}
 .qa-tile::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1.5px;opacity:0;transition:opacity var(--ease)}
 .qa-tile:hover{transform:translateY(-3px);color:var(--t1);box-shadow:var(--ne-md)}.qa-tile:hover::before{opacity:1}
@@ -252,7 +252,7 @@ button{font-family:var(--ff)}
 /* ═══ DAILY CARD ═══ */
 .daily-card{position:relative;overflow:hidden;background:linear-gradient(135deg,rgba(var(--amb-rgb),.12) 0%,rgba(18,24,41,.98) 55%);border:1.5px solid rgba(var(--amb-rgb),.25);border-radius:var(--r3);padding:1.05rem 1.1rem;margin-bottom:.85rem}
 .daily-card::after{content:'';position:absolute;top:-50px;right:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(var(--amb-rgb),.1),transparent 70%);pointer-events:none}
-.daily-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.daily-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem;flex-wrap:wrap;gap:.4rem}
 .daily-top h3{font-family:var(--fd);font-size:.9rem;font-weight:700;display:flex;align-items:center;gap:.4rem;position:relative}
 .stk-tag{background:linear-gradient(90deg,rgba(var(--amb-rgb),.2),rgba(var(--ros-rgb),.12));border:1px solid rgba(var(--amb-rgb),.38);border-radius:20px;padding:.18rem .6rem;font-size:.64rem;font-weight:700;color:var(--amb);display:flex;align-items:center;gap:.2rem}
 .sk-bar{display:flex;gap:.28rem;margin-bottom:.6rem}
@@ -278,7 +278,7 @@ button{font-family:var(--ff)}
 .qb-btn{display:inline-flex;align-items:center;gap:.18rem;border-radius:7px;padding:.55rem .85rem;font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--ff);border:1px solid;line-height:1.2;transition:all var(--ease);background:var(--b0);border-color:var(--b1);color:var(--t2)}
 .qb-btn:hover{transform:translateY(-1px);background:var(--b1);color:var(--t1)}
 .qb-btn.ok{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--grn)}
-.qb-btn.ok:hover{background:var(--grn);color:#fff;box-shadow:var(--ggrn)}
+.qb-btn.ok:hover{background:var(--grn);color:#fff;box-shadow:0 0 0 3px var(--grn-glow)}
 
 /* ═══ SUBJECTIVE — 3 swiping panels ═══ */
 .subj-tabs{display:flex;gap:.28rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);padding:.28rem;margin-bottom:.85rem;box-shadow:var(--ne-in-sm)}
@@ -290,7 +290,6 @@ button{font-family:var(--ff)}
 .subj-scroller::-webkit-scrollbar{display:none}
 .subj-panel{flex:0 0 100%;min-width:100%;scroll-snap-align:start;scroll-snap-stop:always;box-sizing:border-box;padding:.05rem}
 @media(max-width:400px){.subj-tab{padding:.5rem .2rem;font-size:.66rem}.subj-tab i{font-size:.78rem}}
-
 .qotd-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.75rem}
 .qotd-marks{background:linear-gradient(135deg,var(--amb2),var(--amb));color:var(--on-accent);font-weight:800;font-size:.72rem;padding:.32rem .7rem;border-radius:20px;letter-spacing:.4px;box-shadow:0 2px 10px var(--amb-glow)}
 .qotd-marks.m10{background:linear-gradient(135deg,var(--vio2),var(--vio))}
@@ -317,7 +316,6 @@ button{font-family:var(--ff)}
 .qotd-done .big{font-size:2.6rem;margin-bottom:.5rem;display:block;line-height:1}
 .qotd-done h3{font-family:var(--fd);font-size:1rem;font-weight:700;color:var(--grn);margin-bottom:.35rem}
 .qotd-done p{font-size:.76rem;color:var(--t3);line-height:1.55}
-
 .subj-tree{display:flex;flex-direction:column;gap:.4rem}
 .subj-group{background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);overflow:hidden}
 .subj-group-hd{padding:.65rem .85rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;font-weight:600;font-size:.82rem;color:var(--t1)}
@@ -361,11 +359,11 @@ button{font-family:var(--ff)}
 .qb-btn{display:inline-flex;align-items:center;gap:.18rem;border-radius:7px;padding:.22rem .55rem;font-size:.65rem;font-weight:700;cursor:pointer;font-family:var(--ff);border:1px solid;line-height:1.1;white-space:nowrap;transition:all var(--ease);background:var(--b0);border-color:var(--b1);color:var(--t2)}
 .qb-btn:hover{transform:translateY(-1px)}
 .qb-btn.ok{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--grn)}
-.qb-btn.ok:hover{background:var(--grn);color:#fff;box-shadow:var(--ggrn)}
+.qb-btn.ok:hover{background:var(--grn);color:#fff}
 .qb-btn.quit{background:var(--bad-bg);border-color:var(--bad-bd);color:var(--ros)}
-.qb-btn.quit:hover{background:var(--ros);color:#fff;box-shadow:var(--gros)}
+.qb-btn.quit:hover{background:var(--ros);color:#fff}
 .qb-btn.skip{background:var(--warn-bg);border-color:var(--warn-bd);color:var(--amb);animation:skipPulse 2s ease-in-out infinite}
-.qb-btn.skip:hover{background:var(--amb);color:#000;box-shadow:var(--gamb);animation:none}
+.qb-btn.skip:hover{background:var(--amb);color:#000;animation:none}
 @keyframes skipPulse{0%,100%{box-shadow:0 0 0 0 rgba(var(--amb-rgb),0)}50%{box-shadow:0 0 0 3px rgba(var(--amb-rgb),.18)}}
 .qb-left-actions{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-top:.15rem}
 .qb-tiles{display:flex;gap:.24rem;align-items:center}
@@ -387,7 +385,6 @@ button{font-family:var(--ff)}
 .qb-l3{background:var(--c1);border-top:1px solid var(--b1);padding:.22rem .55rem}
 .qprog,.qbprog{height:3px;background:var(--b1);border-radius:3px;overflow:hidden}
 .qpf,.qbpf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--amb2),var(--amb));transition:width .3s ease}
-
 .qcard{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r3);padding:1rem;margin-bottom:.75rem;box-shadow:var(--sh1);transition:border-color var(--ease),box-shadow var(--ease)}
 .qcard:hover{border-color:var(--b2);box-shadow:var(--sh2)}
 .qm{display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem;gap:.4rem}
@@ -413,7 +410,6 @@ button{font-family:var(--ff)}
 .eqc{background:var(--c2);border:1px solid var(--b1);border-radius:var(--r2);padding:.85rem;margin-bottom:.6rem;border-left:3px solid var(--b2);transition:border-color .18s,box-shadow .18s}
 .eqc.answered{border-left-color:var(--amb)}
 .eqc:hover{box-shadow:var(--sh1)}
-
 .rh{text-align:center;padding:1.5rem 1rem .85rem}
 .ring{width:108px;height:108px;border-radius:50%;background:conic-gradient(var(--amb) var(--p,0%),var(--c2) 0%);display:flex;align-items:center;justify-content:center;margin:0 auto .9rem;position:relative;box-shadow:0 0 28px var(--amb-glow)}
 .ring::before{content:'';position:absolute;inset:11px;background:var(--c3);border-radius:50%}
@@ -506,25 +502,37 @@ input[type=file]:hover{border-color:var(--amb)}
 /* ═══ ON BANNER ═══ */
 .on-card-banner{background:linear-gradient(135deg,rgba(var(--sky-rgb),.1),rgba(var(--vio-rgb),.07));border:1px solid rgba(var(--sky-rgb),.2);border-radius:var(--r2);padding:.75rem .9rem;margin-bottom:.75rem;font-size:.74rem;color:var(--t2);display:flex;align-items:center;gap:.6rem}
 .on-card-banner span{font-size:1.1rem}
-
 @media(max-width:700px){.g2{grid-template-columns:1fr}.dash-lower{grid-template-columns:1fr}}
 #net-mode-btn{transition:all var(--ease)}
 #net-mode-btn.forced{animation:netpulse 2.5s ease-in-out infinite}
 @keyframes netpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px rgba(var(--ros-rgb),.2)}}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+/* ═══ ADMIN PORTAL PROMO (in sidebar) ═══ */
+.sb-admin-promo{
+  background:linear-gradient(135deg,rgba(var(--vio-rgb),.14),rgba(var(--amb-rgb),.08));
+  border:1px solid rgba(var(--vio-rgb),.28);
+  border-radius:var(--r2);padding:.6rem .7rem;margin-bottom:.4rem;
+}
+.sb-admin-promo h4{font-size:.72rem;font-weight:700;color:var(--vio);display:flex;align-items:center;gap:.3rem;margin-bottom:.25rem}
+.sb-admin-promo p{font-size:.62rem;color:var(--t3);line-height:1.4;margin-bottom:.45rem}
+.sb-admin-promo button{
+  width:100%;padding:.42rem .6rem;background:linear-gradient(135deg,var(--vio2),var(--vio));
+  border:none;border-radius:8px;color:#fff;font-size:.7rem;font-weight:700;cursor:pointer;
+  font-family:var(--ff);transition:all var(--ease);display:flex;align-items:center;justify-content:center;gap:.3rem;
+}
+.sb-admin-promo button:hover{transform:translateY(-1px);box-shadow:0 4px 14px var(--vio-glow)}
 </style>
 </head>
 <body>
 
 <a href="#main" class="skip-link">Skip to content</a>
 
-<!-- SESSION GATE -->
 <div id="sg">
   <div class="sg-spin"></div>
   <div class="sg-txt" id="sg-txt">Checking your session…</div>
 </div>
 
-<!-- APP -->
 <div id="app">
   <div class="off-bar" id="offbar">📡 Offline — serving from local cache</div>
 
@@ -539,7 +547,10 @@ input[type=file]:hover{border-color:var(--amb)}
     </button>
     <div class="tb-r">
       <div class="uchip" id="uchip">👤 —</div>
-      <button class="tb-btn" id="tb-admin-btn" onclick="APP_SWITCH.toAdmin()" title="Switch to Admin panel" aria-label="Switch to Admin panel" style="display:none;color:var(--vio);border-color:rgba(var(--vio-rgb),.35);background:rgba(var(--vio-rgb),.08)"><i class="ph ph-shield-check"></i><span style="font-size:.66rem;font-weight:700">Admin</span></button>
+      <button class="tb-btn admin-portal" id="tb-admin-btn" onclick="APP_SWITCH.toAdmin()" title="Open Admin Portal" aria-label="Open Admin Portal" style="display:none">
+        <i class="ph ph-shield-check"></i>
+        <span style="font-size:.66rem;font-weight:700">Admin</span>
+      </button>
       <button class="tb-btn" id="net-mode-btn" onclick="NET.toggle()" title="Online mode — click to force offline" aria-label="Online mode — click to force offline" aria-pressed="false" style="font-size:.8rem;min-width:32px;justify-content:center;color:var(--grn);border-color:rgba(var(--grn-rgb),.35);background:rgba(var(--grn-rgb),.08)"><i class="ph ph-wifi-high"></i></button>
       <button class="tb-btn" id="tb-sync-btn" onclick="UI.go('progress')" title="Not synced yet this session" aria-label="Sync status" style="min-width:32px;justify-content:center;padding:.28rem;position:relative"><i class="ph ph-cloud-check"></i><span id="tb-sync-dot" style="position:absolute;bottom:5px;right:5px;display:block;width:7px;height:7px;border-radius:50%;background:var(--t3);border:1.5px solid var(--c0);transition:background .3s"></span></button>
       <button class="tb-btn" onclick="UI.theme()" title="Toggle theme" aria-label="Toggle theme"><i class="ph ph-circle-half"></i></button>
@@ -555,6 +566,8 @@ input[type=file]:hover{border-color:var(--amb)}
     <!-- SIDEBAR -->
     <div id="sb">
       <button class="sb-close" onclick="UI.sidebarClose()" aria-label="Close menu"><i class="ph ph-x"></i></button>
+
+      <!-- User card -->
       <div class="card" style="padding:.65rem .75rem;margin-bottom:.7rem;display:flex;align-items:center;justify-content:space-between;gap:.5rem">
         <div style="min-width:0">
           <div id="sb-uname" style="font-size:.8rem;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Student</div>
@@ -562,12 +575,30 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
         <button class="ib" onclick="AUTH.logout()" title="Log out" aria-label="Log out" style="flex-shrink:0"><i class="ph ph-power"></i></button>
       </div>
+
+      <!-- Admin portal promo (hidden unless adminCapable) -->
+      <div class="sb-admin-promo" id="sb-admin-promo" style="display:none">
+        <h4><i class="ph ph-shield-check"></i> Admin Access</h4>
+        <p>You have admin privileges on this account. Open the admin panel to manage users, payments, weekly sets, and subjective grading.</p>
+        <button onclick="APP_SWITCH.toAdmin()"><i class="ph ph-arrow-square-out"></i> Open Admin Portal</button>
+      </div>
+
+      <!-- Dashboard -->
+      <div class="sb-sec">
+        <div class="sb-lbl">Dashboard</div>
+        <button type="button" class="sb-item active" id="nav-home" onclick="UI.go('home')">
+          <div class="sb-ic"><i class="ph ph-house"></i></div>
+          <div style="flex:1;min-width:0"><span>Home</span></div>
+        </button>
+      </div>
+
+      <!-- Today (Qn of Day + Weekly Sets hints) -->
       <div class="sb-sec">
         <div class="sb-lbl">Today</div>
         <button type="button" class="sb-item" id="nav-subjective" onclick="UI.go('subjective')">
           <div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>
           <div style="flex:1;min-width:0">
-            <div style="display:flex;align-items:center;gap:.35rem"><span>Daily Question</span><span class="sb-badge amb" id="subj-qotd-badge" style="display:none">!</span></div>
+            <div style="display:flex;align-items:center;gap:.35rem"><span>Qn of the Day</span><span class="sb-badge amb" id="subj-qotd-badge" style="display:none">!</span></div>
             <div class="sb-sub" id="subj-qotd-hint">Tap to begin</div>
           </div>
         </button>
@@ -579,41 +610,60 @@ input[type=file]:hover{border-color:var(--amb)}
           </div>
         </button>
       </div>
-      <div class="sb-div"></div>
+
+      <!-- Objective group -->
       <div class="sb-sec">
-        <div class="sb-lbl">Study</div>
-        <button type="button" class="sb-item active" id="nav-home"    onclick="UI.go('home')"><div class="sb-ic"><i class="ph ph-house"></i></div>Dashboard</button>
-        <button type="button" class="sb-item"        id="nav-online"  onclick="UI.go('online')"><div class="sb-ic"><i class="ph ph-cloud"></i></div>Online Study</button>
-        <button type="button" class="sb-item"        id="nav-local"   onclick="UI.go('local')"><div class="sb-ic"><i class="ph ph-folder-open"></i></div>Local File</button>
-        <button type="button" class="sb-item"        id="nav-psycho"  onclick="UI.go('psycho')"><div class="sb-ic"><i class="ph ph-lightning"></i></div>Psycho Mode<span class="sb-badge amb">HOT</span></button>
-      </div>
-      <div class="sb-div"></div>
-      <div class="sb-sec">
-        <div class="sb-lbl">Review</div>
+        <div class="sb-lbl">Objective (MCQ)</div>
+        <button type="button" class="sb-item" id="nav-online"  onclick="UI.go('online')"><div class="sb-ic"><i class="ph ph-cloud"></i></div>Online Study</button>
+        <button type="button" class="sb-item" id="nav-local"   onclick="UI.go('local')"><div class="sb-ic"><i class="ph ph-folder-open"></i></div>Local File</button>
+        <button type="button" class="sb-item" id="nav-psycho"  onclick="UI.go('psycho')"><div class="sb-ic"><i class="ph ph-lightning"></i></div>Psycho Mode<span class="sb-badge amb">HOT</span></button>
         <button type="button" class="sb-item" id="nav-bookmarks" onclick="UI.go('bookmarks')"><div class="sb-ic"><i class="ph ph-star"></i></div>Bookmarks<span class="sb-badge ok" id="bkc">0</span></button>
         <button type="button" class="sb-item" id="nav-flagged"   onclick="UI.go('flagged')"><div class="sb-ic"><i class="ph ph-flag"></i></div>Flagged<span class="sb-badge" id="flc">0</span></button>
         <button type="button" class="sb-item" id="nav-wrong"     onclick="UI.go('wrong')"><div class="sb-ic"><i class="ph ph-x-circle"></i></div>Wrong Bank<span class="sb-badge" id="wrc">0</span></button>
       </div>
-      <div class="sb-div"></div>
+
+      <!-- Subjective group -->
+      <div class="sb-sec">
+        <div class="sb-lbl">Subjective</div>
+        <button type="button" class="sb-item" id="nav-subj-qotd" onclick="UI.go('subj-qotd')"><div class="sb-ic"><i class="ph ph-sun-horizon"></i></div>Question of the Day</button>
+        <button type="button" class="sb-item" id="nav-subj-exam" onclick="UI.go('subj-exam')"><div class="sb-ic"><i class="ph ph-note-pencil"></i></div>Proper Exam</button>
+        <button type="button" class="sb-item" id="nav-subj-list" onclick="UI.go('subj-list')"><div class="sb-ic"><i class="ph ph-list-dashes"></i></div>Question List</button>
+      </div>
+
+      <!-- Progress -->
+      <div class="sb-sec">
+        <div class="sb-lbl">Progress</div>
+        <button type="button" class="sb-item" id="nav-progress" onclick="UI.go('progress')"><div class="sb-ic"><i class="ph ph-chart-bar"></i></div>Overview</button>
+        <button type="button" class="sb-item" id="nav-server-progress" onclick="UI.go('server-progress')"><div class="sb-ic"><i class="ph ph-database"></i></div>Server Progress</button>
+      </div>
+
+      <!-- File Management -->
+      <div class="sb-sec">
+        <div class="sb-lbl">File Management</div>
+        <button type="button" class="sb-item" id="nav-offline"   onclick="UI.go('offline')"><div class="sb-ic"><i class="ph ph-package"></i></div>Offline Cache</button>
+        <button type="button" class="sb-item" id="nav-data"      onclick="UI.go('data')"><div class="sb-ic"><i class="ph ph-floppy-disk"></i></div>Data Backup</button>
+      </div>
+
+      <!-- Tools -->
       <div class="sb-sec">
         <div class="sb-lbl">Tools</div>
         <button type="button" class="sb-item" id="nav-timetable" onclick="UI.go('timetable')"><div class="sb-ic"><i class="ph ph-calendar-blank"></i></div>Timetable</button>
-        <button type="button" class="sb-item" id="nav-progress"  onclick="UI.go('progress')"><div class="sb-ic"><i class="ph ph-chart-bar"></i></div>Progress</button>
-        <button type="button" class="sb-item" id="nav-offline"   onclick="UI.go('offline')"><div class="sb-ic"><i class="ph ph-package"></i></div>Offline Cache</button>
         <button type="button" class="sb-item" id="nav-tutorial"  onclick="TUTORIAL.open()"><div class="sb-ic"><i class="ph ph-question"></i></div>Tutorial</button>
       </div>
-      <div style="text-align:center;font-size:.62rem;color:var(--t3);opacity:.6;padding:.6rem 0 .2rem" id="sb-version"></div>
+
+      <div style="text-align:center;font-size:.62rem;color:var(--t3);opacity:.6;padding:.6rem 0 .2rem;margin-top:auto" id="sb-version"></div>
     </div>
 
     <!-- MAIN -->
     <div id="main">
 
-      <!-- DASHBOARD -->
+      <!-- ═══════════════ DASHBOARD ═══════════════ -->
       <div class="view on" id="view-home">
         <div id="home-marquee" class="marquee-bar" style="display:none" role="status" aria-live="polite" aria-label="Active notifications">
           <i class="ph ph-speaker-high marquee-icon" aria-hidden="true"></i>
           <div class="marquee-viewport"><div class="marquee-track" id="marquee-track"></div></div>
         </div>
+
         <div class="hero">
           <div class="hero-orb"></div>
           <div class="hero-text">
@@ -622,18 +672,21 @@ input[type=file]:hover{border-color:var(--amb)}
           </div>
           <div class="hero-icon" id="greeting-icon">🌅</div>
         </div>
+
         <div class="daily-card">
           <div class="daily-top"><h3><i class="ph ph-star"></i> Daily Challenge</h3><div class="stk-tag" id="stk-tag">🔥 0 day streak</div></div>
           <div class="sk-bar" id="sk-bar"></div>
-          <p class="daily-desc">30 mixed questions every day — keep the streak alive!</p>
+          <p class="daily-desc">30 mixed MCQ questions every day — keep the streak alive!</p>
           <button class="daily-btn" onclick="QUIZ.daily()"><i class="ph ph-rocket-launch"></i> Start Today's Challenge</button>
         </div>
+
         <div class="card" style="margin-bottom:1rem">
           <div class="card-hd"><h3><i class="ph ph-target"></i> Adaptive Practice</h3><span class="ctag ta">Weak-topic focused</span></div>
           <p style="font-size:.78rem;color:var(--t3);margin:.2rem 0 .7rem">Pulls questions you're struggling with first — due Wrong Bank items and anything tagged Confusing.</p>
           <button class="btn btn-a btn-lg" style="width:100%" onclick="QUIZ.adaptive()"><i class="ph ph-lightning"></i> Start Adaptive Session</button>
         </div>
-        <div class="sb-lbl" style="margin-bottom:.4rem">Today's Overview</div>
+
+        <div class="sb-lbl" style="margin-bottom:.4rem;padding-left:0">Today's Overview</div>
         <div class="stats-row">
           <div class="scard sc-c"><div class="sv tcy" id="hs-tot">0</div><div class="stat-lbl">Answered</div></div>
           <div class="scard sc-g"><div class="sv tc2" id="hs-cor">0</div><div class="stat-lbl">Correct</div></div>
@@ -643,16 +696,19 @@ input[type=file]:hover{border-color:var(--amb)}
         <div style="display:flex;align-items:center;gap:.35rem;font-size:.72rem;color:var(--t3);margin-bottom:.7rem">
           <i class="ph ph-clock"></i> <span id="hs-time">0m</span> studied this week
         </div>
-        <div class="sb-lbl" style="margin:.7rem 0 .4rem">Quick Actions</div>
+
+        <div class="sb-lbl" style="margin:.7rem 0 .4rem;padding-left:0">Quick Actions</div>
         <div class="qa-row">
           <button class="qa-tile qt-sky" onclick="UI.go('online')"><span class="qa-ic"><i class="ph ph-cloud"></i></span>Online Study</button>
           <button class="qa-tile qt-vio" onclick="UI.go('psycho')"><span class="qa-ic"><i class="ph ph-lightning"></i></span>Psycho Mode</button>
+          <button class="qa-tile qt-amb" onclick="UI.go('subjective')"><span class="qa-ic"><i class="ph ph-sun-horizon"></i></span>Qn of the Day</button>
           <button class="qa-tile qt-ros" onclick="UI.go('wrong')"><span class="qa-ic"><i class="ph ph-x-circle"></i></span>Wrong Bank</button>
           <button class="qa-tile qt-grn" onclick="UI.go('bookmarks')"><span class="qa-ic"><i class="ph ph-star"></i></span>Bookmarks</button>
           <button class="qa-tile qt-amb" onclick="UI.go('timetable')"><span class="qa-ic"><i class="ph ph-calendar-blank"></i></span>Timetable</button>
           <button class="qa-tile qt-sky" onclick="UI.go('progress')"><span class="qa-ic"><i class="ph ph-chart-bar"></i></span>Progress</button>
           <button class="qa-tile qt-vio" onclick="TUTORIAL.open()"><span class="qa-ic"><i class="ph ph-question"></i></span>Tutorial</button>
         </div>
+
         <div class="dash-lower">
           <div class="card"><div class="card-hd"><h3><i class="ph ph-trend-up"></i> Recent Sessions</h3></div><div id="recent-sessions"></div></div>
           <div class="card">
@@ -664,7 +720,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- WEEKLY SETS VIEW (moved from dashboard) -->
+      <!-- ═══════════════ WEEKLY SETS ═══════════════ -->
       <div class="view" id="view-weekly">
         <div class="pg-head"><h2><i class="ph ph-calendar-check"></i> Weekly Sets</h2><p>One graded attempt per set · timed window · then review-only</p></div>
         <div class="on-card-banner" style="background:linear-gradient(135deg,rgba(var(--sky-rgb),.1),rgba(var(--vio-rgb),.07));border-color:rgba(var(--sky-rgb),.2)">
@@ -682,45 +738,40 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- SUBJECTIVE — 3 swipeable panels -->
-      <div class="view" id="view-subjective">
-        <div class="pg-head"><h2><i class="ph ph-pencil-line"></i> Subjective</h2><p>Swipe or tap the tabs · written answers, admin-graded</p></div>
-
-        <div class="subj-tabs" role="tablist" aria-label="Subjective sections">
-          <button type="button" class="subj-tab active" data-tab="qotd" role="tab" aria-selected="true" aria-controls="subj-qotd" onclick="SUBJ.goTo('qotd')"><i class="ph ph-sun-horizon"></i> Q of the Day</button>
-          <button type="button" class="subj-tab" data-tab="exam" role="tab" aria-selected="false" aria-controls="subj-exam" onclick="SUBJ.goTo('exam')"><i class="ph ph-note-pencil"></i> Proper Exam</button>
-          <button type="button" class="subj-tab" data-tab="list" role="tab" aria-selected="false" aria-controls="subj-list" onclick="SUBJ.goTo('list')"><i class="ph ph-list-dashes"></i> Question List</button>
-        </div>
-
-        <div class="subj-scroller" id="subj-scroller">
-          <section class="subj-panel" id="subj-qotd" role="tabpanel" aria-labelledby="subj-qotd-tab">
-            <div id="subj-qotd-body">
-              <div class="card" style="text-align:center;padding:2rem 1rem">
-                <div class="empty-i" style="opacity:.6"><i class="ph ph-circle-notch" style="font-size:2rem"></i></div>
-                <p style="font-size:.8rem;color:var(--t3)">Loading today's question…</p>
-              </div>
-            </div>
-          </section>
-          <section class="subj-panel" id="subj-exam" role="tabpanel" aria-labelledby="subj-exam-tab">
-            <div id="subj-exam-body">
-              <div class="card" style="text-align:center;padding:2rem 1rem">
-                <div class="empty-i" style="opacity:.6"><i class="ph ph-note-pencil" style="font-size:2rem"></i></div>
-                <p style="font-size:.8rem;color:var(--t3)">Loading exam papers…</p>
-              </div>
-            </div>
-          </section>
-          <section class="subj-panel" id="subj-list" role="tabpanel" aria-labelledby="subj-list-tab">
-            <div id="subj-list-body">
-              <div class="card" style="text-align:center;padding:2rem 1rem">
-                <div class="empty-i" style="opacity:.6"><i class="ph ph-list-dashes" style="font-size:2rem"></i></div>
-                <p style="font-size:.8rem;color:var(--t3)">Loading topics…</p>
-              </div>
-            </div>
-          </section>
+      <!-- ═══════════════ SUBJECTIVE — Qn of the Day ═══════════════ -->
+      <div class="view" id="view-subj-qotd">
+        <div class="pg-head"><h2><i class="ph ph-sun-horizon"></i> Question of the Day</h2><p>Same question for everyone · timed write · 5-min PDF upload</p></div>
+        <div id="subj-qotd-body">
+          <div class="card" style="text-align:center;padding:2rem 1rem">
+            <div class="empty-i" style="opacity:.6"><i class="ph ph-circle-notch" style="font-size:2rem"></i></div>
+            <p style="font-size:.8rem;color:var(--t3)">Loading today's question…</p>
+          </div>
         </div>
       </div>
 
-      <!-- ONLINE STUDY -->
+      <!-- ═══════════════ SUBJECTIVE — Proper Exam ═══════════════ -->
+      <div class="view" id="view-subj-exam">
+        <div class="pg-head"><h2><i class="ph ph-note-pencil"></i> Proper Exam</h2><p>A full 100-mark paper on demand — 3 hours, one PDF upload</p></div>
+        <div id="subj-exam-body">
+          <div class="card" style="text-align:center;padding:2rem 1rem">
+            <div class="empty-i" style="opacity:.6"><i class="ph ph-note-pencil" style="font-size:2rem"></i></div>
+            <p style="font-size:.8rem;color:var(--t3)">Loading exam papers…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ SUBJECTIVE — Question List ═══════════════ -->
+      <div class="view" id="view-subj-list">
+        <div class="pg-head"><h2><i class="ph ph-list-dashes"></i> Question List</h2><p>Topic-wise index of every subjective question</p></div>
+        <div id="subj-list-body">
+          <div class="card" style="text-align:center;padding:2rem 1rem">
+            <div class="empty-i" style="opacity:.6"><i class="ph ph-list-dashes" style="font-size:2rem"></i></div>
+            <p style="font-size:.8rem;color:var(--t3)">Loading topics…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ OBJECTIVE — Online Study ═══════════════ -->
       <div class="view" id="view-online">
         <div class="pg-head"><h2><i class="ph ph-cloud"></i> Online Study</h2><p>Level → Chapter → Book → Subtopic → Mode</p></div>
         <div class="on-card-banner"><span><i class="ph ph-broadcast"></i></span> Questions stream from Google Drive and cache automatically for offline use.</div>
@@ -756,7 +807,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- LOCAL FILE -->
+      <!-- ═══════════════ OBJECTIVE — Local File ═══════════════ -->
       <div class="view" id="view-local">
         <div class="pg-head"><h2><i class="ph ph-folder-open"></i> Local File</h2><p>Load a JSON question bank — works fully offline</p></div>
         <div class="card">
@@ -776,7 +827,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- PSYCHO MODE -->
+      <!-- ═══════════════ OBJECTIVE — Psycho Mode ═══════════════ -->
       <div class="view" id="view-psycho">
         <div class="pg-head"><h2><i class="ph ph-lightning"></i> Psycho Mode</h2><p>Mix chapters · randomise · target weak spots</p></div>
         <div class="psy-hero"><div class="psy-hero-ic"><i class="ph ph-lightning"></i></div><div class="psy-hero-text"><h4>Multi-chapter Gauntlet</h4><p>Crunch-time training — mix levels, exam pressure, weak-area targeting.</p></div></div>
@@ -795,7 +846,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- BOOKMARKS -->
+      <!-- ═══════════════ OBJECTIVE — Bookmarks ═══════════════ -->
       <div class="view" id="view-bookmarks">
         <div class="pg-head"><h2><i class="ph ph-star"></i> Bookmarks</h2><p>Questions saved for focused revision</p></div>
         <div class="card"><div class="card-hd"><h3>Saved Questions</h3>
@@ -803,7 +854,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="bk-list"></div></div>
       </div>
 
-      <!-- FLAGGED -->
+      <!-- ═══════════════ OBJECTIVE — Flagged ═══════════════ -->
       <div class="view" id="view-flagged">
         <div class="pg-head"><h2><i class="ph ph-flag"></i> Flagged</h2><p>Questions marked for follow-up</p></div>
         <div class="card"><div class="card-hd"><h3>Flagged Questions</h3>
@@ -811,7 +862,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="fl-list"></div></div>
       </div>
 
-      <!-- WRONG BANK -->
+      <!-- ═══════════════ OBJECTIVE — Wrong Bank ═══════════════ -->
       <div class="view" id="view-wrong">
         <div class="pg-head"><h2><i class="ph ph-x-circle"></i> Wrong Bank</h2><p>Spaced repetition: <span id="wrc-due">0</span> due for review right now</p></div>
         <div class="card"><div class="card-hd"><h3>Wrong Answers</h3>
@@ -819,7 +870,108 @@ input[type=file]:hover{border-color:var(--amb)}
         </div><div id="wr-list"></div></div>
       </div>
 
-      <!-- TIMETABLE -->
+      <!-- ═══════════════ PROGRESS — Overview ═══════════════ -->
+      <div class="view" id="view-progress">
+        <div class="pg-head"><h2><i class="ph ph-chart-bar"></i> Progress</h2><p>Overall performance &amp; chapter breakdown</p></div>
+        <div class="g4" id="prog-stats" style="margin-bottom:.85rem"></div>
+        <div id="predict-card" style="margin-bottom:.85rem"></div>
+        <div class="card"><div class="card-hd"><h3>Chapter Accuracy</h3><span class="ctag tp">Breakdown</span></div><div id="chap-acc"></div></div>
+
+        <div class="card">
+          <div class="card-hd"><h3>Server Backup</h3><span class="ctag tg">Automatic</span></div>
+          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Your progress is backed up to your Abhyas account automatically while you're online. Never overwrites what's on this device; only fills in a brand new one.</p>
+          <div id="psync-status" style="font-size:.75rem;color:var(--t3);margin-bottom:.6rem">Not synced yet this session.</div>
+          <div class="bg">
+            <button class="btn btn-a" onclick="DATA.syncNow()"><i class="ph ph-cloud-arrow-up"></i> Back Up Now</button>
+            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="DATA.restoreCloud()"><i class="ph ph-cloud-arrow-down"></i> Restore From Cloud</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h3>Personal Drive Backup</h3><span class="ctag tp">Optional</span></div>
+          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Keep your own snapshot in your Google Drive — independent of the Abhyas server. Only this app can read or write it; it doesn't appear in your normal Drive.</p>
+          <div id="cloud-status" style="font-size:.75rem;color:var(--t3);margin-bottom:.6rem">Sign in with Google to enable.</div>
+          <div class="bg" id="cloud-btn-row">
+            <button class="btn btn-p" id="cloud-signin-btn" onclick="CLOUD_UI.signIn()"><i class="ph ph-google-logo"></i> Sign in with Google</button>
+            <button class="btn btn-a" id="cloud-backup-btn" style="display:none" onclick="CLOUD_UI.backup()"><i class="ph ph-cloud-arrow-up"></i> Back Up to Drive</button>
+            <button class="btn btn-sm" style="display:none;background:var(--b0);border:1px solid var(--b1);color:var(--t2)" id="cloud-restore-btn" onclick="CLOUD_UI.restore()"><i class="ph ph-cloud-arrow-down"></i> Restore</button>
+            <button class="btn btn-r btn-sm" id="cloud-signout-btn" style="display:none" onclick="CLOUD_UI.signOut()">Sign Out</button>
+          </div>
+        </div>
+
+        <div class="card"><div class="card-hd"><h3>Notifications</h3></div>
+          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem" id="push-status-desc">Get notified when your trial is about to end or your payment is verified.</p>
+          <div class="bg"><button class="btn btn-a" id="push-enable-btn" onclick="PUSH.enable()"><i class="ph ph-bell"></i> Enable Notifications</button></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ PROGRESS — Server (per-file) ═══════════════ -->
+      <div class="view" id="view-server-progress">
+        <div class="pg-head"><h2><i class="ph ph-database"></i> Server Progress</h2><p>Per-file progress pulled from the server — how much of each question file you've worked through.</p></div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3><i class="ph ph-list-checks"></i> Per-File Progress</h3>
+            <div class="bg">
+              <button class="btn btn-sm btn-c" onclick="SERVER_PROG.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+              <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="SERVER_PROG.toggleSort()"><i class="ph ph-sort-ascending"></i> <span id="srv-sort-label">Sort: Most done</span></button>
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <select id="srv-filter-level" onchange="SERVER_PROG.render()" aria-label="Filter by level" style="min-width:auto">
+              <option value="">All Levels</option>
+            </select>
+            <input type="text" id="srv-search" placeholder="Search chapter, book, subtopic…" oninput="SERVER_PROG.render()">
+            <label class="inline">Only started
+              <input type="checkbox" id="srv-only-started" onchange="SERVER_PROG.render()">
+            </label>
+          </div>
+
+          <div id="srv-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.7rem"></div>
+          <div id="srv-list" style="display:flex;flex-direction:column;gap:.4rem"></div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ FILE MGMT — Offline Cache ═══════════════ -->
+      <div class="view" id="view-offline">
+        <div class="pg-head"><h2><i class="ph ph-package"></i> Offline Cache</h2><p>Download all question sets for offline study</p></div>
+        <div class="card">
+          <div class="card-hd"><h3>Cache Status</h3><span class="ctag" id="cache-tag">Checking…</span></div>
+          <div id="cache-txt" style="font-size:.76rem;color:var(--t3);margin-bottom:.65rem"></div>
+          <div class="cpb" id="cpb"><div class="cpf" id="cpf"></div></div>
+          <div id="cptxt" style="font-size:.68rem;color:var(--t3);margin:.24rem 0"></div>
+          <div class="bg" style="margin-top:.38rem">
+            <button class="btn btn-a btn-lg" onclick="CACHE.dl()"><i class="ph ph-download-simple"></i> Cache All Data</button>
+            <button class="btn btn-r" onclick="CACHE.clr()"><i class="ph ph-trash"></i> Clear Cache</button>
+            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="CACHE.purgeStale()"><i class="ph ph-broom"></i> Fix Errors</button>
+          </div>
+        </div>
+        <div class="card"><div class="card-hd"><h3>Per-Level Status</h3></div><div class="cg" id="cache-grid"></div></div>
+        <div class="card"><div class="card-hd"><h3>Cached Sets</h3></div><div id="cache-list"></div></div>
+      </div>
+
+      <!-- ═══════════════ FILE MGMT — Data ═══════════════ -->
+      <div class="view" id="view-data">
+        <div class="pg-head"><h2><i class="ph ph-floppy-disk"></i> Data Backup</h2><p>Export/import your local data as a JSON file</p></div>
+        <div class="card">
+          <div class="card-hd"><h3>Local Backup File</h3></div>
+          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .8rem">Everything below is stored locally on this device. Export to keep an offline copy, or import to restore one.</p>
+          <div class="bg">
+            <button class="btn btn-a" onclick="DATA.exportAll()"><i class="ph ph-upload"></i> Export Backup</button>
+            <button class="btn btn-a" onclick="DATA.imp()"><i class="ph ph-download-simple"></i> Import Backup</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>Advanced</h3><span class="ctag tr">Careful</span></div>
+          <div class="bg">
+            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="DATA.clearQ()"><i class="ph ph-broom"></i> Clear Question Cache</button>
+            <button class="btn btn-r" onclick="DATA.reset()"><i class="ph ph-warning"></i> Reset All Local Data</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════════ TIMETABLE ═══════════════ -->
       <div class="view" id="view-timetable">
         <div class="pg-head"><h2><i class="ph ph-calendar-blank"></i> Timetable</h2><p>Plan your weekly study sessions</p></div>
         <div class="g2" style="align-items:start">
@@ -854,63 +1006,7 @@ input[type=file]:hover{border-color:var(--amb)}
         </div>
       </div>
 
-      <!-- PROGRESS -->
-      <div class="view" id="view-progress">
-        <div class="pg-head"><h2><i class="ph ph-chart-bar"></i> Progress</h2><p>Overall performance &amp; chapter breakdown</p></div>
-        <div class="g4" id="prog-stats" style="margin-bottom:.85rem"></div>
-        <div id="predict-card" style="margin-bottom:.85rem"></div>
-        <div class="card"><div class="card-hd"><h3>Chapter Accuracy</h3><span class="ctag tp">Breakdown</span></div><div id="chap-acc"></div></div>
-        <div class="card"><div class="card-hd"><h3>Data Management</h3><span class="ctag tr">Backup</span></div>
-          <div class="bg">
-            <button class="btn btn-a" onclick="DATA.exp()"><i class="ph ph-upload"></i> Export</button>
-            <button class="btn btn-a" onclick="DATA.imp()"><i class="ph ph-download-simple"></i> Import</button>
-            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="DATA.clearQ()"><i class="ph ph-broom"></i> Clear Q Cache</button>
-            <button class="btn btn-r" onclick="DATA.reset()"><i class="ph ph-warning"></i> Reset All</button>
-          </div>
-        </div>
-        <div class="card"><div class="card-hd"><h3>Server Backup</h3><span class="ctag tg">Automatic</span></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Your progress, bookmarks, flags, and wrong-answer bank are backed up to your Abhyas account automatically while you're online. This never overwrites what's on this device; it only fills in a brand new one.</p>
-          <div id="psync-status" style="font-size:.75rem;color:var(--t3);margin-bottom:.6rem">Not synced yet this session.</div>
-          <div class="bg">
-            <button class="btn btn-a" onclick="DATA.syncNow()"><i class="ph ph-cloud-arrow-up"></i> Back Up Now</button>
-            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="DATA.restoreCloud()"><i class="ph ph-cloud-arrow-down"></i> Restore From Cloud</button>
-          </div>
-        </div>
-        <div class="card"><div class="card-hd"><h3>Personal Drive Backup</h3><span class="ctag tp">Optional</span></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem">Keep your own snapshot in your Google Drive — independent of the Abhyas server.</p>
-          <div id="cloud-status" style="font-size:.75rem;color:var(--t3);margin-bottom:.6rem">Sign in with Google to enable.</div>
-          <div class="bg" id="cloud-btn-row">
-            <button class="btn btn-p" id="cloud-signin-btn" onclick="CLOUD_UI.signIn()"><i class="ph ph-google-logo"></i> Sign in with Google</button>
-            <button class="btn btn-a" id="cloud-backup-btn" style="display:none" onclick="CLOUD_UI.backup()"><i class="ph ph-cloud-arrow-up"></i> Back Up to Drive</button>
-            <button class="btn btn-sm" style="display:none;background:var(--b0);border:1px solid var(--b1);color:var(--t2)" id="cloud-restore-btn" onclick="CLOUD_UI.restore()"><i class="ph ph-cloud-arrow-down"></i> Restore</button>
-            <button class="btn btn-r btn-sm" id="cloud-signout-btn" style="display:none" onclick="CLOUD_UI.signOut()">Sign Out</button>
-          </div>
-        </div>
-        <div class="card"><div class="card-hd"><h3>Notifications</h3></div>
-          <p style="font-size:.78rem;color:var(--t3);margin:0 0 .6rem" id="push-status-desc">Get notified when your trial is about to end or your payment is verified.</p>
-          <div class="bg"><button class="btn btn-a" id="push-enable-btn" onclick="PUSH.enable()"><i class="ph ph-bell"></i> Enable Notifications</button></div>
-        </div>
-      </div>
-
-      <!-- OFFLINE CACHE -->
-      <div class="view" id="view-offline">
-        <div class="pg-head"><h2><i class="ph ph-package"></i> Offline Cache</h2><p>Download all question sets for offline study</p></div>
-        <div class="card">
-          <div class="card-hd"><h3>Cache Status</h3><span class="ctag" id="cache-tag">Checking…</span></div>
-          <div id="cache-txt" style="font-size:.76rem;color:var(--t3);margin-bottom:.65rem"></div>
-          <div class="cpb" id="cpb"><div class="cpf" id="cpf"></div></div>
-          <div id="cptxt" style="font-size:.68rem;color:var(--t3);margin:.24rem 0"></div>
-          <div class="bg" style="margin-top:.38rem">
-            <button class="btn btn-a btn-lg" onclick="CACHE.dl()"><i class="ph ph-download-simple"></i> Cache All Data</button>
-            <button class="btn btn-r" onclick="CACHE.clr()"><i class="ph ph-trash"></i> Clear Cache</button>
-            <button class="btn btn-sm" style="background:var(--b0);border:1px solid var(--b1);color:var(--t2)" onclick="CACHE.purgeStale()"><i class="ph ph-broom"></i> Fix Errors</button>
-          </div>
-        </div>
-        <div class="card"><div class="card-hd"><h3>Per-Level Status</h3></div><div class="cg" id="cache-grid"></div></div>
-        <div class="card"><div class="card-hd"><h3>Cached Sets</h3></div><div id="cache-list"></div></div>
-      </div>
-
-      <!-- QUIZ WRAPPER -->
+      <!-- ═══════════════ QUIZ WRAPPER ═══════════════ -->
       <div id="quiz-wrap" style="display:none">
         <div id="fc-wrap">
           <div class="qbar">
@@ -993,8 +1089,8 @@ input[type=file]:hover{border-color:var(--amb)}
   <nav id="bnav">
     <button class="bn-item active" id="bn-home"       onclick="UI.go('home')"><div class="bn-ic"><i class="ph ph-house"></i></div>Home</button>
     <button class="bn-item"        id="bn-online"     onclick="UI.go('online')"><div class="bn-ic"><i class="ph ph-cloud"></i></div>Study</button>
-    <button class="bn-item"        id="bn-psycho"     onclick="UI.go('psycho')"><div class="bn-ic"><i class="ph ph-lightning"></i></div>Psycho</button>
-    <button class="bn-item"        id="bn-subjective" onclick="UI.go('subjective')"><div class="bn-ic"><i class="ph ph-pencil-line"></i></div>Subj</button>
+    <button class="bn-item"        id="bn-subjective" onclick="UI.go('subjective')"><div class="bn-ic"><i class="ph ph-sun-horizon"></i></div>Subj</button>
+    <button class="bn-item"        id="bn-progress"   onclick="UI.go('progress')"><div class="bn-ic"><i class="ph ph-chart-bar"></i></div>Progress</button>
     <button class="bn-item bn-more" onclick="_bnavMore()" aria-label="More options"><div class="bn-ic"><i class="ph ph-list"></i></div>More<div class="bn-badge" id="bn-badge" style="display:none"></div></button>
   </nav>
 </div>
@@ -1025,27 +1121,19 @@ input[type=file]:hover{border-color:var(--amb)}
 <script src="cloud-sync.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
-   PATCH LAYER — UI hooks only.
-   Anything that touches business state lives in app.js / objective.js /
-   subjective.js. This file wires:
-     • sidebar hints (Daily Qn + Weekly Sets status)
-     • dashboard marquee
-     • "Switch to Admin" button
-     • view dispatch — new views weekly + subjective
-     • swipe-right-to-open-sidebar
-     • keyboard shortcuts not owned by the quiz engine
+   PATCH LAYER — user.html
+   Hooks UI. Anything that touches business state lives in app.js /
+   objective.js / subjective.js.
    ═══════════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
 const $   = id => document.getElementById(id);
 const set = (id,v) => { const e=$(id); if(e) e.textContent=v; };
-const htm = (id,v) => { const e=$(id); if(e) e.innerHTML=v; };
 
-/* ── 1. Quiz-engine tile number format (unchanged from previous versions) ── */
+/* ── 1. Quiz-engine tile number format ── */
 function _cleanChip(id){ const e=$(id); if(!e)return; e.textContent=e.textContent.replace(/^[⚡📝🌟❌⭐🚩🎯👁️]\s*/,'').trim(); }
 function _ctr(id,cur,tot){ const e=$(id); if(!e)return; e.innerHTML=cur+'<em>/'+tot+'</em>'; }
 
-/* Guard: patches only apply if QUIZ exists (objective.js loaded). */
 if (typeof QUIZ !== 'undefined') {
   const _rf = QUIZ._renderFlashcard.bind(QUIZ);
   QUIZ._renderFlashcard = function(){
@@ -1122,76 +1210,87 @@ document.addEventListener('keydown',e=>{
 /* ── 4. Bottom nav helpers ── */
 function _updateBottomNav(v){
   document.querySelectorAll('.bn-item').forEach(e=>e.classList.remove('active'));
-  const ids=['home','online','psycho','subjective'];
-  if(ids.includes(v)){ const b=$('bn-'+v); if(b) b.classList.add('active'); }
+  const map = {
+    'home':'bn-home','online':'bn-online',
+    'subj-qotd':'bn-subjective','subj-exam':'bn-subjective','subj-list':'bn-subjective',
+    'progress':'bn-progress','server-progress':'bn-progress'
+  };
+  const bid = map[v];
+  if(bid){ const b=$(bid); if(b) b.classList.add('active'); }
 }
 window._bnav=function(id){ _updateBottomNav(id); };
 window._bnavMore=function(){
   openMod('More', `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.42rem;padding:.1rem 0">
-      ${[['<i class="ph ph-calendar-check"></i>','Weekly Sets','weekly'],['<i class="ph ph-folder-open"></i>','Local File','local'],['<i class="ph ph-star"></i>','Bookmarks','bookmarks'],['<i class="ph ph-flag"></i>','Flagged','flagged'],['<i class="ph ph-x-circle"></i>','Wrong Bank','wrong'],['<i class="ph ph-calendar-blank"></i>','Timetable','timetable'],['<i class="ph ph-package"></i>','Offline Cache','offline'],['<i class="ph ph-chart-bar"></i>','Progress','progress']].map(([ic,lb,v])=>`<button class="btn btn-a btn-lg" style="justify-content:flex-start;gap:.5rem" onclick="UI.go('${v}');closeMod()">${ic} ${lb}</button>`).join('')}
+      ${[
+        ['<i class="ph ph-calendar-check"></i>','Weekly Sets','weekly'],
+        ['<i class="ph ph-folder-open"></i>','Local File','local'],
+        ['<i class="ph ph-lightning"></i>','Psycho Mode','psycho'],
+        ['<i class="ph ph-star"></i>','Bookmarks','bookmarks'],
+        ['<i class="ph ph-flag"></i>','Flagged','flagged'],
+        ['<i class="ph ph-x-circle"></i>','Wrong Bank','wrong'],
+        ['<i class="ph ph-calendar-blank"></i>','Timetable','timetable'],
+        ['<i class="ph ph-package"></i>','Offline Cache','offline'],
+        ['<i class="ph ph-database"></i>','Server Progress','server-progress'],
+        ['<i class="ph ph-floppy-disk"></i>','Data Backup','data']
+      ].map(([ic,lb,v])=>`<button class="btn btn-a btn-lg" style="justify-content:flex-start;gap:.5rem" onclick="UI.go('${v}');closeMod()">${ic} ${lb}</button>`).join('')}
     </div>
   `);
 };
 
-/* ── 5. UI.go wrapper — hooks the new views, then re-renders hints ── */
+/* ── 5. UI.go wrapper — dispatches the new views ── */
 const _uigoraw = UI._goRaw.bind(UI);
 UI._goRaw = function(v){
-  _uigoraw(v);
-  _updateBottomNav(v);
+  // Map grouped nav aliases to real view IDs
+  const aliasMap = {
+    'subjective':'subj-qotd'   // legacy: sidebar "subjective" opens Qn of the Day view
+  };
+  const real = aliasMap[v] || v;
 
-  // Weekly Sets: re-render the card into the newly-shown view.
-  if(v === 'weekly' && typeof WEEKLY !== 'undefined'){
+  _uigoraw(real);
+  _updateBottomNav(real);
+
+  if(real === 'weekly' && typeof WEEKLY !== 'undefined'){
     if(typeof WEEKLY._renderHomeCard === 'function') WEEKLY._renderHomeCard();
     const outer = $('weekly-sets-outer');
     const empty = $('weekly-empty');
     if(outer && empty) empty.style.display = (outer.style.display === 'none') ? '' : 'none';
   }
 
-  // Subjective: first entry inits the module (fetches bank); later
-  // entries just re-render.
-  if(v === 'subjective' && typeof SUBJ !== 'undefined'){
-    if(typeof SUBJ.ready === 'function' && SUBJ.ready()) {
+  // Subjective sub-views: init the module once, then let individual
+  // views render themselves (they already do their own render on entry).
+  if((real === 'subj-qotd' || real === 'subj-exam' || real === 'subj-list') && typeof SUBJ !== 'undefined'){
+    if(typeof SUBJ.ready === 'function' && SUBJ.ready()){
       if(typeof SUBJ._renderQotd === 'function') SUBJ._renderQotd();
       if(typeof SUBJ._renderExam === 'function') SUBJ._renderExam();
       if(typeof SUBJ._renderList === 'function') SUBJ._renderList();
     } else {
       SUBJ.init();
     }
-    // Update tab-bar state to match the current snap position.
-    const scroller = $('subj-scroller');
-    if(scroller){
-      const visible = Array.from(scroller.children).find(p => {
-        const r = p.getBoundingClientRect();
-        return r.left >= -5 && r.left < window.innerWidth/2;
-      });
-      if(visible){
-        const id = visible.id.replace(/^subj-/, '');
-        document.querySelectorAll('.subj-tab').forEach(t => {
-          const on = t.dataset.tab === id;
-          t.classList.toggle('active', on);
-          t.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
-      }
-    }
+    // Reflect the current sub-view in the sidebar active state
+    document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
+    const active = $('nav-' + real);
+    if(active) active.classList.add('active');
+    return;
   }
 
-  // Progress view: give CLOUD_UI a chance to refresh its state.
-  if(v === 'progress' && typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render){
+  if(real === 'server-progress' && typeof SERVER_PROG !== 'undefined'){
+    SERVER_PROG.load(false);
+  }
+
+  if(real === 'progress' && typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render){
     setTimeout(CLOUD_UI.render, 0);
   }
 
-  // Any nav — refresh the sidebar hints + marquee.
   setTimeout(_refreshHints, 50);
 };
 
-/* ── 6. SUBJECTIVE panel snapping (IntersectionObserver on the horizontal scroller) ── */
+/* ── 6. Subject panel snapping (IntersectionObserver) ── */
 (function(){
   const scroller = document.getElementById('subj-scroller');
   if(!scroller) return;
   const panels = Array.from(scroller.querySelectorAll('.subj-panel'));
   const tabs = Array.from(document.querySelectorAll('.subj-tab'));
-
   function setActive(tabId){
     tabs.forEach(t => {
       const on = t.dataset.tab === tabId;
@@ -1199,7 +1298,6 @@ UI._goRaw = function(v){
       t.setAttribute('aria-selected', on ? 'true' : 'false');
     });
   }
-
   const io = new IntersectionObserver((entries) => {
     let best = null;
     entries.forEach(e => {
@@ -1210,8 +1308,6 @@ UI._goRaw = function(v){
     setActive(id);
   }, { root: scroller, threshold: [0.5] });
   panels.forEach(p => io.observe(p));
-
-  // SUBJ.goTo is defined by subjective.js; if it isn't, provide a fallback
   if(typeof SUBJ === 'undefined') window.SUBJ = {};
   if(!SUBJ.goTo){
     SUBJ.goTo = function(tabId){
@@ -1223,36 +1319,21 @@ UI._goRaw = function(v){
   }
 })();
 
-/* ── 7. SIDEBAR HINTS + MARQUEE ── */
+/* ── 7. Sidebar hints + marquee ── */
 window.SB_HINTS = {
   refresh(){
-    // Daily Question
     const qHint = $('subj-qotd-hint');
     const qBadge = $('subj-qotd-badge');
     if(qHint && qBadge && typeof SUBJ !== 'undefined'){
       const st = SUBJ._qotdPublicState ? SUBJ._qotdPublicState() : null;
       const ready = SUBJ._hasBank ? SUBJ._hasBank() : false;
-      if(!ready){
-        qHint.textContent = 'No questions yet';
-        qBadge.style.display = 'none';
-      } else if(!st || st.phase === 'idle'){
-        qHint.textContent = 'Ready — tap to begin';
-        qBadge.style.display = '';
-      } else if(st.phase === 'solving'){
-        qHint.textContent = 'Writing… ' + (st.left || '');
-        qBadge.style.display = 'none';
-      } else if(st.phase === 'upload'){
-        qHint.textContent = 'Upload window open';
-        qBadge.style.display = '';
-      } else if(st.phase === 'submitted'){
-        qHint.textContent = '✓ Submitted for grading';
-        qBadge.style.display = 'none';
-      } else if(st.phase === 'expired'){
-        qHint.textContent = 'Come back tomorrow';
-        qBadge.style.display = 'none';
-      }
+      if(!ready){ qHint.textContent = 'No questions yet'; qBadge.style.display = 'none'; }
+      else if(!st || st.phase === 'idle'){ qHint.textContent = 'Ready — tap to begin'; qBadge.style.display = ''; }
+      else if(st.phase === 'solving'){ qHint.textContent = 'Writing… ' + (st.left || ''); qBadge.style.display = 'none'; }
+      else if(st.phase === 'upload'){ qHint.textContent = 'Upload window open'; qBadge.style.display = ''; }
+      else if(st.phase === 'submitted'){ qHint.textContent = '✓ Submitted for grading'; qBadge.style.display = 'none'; }
+      else if(st.phase === 'expired'){ qHint.textContent = 'Come back tomorrow'; qBadge.style.display = 'none'; }
     }
-    // Weekly Sets
     const wHint = $('weekly-hint');
     const wBadge = $('weekly-badge');
     if(wHint && wBadge && typeof WEEKLY !== 'undefined'){
@@ -1260,23 +1341,16 @@ window.SB_HINTS = {
       const attempts = WEEKLY.attempts || {};
       const liveNow = sets.filter(s => s.released && !attempts[s.id] && WEEKLY.examOpen && WEEKLY.examOpen(s));
       const upcoming = sets.filter(s => !s.released);
-      if(liveNow.length){
-        wHint.textContent = liveNow.length + ' exam' + (liveNow.length!==1?'s':'') + ' open now';
-        wBadge.style.display = '';
-      } else if(upcoming.length){
+      if(liveNow.length){ wHint.textContent = liveNow.length + ' exam' + (liveNow.length!==1?'s':'') + ' open now'; wBadge.style.display = ''; }
+      else if(upcoming.length){
         const next = upcoming.sort((a,b) => new Date(a.releaseAt) - new Date(b.releaseAt))[0];
         const t = new Date(next.releaseAt).getTime() - Date.now();
         wHint.textContent = 'Next unlocks in ' + _briefDuration(t);
         wBadge.style.display = 'none';
-      } else if(sets.length){
-        wHint.textContent = sets.length + ' set' + (sets.length!==1?'s':'') + ' in library';
-        wBadge.style.display = 'none';
-      } else {
-        wHint.textContent = 'No sets yet';
-        wBadge.style.display = 'none';
       }
+      else if(sets.length){ wHint.textContent = sets.length + ' set' + (sets.length!==1?'s':'') + ' in library'; wBadge.style.display = 'none'; }
+      else { wHint.textContent = 'No sets yet'; wBadge.style.display = 'none'; }
     }
-    // Marquee
     _renderMarquee();
   }
 };
@@ -1288,28 +1362,18 @@ function _briefDuration(ms){
   if(hrs < 24) return hrs + 'h';
   return Math.floor(hrs/24) + 'd';
 }
-
 function _renderMarquee(){
   const bar = $('home-marquee');
   const track = $('marquee-track');
   if(!bar || !track) return;
-
   const items = [];
   let urgent = false;
-
   if(typeof SUBJ !== 'undefined' && SUBJ._qotdPublicState && SUBJ._hasBank && SUBJ._hasBank()){
     const st = SUBJ._qotdPublicState();
-    if(!st || st.phase === 'idle'){
-      items.push(`📝 <strong>Today's subjective question is ready</strong> — ${st?.marks || 10}-mark paper`);
-    } else if(st.phase === 'solving' && st.left){
-      items.push(`⏱ <strong>Writing in progress</strong> — ${st.left} left to solve the ${st.marks}-mark question`);
-      urgent = (st.leftSec || 0) < 120;
-    } else if(st.phase === 'upload' && st.left){
-      items.push(`📤 <strong>Upload window open</strong> — send your PDF before ${st.left}`);
-      urgent = true;
-    }
+    if(!st || st.phase === 'idle'){ items.push(`📝 <strong>Today's subjective question is ready</strong> — ${st?.marks || 10}-mark paper`); }
+    else if(st.phase === 'solving' && st.left){ items.push(`⏱ <strong>Writing in progress</strong> — ${st.left} left to solve the ${st.marks}-mark question`); urgent = (st.leftSec || 0) < 120; }
+    else if(st.phase === 'upload' && st.left){ items.push(`📤 <strong>Upload window open</strong> — send your PDF before ${st.left}`); urgent = true; }
   }
-
   if(typeof WEEKLY !== 'undefined'){
     const sets = WEEKLY.sets || [];
     const attempts = WEEKLY.attempts || {};
@@ -1317,9 +1381,7 @@ function _renderMarquee(){
       const attempted = attempts[s.id];
       if(!s.released){
         const ms = new Date(s.releaseAt).getTime() - Date.now();
-        if(ms > 0 && ms < 24*60*60*1000){
-          items.push(`📅 <strong>${esc(s.title)}</strong> unlocks in ${_briefDuration(ms)}`);
-        }
+        if(ms > 0 && ms < 24*60*60*1000){ items.push(`📅 <strong>${esc(s.title)}</strong> unlocks in ${_briefDuration(ms)}`); }
         return;
       }
       if(attempted) return;
@@ -1331,22 +1393,15 @@ function _renderMarquee(){
       }
     });
   }
-
   if(!items.length){ bar.style.display = 'none'; return; }
   bar.style.display = '';
   bar.classList.toggle('urgent', urgent);
-
-  // Duplicate the item list so the CSS translateX(-50%) loops seamlessly.
   const cycle = items.map(t => `<span class="marquee-item">${t}</span>`).join('');
   track.innerHTML = cycle + cycle;
 }
-
 function _refreshHints(){ SB_HINTS.refresh(); }
-
 setInterval(_refreshHints, 30000);
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') _refreshHints();
-});
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') _refreshHints(); });
 setTimeout(() => { _refreshHints(); }, 800);
 
 /* ── 8. APP_SWITCH — direct handoff to admin.html ── */
@@ -1375,14 +1430,15 @@ window.APP_SWITCH = {
   _setVisible(v){
     const b = $('tb-admin-btn');
     if(b) b.style.display = v ? '' : 'none';
-    const s = $('sb-admin-switch');
-    if(s) s.style.display = v ? '' : 'none';
+    const promo = $('sb-admin-promo');
+    if(promo) promo.style.display = v ? '' : 'none';
   },
   async toAdmin(){
     if(!S.user || !S.user.token){ toast('❌ Please log in again'); return; }
     if(!S.online || S.forcedOffline){ toast('❌ You need internet to switch'); return; }
     const btn = $('tb-admin-btn');
-    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Switching…'; }
+    const orig = btn ? btn.innerHTML : '';
+    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>…'; }
     try{
       const url = (window.ABHYAS_CONFIG && ABHYAS_CONFIG.GAS_URL) || '';
       const r = await fetch(url, {
@@ -1396,32 +1452,29 @@ window.APP_SWITCH = {
       });
       const data = await r.json();
       if(!data || !data.success){
-        if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-shield-check"></i> Admin'; }
+        if(btn){ btn.disabled = false; btn.innerHTML = orig; }
         toast('❌ ' + ((data && data.error) || 'Switch failed'));
         return;
       }
-      // Persist admin token where admin.html reads it on boot.
       localStorage.setItem('abhyas_admin', JSON.stringify({
         user: data.username || S.user.username,
         token: data.adminToken,
         expires: Date.now() + (data.expiresInMs || 86400000)
       }));
-      // Flush pending sync before navigating.
       try{ if(typeof PSYNC !== 'undefined' && PSYNC._timer) PSYNC._beaconSync(); }catch(e){}
-      toast('🛡️ Switched to Admin');
+      toast('🛡️ Opening Admin Portal…');
       setTimeout(() => { window.location.href = 'admin.html'; }, 200);
     }catch(e){
-      if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-shield-check"></i> Admin'; }
+      if(btn){ btn.disabled = false; btn.innerHTML = orig; }
       toast('❌ ' + (e.message || 'Network error'));
     }
   }
 };
 
-/* Re-check capability on entering home and on AUTH._enter. */
 const _uigorawSwitch = UI._goRaw.bind(UI);
 UI._goRaw = function(v){
   _uigorawSwitch(v);
-  if(v === 'home' && typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
+  if((v === 'home' || v === 'progress') && typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
 };
 if(typeof AUTH !== 'undefined' && AUTH._enter){
   const _origEnter = AUTH._enter.bind(AUTH);
@@ -1437,7 +1490,6 @@ if(typeof AUTH !== 'undefined' && AUTH._enter){
   if(!mbg) return;
   let prevFocus = null;
   let handler = null;
-
   function focusables(){
     return Array.from(mbg.querySelectorAll(
       'button, [href], input:not([type="hidden"]), select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -1548,7 +1600,6 @@ window.CLOUD_UI = (function(){
   return { render: render, signIn: signIn, signOut: signOut, backup: backup, restore: restore };
 })();
 
-/* Warm up GSI when Progress is first opened. */
 document.addEventListener('click', function warm(e){
   if(e.target.closest && e.target.closest('#nav-progress')){
     if(typeof CLOUD !== 'undefined') CLOUD.init().catch(function(){});
@@ -1556,6 +1607,183 @@ document.addEventListener('click', function warm(e){
     setTimeout(CLOUD_UI.render, 50);
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SERVER_PROG — Per-file progress pulled from the server's Progress sheet.
+   Reads the user's own stored progress JSON, walks every session's qres
+   array, groups by fileId, and renders a table of { file, practised,
+   attempted, correct, wrong, % covered }. Unlike Wrong Bank / Bookmarks,
+   this shows how much of each file you've actually worked through.
+   ═══════════════════════════════════════════════════════════════════════════ */
+const SERVER_PROG = {
+  _loaded: false,
+  _loading: false,
+  _sort: 'most',   // 'most' | 'least' | 'name'
+
+  toggleSort(){
+    this._sort = this._sort === 'most' ? 'least' : this._sort === 'least' ? 'name' : 'most';
+    const lbl = document.getElementById('srv-sort-label');
+    if(lbl) lbl.textContent = 'Sort: ' + ({most:'Most done', least:'Least done', name:'A–Z'}[this._sort]);
+    this.render();
+  },
+
+  async load(force){
+    const listEl = document.getElementById('srv-list');
+    if(!listEl) return;
+    if(this._loaded && !force) { this.render(); return; }
+    if(this._loading) return;
+    this._loading = true;
+
+    listEl.innerHTML = '<p style="font-size:.8rem;opacity:.6"><i class="ph ph-circle-notch" style="animation:spin 1s linear infinite"></i> Fetching from server…</p>';
+
+    if(!S.online || S.forcedOffline){
+      listEl.innerHTML = '<div class="empty"><div class="empty-i"><i class="ph ph-wifi-slash"></i></div><p>You\'re offline</p><p>Server progress needs a connection.</p></div>';
+      this._loading = false;
+      return;
+    }
+    try{
+      const r = await fetch(`${APPS}?${qs({action:'getProgress', username:S.user.username, token:S.user.token})}`, {redirect:'follow'});
+      const res = await r.json();
+      if(!res.success || !res.data){
+        listEl.innerHTML = '<div class="empty"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No server progress yet</p><p>Start a quiz to populate your per-file stats.</p></div>';
+        this._loaded = true;
+        this._loading = false;
+        return;
+      }
+      const data = JSON.parse(res.data);
+      this._compute(data);
+      this._loaded = true;
+    }catch(e){
+      listEl.innerHTML = `<p style="font-size:.8rem;color:var(--ros)">❌ ${esc(e.message || 'Failed to load')}</p>`;
+    }
+    this._loading = false;
+    this.render();
+  },
+
+  _rows: [],
+  _compute(data){
+    const sessions = (data && data.prog && Array.isArray(data.prog.sessions)) ? data.prog.sessions : [];
+    // fileId → { attempted, correct, wrong, practisedSet }
+    const byFile = new Map();
+    sessions.forEach(sess => {
+      const qres = Array.isArray(sess.qres) ? sess.qres : [];
+      qres.forEach(q => {
+        if(!q || !q.uid) return;
+        const fid = typeof fidFromUid === 'function' ? fidFromUid(q.uid) : String(q.uid).replace(/_\d+$/, '');
+        if(!byFile.has(fid)) byFile.set(fid, { fid, attempted:0, correct:0, wrong:0, practised:new Set() });
+        const rec = byFile.get(fid);
+        rec.attempted++;
+        if(q.ok) rec.correct++; else rec.wrong++;
+        rec.practised.add(q.uid);
+      });
+    });
+
+    // Build rows with metadata from ChapterData
+    const rows = [];
+    byFile.forEach(rec => {
+      let meta = { lv:'', ch:'', book:'', subtopic:'', name:rec.fid };
+      if(typeof ChapterData !== 'undefined'){
+        const all = ChapterData.allFileRefs();
+        const found = all.find(r => r.fid === rec.fid);
+        if(found){
+          meta = {
+            lv: found.lv,
+            ch: found.ch,
+            book: found.book,
+            subtopic: found.subtopic,
+            name: `${ChapterData.chapterName(found.lv, found.ch)} — ${found.book} — ${found.subtopic}`
+          };
+        }
+      }
+      const total = (typeof S !== 'undefined' && S.fcount && S.fcount[rec.fid]) || null;
+      const practised = rec.practised.size;
+      const pct = total ? Math.round((practised / total) * 100) : null;
+      rows.push({ ...rec, practised, total, pct, ...meta });
+    });
+    this._rows = rows;
+  },
+
+  render(){
+    const listEl = document.getElementById('srv-list');
+    const summaryEl = document.getElementById('srv-summary');
+    const levelSel = document.getElementById('srv-filter-level');
+    if(!listEl || !summaryEl) return;
+
+    if(!this._rows.length){
+      listEl.innerHTML = '<div class="empty"><div class="empty-i"><i class="ph ph-tray"></i></div><p>No file data yet</p><p>Take a quiz to start tracking per-file progress.</p></div>';
+      summaryEl.innerHTML = '';
+      return;
+    }
+
+    // Populate level filter once
+    if(levelSel && levelSel.options.length <= 1 && typeof ChapterData !== 'undefined'){
+      const levels = [...new Set(this._rows.map(r => r.lv).filter(Boolean))].sort();
+      levels.forEach(lv => {
+        const opt = document.createElement('option');
+        opt.value = lv;
+        opt.textContent = ChapterData.levelLabel(lv);
+        levelSel.appendChild(opt);
+      });
+    }
+
+    const lvFilter = levelSel ? levelSel.value : '';
+    const search = (document.getElementById('srv-search')?.value || '').toLowerCase().trim();
+    const onlyStarted = document.getElementById('srv-only-started')?.checked;
+
+    let rows = this._rows.slice();
+    if(lvFilter) rows = rows.filter(r => r.lv === lvFilter);
+    if(search) rows = rows.filter(r => (r.name || '').toLowerCase().includes(search));
+    if(onlyStarted) rows = rows.filter(r => r.practised > 0);
+
+    // Sorting
+    if(this._sort === 'most') rows.sort((a,b) => (b.pct ?? -1) - (a.pct ?? -1) || b.practised - a.practised);
+    else if(this._sort === 'least') rows.sort((a,b) => (a.pct ?? 999) - (b.pct ?? 999) || a.practised - b.practised);
+    else rows.sort((a,b) => (a.name || '').localeCompare(b.name || ''));
+
+    // Summary stats
+    const totalFiles = this._rows.length;
+    const startedFiles = this._rows.filter(r => r.practised > 0).length;
+    const completedFiles = this._rows.filter(r => r.pct !== null && r.pct >= 100).length;
+    summaryEl.innerHTML = `
+      <div class="sc sc-c"><div class="sv tcy">${totalFiles}</div><div class="stat-lbl">Files Available</div></div>
+      <div class="sc sc-a"><div class="sv ta2">${startedFiles}</div><div class="stat-lbl">Started</div></div>
+      <div class="sc sc-g"><div class="sv tc2">${completedFiles}</div><div class="stat-lbl">Completed</div></div>
+    `;
+
+    if(!rows.length){
+      listEl.innerHTML = '<p style="font-size:.8rem;opacity:.6;text-align:center;padding:1rem">No files match the current filter.</p>';
+      return;
+    }
+
+    listEl.innerHTML = rows.map(r => {
+      const pct = r.pct;
+      const barColor = pct === null ? 'var(--b2)' : pct >= 75 ? 'var(--grn)' : pct >= 40 ? 'var(--amb)' : 'var(--sky)';
+      const accPct = r.attempted ? Math.round((r.correct / r.attempted) * 100) : 0;
+      return `<div style="background:var(--b0);border:1px solid var(--b1);border-radius:10px;padding:.6rem .75rem">
+        <div style="display:flex;justify-content:space-between;gap:.6rem;align-items:flex-start;flex-wrap:wrap;margin-bottom:.35rem">
+          <div style="min-width:0;flex:1">
+            <div style="font-weight:600;font-size:.8rem;color:var(--t1)">${esc(r.subtopic || r.fid)}</div>
+            <div style="font-size:.66rem;color:var(--t3);margin-top:.1rem">${esc(r.book || '')}${r.ch ? ' · ' + esc(typeof ChapterData!=='undefined' ? ChapterData.chapterName(r.lv, r.ch) : r.ch) : ''}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            ${pct === null
+              ? '<span style="font-family:var(--fm);font-size:.7rem;color:var(--t3)">' + r.practised + ' done</span>'
+              : `<span style="font-family:var(--fm);font-size:.85rem;font-weight:700;color:var(--t1)">${pct}%</span>
+                 <div style="font-size:.6rem;color:var(--t3)">${r.practised}/${r.total}</div>`}
+          </div>
+        </div>
+        <div class="pb" style="margin-bottom:.35rem"><div class="pb-f" style="width:${pct ?? (r.practised ? Math.min(100, r.practised) : 0)}%;background:${barColor}"></div></div>
+        <div style="display:flex;gap:.7rem;flex-wrap:wrap;font-size:.62rem;color:var(--t3)">
+          <span><i class="ph ph-hash"></i> ${r.attempted} attempts</span>
+          <span style="color:var(--grn)"><i class="ph ph-check"></i> ${r.correct} correct</span>
+          <span style="color:var(--ros)"><i class="ph ph-x"></i> ${r.wrong} wrong</span>
+          ${r.attempted ? `<span><i class="ph ph-percent"></i> ${accPct}% accuracy</span>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+};
+window.SERVER_PROG = SERVER_PROG;
 
 })();
 </script>
