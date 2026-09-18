@@ -7,10 +7,6 @@
 <meta name="color-scheme" content="light dark">
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <script>(function(){
-  /* Pre-paint theme. Runs before the stylesheet is evaluated so there is
-     no flash of the wrong theme on a slow phone. app.js toggles .dark on
-     <body>; shared.js toggles it on <html>. Every token selector below
-     accepts either, so both paths work. */
   try{
     var raw = localStorage.getItem('abhyas_theme');
     var t = raw ? JSON.parse(raw) : null;
@@ -41,66 +37,39 @@
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas — student app. Self-contained stylesheet.
-
-   Deliberately does NOT import design-system.css. Everything app.js,
-   objective.js, subjective.js and cloud-sync.js render is defined here,
-   so this page owns its own appearance and ships one stylesheet instead
-   of two. On a 3G phone that is ~67 KB less to download before first
-   paint, which is the single biggest win available on this page.
-
-   Direction: this is a training log, not a dashboard. A student opens it
-   twice a day for months; the job is to make "keep going" obvious and
-   starting a session one tap. Numbers are the personality — timers,
-   scores, streaks, counts — so they get a mono face with tabular figures
-   and real size. Everything around them stays quiet.
-
-   Boldness is spent in exactly one place: the quiz surface. The timer,
-   the answer options and the result ring are where a student spends
-   almost all their time, so that is where the contrast and weight go.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Tokens — light ─────────────────────────────────────────────── */
 :root{
   color-scheme:light;
-
   --bg:#F2F4F3;
   --bg-sunken:#E9ECEA;
   --surface:#FFFFFF;
   --surface-2:#FFFFFF;
   --surface-alt:#F7F9F8;
   --scrim:rgba(14,22,18,.46);
-
   --sep:#E3E7E4;
   --sep-strong:#D2D8D4;
   --hairline:rgba(20,30,24,.06);
-
   --ink:#15201A;
   --ink-2:#556059;
   --ink-3:#7F8A84;
   --ink-4:#AAB3AE;
   --on-accent:#FFFFFF;
-
   --accent:#1E7A4C;
   --accent-hover:#196741;
   --accent-pressed:#145536;
   --accent-soft:#E2F0E8;
   --accent-line:rgba(30,122,76,.24);
   --accent-rgb:30,122,76;
-
   --success:#1E7A4C; --success-soft:#E2F0E8; --success-line:rgba(30,122,76,.26);
   --warning:#8F5407; --warning-soft:#FAEEDF; --warning-line:rgba(143,84,7,.24);
   --danger:#B23029;  --danger-soft:#FBE7E5;  --danger-line:rgba(178,48,41,.24);
   --info:#215C99;    --info-soft:#E6EFF9;    --info-line:rgba(33,92,153,.24);
   --violet:#5A4A8A;  --violet-soft:#EDE9F7;  --violet-line:rgba(90,74,138,.24);
-
   --focus:#1E7A4C;
   --selection:rgba(30,122,76,.18);
-
   --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
-
-  /* Type scale. Small because the app is dense and read at arm's length
-     on a phone; the mono numerals below carry the emphasis instead. */
   --fs-hero:1.5rem;
   --fs-t1:1.1875rem;
   --fs-t2:1.0625rem;
@@ -109,48 +78,27 @@
   --fs-callout:.8125rem;
   --fs-foot:.75rem;
   --fs-cap:.6875rem;
-
-  /* Numeral scale — the characteristic element. */
   --fs-num-xl:2.5rem;
   --fs-num-lg:1.625rem;
   --fs-num-md:1.125rem;
-
   --sp-1:.25rem; --sp-2:.5rem;  --sp-3:.75rem; --sp-4:1rem;
   --sp-5:1.25rem;--sp-6:1.5rem; --sp-8:2rem;   --sp-10:2.5rem;
   --sp-12:3rem;  --sp-16:4rem;
-
   --r-control:8px; --r-input:10px; --r-card:14px; --r-panel:18px;
   --r-sheet:22px;  --r-full:999px;
-
   --sh-1:0 1px 2px rgba(18,28,22,.05),0 1px 1px rgba(18,28,22,.03);
   --sh-2:0 4px 16px rgba(18,28,22,.07),0 1px 2px rgba(18,28,22,.05);
   --sh-3:0 12px 32px rgba(18,28,22,.10),0 2px 6px rgba(18,28,22,.05);
   --sh-modal:0 24px 64px rgba(18,28,22,.22),0 4px 16px rgba(18,28,22,.10);
-
   --dur-fast:150ms; --dur-base:220ms; --dur-slow:320ms;
   --ease:cubic-bezier(.4,0,.2,1);
   --ease-out:cubic-bezier(0,0,.2,1);
   --ease-spring:cubic-bezier(.32,1.35,.5,1);
-
   --rail-w:236px; --topbar-h:54px; --tabbar-h:60px; --content-max:1080px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
-
   --z-sticky:10; --z-quizbar:60; --z-rail:400; --z-tabbar:500;
   --z-sheet:600; --z-modal:700; --z-toast:800; --z-gate:900;
-
-  /* ── Legacy aliases ───────────────────────────────────────────────
-     app.js, objective.js and subjective.js build modals, loaders and
-     banners with inline styles that reference the old design-system
-     token names. Those scripts are not being rewritten, so the old
-     names are kept as aliases onto the palette above rather than left
-     dangling. Without these the quiz loader, the limit picker, the
-     exit guard, the tutorial and the install banner all render with
-     transparent backgrounds.
-
-     --neon was already referenced by objective.js and the timetable
-     grid but was never defined anywhere, so those elements have been
-     drawing with an invalid colour since the split. It resolves now. */
   --amb:var(--accent);       --amb2:var(--accent-pressed);
   --neon:var(--accent);
   --b0:var(--hairline);      --b1:var(--sep);        --bd:var(--sep);
@@ -168,52 +116,41 @@
   --bn-h:var(--tabbar-h);
 }
 
-/* ── 2. Tokens — dark. Tuned, not inverted: the surfaces stay slightly
-     blue-cool so long night sessions don't glare, and the accent lifts
-     to stay legible on them. ─────────────────────────────────────────── */
 .dark{
   color-scheme:dark;
-
   --bg:#080B14;
   --bg-sunken:#0C111C;
   --surface:#121829;
   --surface-2:#182036;
   --surface-alt:#0F1524;
   --scrim:rgba(0,0,0,.62);
-
   --sep:rgba(255,255,255,.08);
   --sep-strong:rgba(255,255,255,.16);
   --hairline:rgba(255,255,255,.05);
-
   --ink:#EDF2EF;
   --ink-2:#9AA6B8;
   --ink-3:#77839A;
   --ink-4:#4E5870;
   --on-accent:#04140C;
-
   --accent:#46C46E;
   --accent-hover:#5FD183;
   --accent-pressed:#35A95C;
   --accent-soft:rgba(70,196,110,.14);
   --accent-line:rgba(70,196,110,.32);
   --accent-rgb:70,196,110;
-
   --success:#46C46E; --success-soft:rgba(70,196,110,.14); --success-line:rgba(70,196,110,.32);
   --warning:#E0A048; --warning-soft:rgba(224,160,72,.14); --warning-line:rgba(224,160,72,.32);
   --danger:#F4606D;  --danger-soft:rgba(244,96,109,.14);  --danger-line:rgba(244,96,109,.32);
   --info:#54B9F0;    --info-soft:rgba(84,185,240,.13);    --info-line:rgba(84,185,240,.30);
   --violet:#9B7DF0;  --violet-soft:rgba(155,125,240,.14); --violet-line:rgba(155,125,240,.32);
-
   --focus:#46C46E;
   --selection:rgba(70,196,110,.24);
-
   --sh-1:0 1px 2px rgba(0,0,0,.45);
   --sh-2:0 4px 18px rgba(0,0,0,.50);
   --sh-3:0 12px 34px rgba(0,0,0,.60);
   --sh-modal:0 28px 72px rgba(0,0,0,.68);
 }
 
-/* ── 3. Reset + base ──────────────────────────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:100%;-webkit-text-size-adjust:100%}
 body{
@@ -237,8 +174,6 @@ hr{border:none;border-top:1px solid var(--sep);margin:var(--sp-4) 0}
 code,kbd,samp,pre{font-family:var(--mono);font-size:.9em}
 b,strong{font-weight:650}
 
-/* Every number that counts, ticks or scores uses this. Tabular figures
-   stop timers and scores from jittering as digits change width. */
 .mono,.num,.sv,.stat-v,.qb-ctr,.qb-timer,.qotd-timer,.home-clock,.tt-clock,
 .ring-v,.q-count,.sess-pct,.tt-ti,.qn,.qt-num{
   font-family:var(--mono);font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;
@@ -248,7 +183,6 @@ b,strong{font-weight:650}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
 
-/* ── 4. Type + layout utilities ───────────────────────────────────── */
 .t-hero{font-size:var(--fs-hero);font-weight:700;letter-spacing:-.022em;line-height:1.15}
 .t-t1{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em;line-height:1.2}
 .t-t2{font-size:var(--fs-t2);font-weight:650;line-height:1.28}
@@ -284,7 +218,6 @@ b,strong{font-weight:650}
 @media (max-width:640px){.g2-grid{grid-template-columns:1fr}}
 @media (max-width:420px){.g4-grid{grid-template-columns:1fr 1fr}}
 
-/* ── 5. Buttons ───────────────────────────────────────────────────── */
 .btn{
   display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
   min-height:38px;padding:0 var(--sp-4);border-radius:var(--r-input);
@@ -299,9 +232,6 @@ b,strong{font-weight:650}
 .btn:active:not(:disabled){transform:scale(.975)}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
 
-/* Variants. The legacy one-letter names (btn-a, btn-g, btn-r, btn-c,
-   btn-p) are the ones app.js/objective.js/subjective.js emit, so they
-   stay — mapped onto the semantic palette rather than re-declared. */
 .btn-solid,.btn-primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
 .btn-solid:hover:not(:disabled),.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
 .btn-solid:active:not(:disabled){background:var(--accent-pressed)}
@@ -322,7 +252,6 @@ b,strong{font-weight:650}
 .btn-blk,.btn-block{width:100%;display:flex}
 .bg{display:flex;gap:var(--sp-2);flex-wrap:wrap}
 
-/* The one genuinely loud button on the page: start studying. */
 .btn-start{
   width:100%;min-height:54px;border-radius:var(--r-card);
   background:var(--accent);color:var(--on-accent);border:none;
@@ -335,9 +264,6 @@ b,strong{font-weight:650}
 .btn-start:active{transform:scale(.985);box-shadow:0 3px 12px rgba(var(--accent-rgb),.26)}
 .btn-start i{font-size:1.2rem}
 
-/* Icon buttons. 34px visual, 44px hit area via the ::before pad — the
-   buttons sit inside dense question cards where a 44px box would break
-   the layout, but a thumb still needs 44px to land on. */
 .ib{
   position:relative;display:inline-flex;align-items:center;justify-content:center;
   width:34px;height:34px;border-radius:var(--r-input);flex-shrink:0;
@@ -366,7 +292,6 @@ b,strong{font-weight:650}
 .tb-btn.danger:hover{background:var(--danger-soft);color:var(--danger)}
 @media (max-width:560px){.tb-btn .tb-label{display:none}}
 
-/* ── 6. Cards + panels ────────────────────────────────────────────── */
 .card{
   background:var(--surface);border:1px solid var(--sep);
   border-radius:var(--r-panel);padding:var(--sp-4);
@@ -394,7 +319,6 @@ b,strong{font-weight:650}
 .row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-top:1px solid var(--sep)}
 .rows > .row:first-child{border-top:none}
 
-/* ── 7. Badges + status. One system; .ctag is what the scripts emit. ── */
 .ctag,.badge,.st{
   display:inline-flex;align-items:center;gap:.3rem;
   padding:.16rem .5rem;border-radius:var(--r-full);
@@ -408,7 +332,6 @@ b,strong{font-weight:650}
 .tp{background:var(--violet-soft);color:var(--violet)}
 .tw{background:var(--warning-soft);color:var(--warning)}
 
-/* ── 8. Forms ─────────────────────────────────────────────────────── */
 .sf{margin-bottom:var(--sp-3)}
 .sf:last-child{margin-bottom:0}
 .sf > label,.sf .sf-label,.field-label{
@@ -431,7 +354,6 @@ b,strong{font-weight:650}
 .sf .hint,.sf-hint,.field-hint{font-size:var(--fs-cap);color:var(--ink-3);margin-top:var(--sp-1);line-height:1.45}
 .invalid{border-color:var(--danger)!important}
 
-/* .sel-c is the select the online-study picker emits, one per level. */
 .sel-c{
   width:100%;min-height:42px;margin-bottom:var(--sp-2);
   padding:.5rem var(--sp-3);padding-right:var(--sp-8);
@@ -469,7 +391,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .file-up .file-up-name{font-size:var(--fs-foot);color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ── 9. Progress bars ─────────────────────────────────────────────── */
 .pb{height:6px;background:var(--bg-sunken);border-radius:3px;overflow:hidden}
 .pb-f{height:100%;border-radius:3px;background:var(--accent);transition:width var(--dur-slow) var(--ease)}
 .pb-l{
@@ -478,7 +399,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .pb-w{margin:var(--sp-2) 0}
 
-/* ── 10. Stat tiles ───────────────────────────────────────────────── */
 .stats-row,.stats-grid,.prog-grid,.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-2)}
 @media (max-width:480px){.stats-row,.stats-grid,.prog-grid,.g4{grid-template-columns:1fr 1fr}}
 .sc,.scard,.stat-card{
@@ -490,7 +410,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   font-size:var(--fs-cap);font-weight:600;color:var(--ink-3);
   margin-top:var(--sp-1);line-height:1.3
 }
-/* Legacy colour hooks the scripts emit on .sv */
 .tcy{color:var(--info)}
 .tc2{color:var(--success)}
 .tb2{color:var(--danger)}
@@ -498,7 +417,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .tvi{color:var(--violet)}
 .tsk{color:var(--info)}
 
-/* ── 11. Empty / skeleton / banner ────────────────────────────────── */
 .empty{text-align:center;padding:var(--sp-10) var(--sp-4);color:var(--ink-3)}
 .empty-i{font-size:1.75rem;color:var(--ink-4);margin-bottom:var(--sp-2);display:flex;align-items:center;justify-content:center}
 .empty p{font-size:var(--fs-t3);font-weight:600;color:var(--ink)}
@@ -534,7 +452,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── 12. Toasts ───────────────────────────────────────────────────── */
 #toasts{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--sp-3));
@@ -554,7 +471,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 @keyframes toast-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes toast-out{to{opacity:0;transform:translateY(-6px)}}
 
-/* ── 13. Modal ────────────────────────────────────────────────────── */
 .mbg{
   position:fixed;inset:0;z-index:var(--z-modal);
   background:var(--scrim);backdrop-filter:blur(6px);
@@ -593,10 +509,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    APP SHELL
-   ─────────────────────────────────────────────────────────────────────
-   Desktop: fixed rail + scrolling content column.
-   Mobile:  topbar + scrolling content + bottom tab bar, rail becomes a
-            drawer. One nav model per breakpoint, never two at once.
    ═══════════════════════════════════════════════════════════════════════ */
 #sg{
   position:fixed;inset:0;z-index:var(--z-gate);display:flex;
@@ -620,7 +532,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .off-bar.show{display:block}
 
-/* ── Topbar ───────────────────────────────────────────────────────── */
 #tb{
   height:var(--topbar-h);flex-shrink:0;position:sticky;top:0;z-index:var(--z-sticky);
   display:flex;align-items:center;gap:var(--sp-2);
@@ -651,8 +562,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 @media (max-width:820px){.uchip{display:none}}
 
-/* Admin pill — only shown to the handful of accounts that are also
-   admins, so it carries the violet that means "other side of the app". */
 .tb-admin{
   background:var(--violet)!important;color:#fff!important;border-color:transparent!important;
   padding:0 var(--sp-3)!important;height:34px;font-weight:650
@@ -660,7 +569,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .tb-admin:hover{background:var(--violet)!important;color:#fff!important;filter:brightness(1.08)}
 @media (max-width:560px){.tb-admin .tb-admin-label{display:none}}
 
-/* Sync dot rides on the cloud icon; colour is set from PSYNC state. */
 #tb-sync-dot{
   position:absolute;bottom:4px;right:4px;width:7px;height:7px;border-radius:50%;
   background:var(--ink-4);border:1.5px solid var(--bg);transition:background var(--dur-slow) var(--ease)
@@ -668,7 +576,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 #net-mode-btn.forced{animation:netpulse 2.4s ease-in-out infinite}
 @keyframes netpulse{0%,100%{box-shadow:none}50%{box-shadow:0 0 0 3px var(--danger-soft)}}
 
-/* ── Layout ───────────────────────────────────────────────────────── */
 #layout{display:flex;flex:1;min-height:0}
 #sb{
   width:var(--rail-w);flex-shrink:0;background:var(--bg);
@@ -728,9 +635,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .sb-badge.ok{background:var(--success-soft);color:var(--success)}
 .sb-badge.amb{background:var(--accent);color:var(--on-accent)}
 
-/* Sidebar identity card — the one place a student sees their access
-   state, so it stays pinned to the top of the rail rather than hidden
-   behind a menu. */
 .sb-you{
   display:flex;align-items:center;gap:var(--sp-2);
   padding:var(--sp-3);border-radius:var(--r-card);
@@ -766,7 +670,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .view.on{display:block;animation:view-in var(--dur-base) var(--ease-out)}
 @keyframes view-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 
-/* ── Bottom tab bar (mobile only) ─────────────────────────────────── */
 #bnav{
   display:none;position:fixed;bottom:0;left:0;right:0;z-index:var(--z-tabbar);
   height:calc(var(--tabbar-h) + var(--safe-b));padding-bottom:var(--safe-b);
@@ -799,7 +702,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .bn-item.bn-admin{color:var(--violet)}
 
-/* ── Bottom sheet (mobile section picker) ─────────────────────────── */
 #bn-sheet-backdrop{
   position:fixed;inset:0;z-index:calc(var(--z-sheet) - 1);
   background:var(--scrim);backdrop-filter:blur(4px);
@@ -845,17 +747,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .bn-sheet-item.admin .bn-sheet-ic{background:var(--violet);color:#fff}
 .bn-sheet-item.admin .bn-sheet-name{color:var(--violet)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   HOME — a training log, not a dashboard.
-   ─────────────────────────────────────────────────────────────────────
-   Order is deliberate: what's due now → one big way to start → the
-   streak record → this week's numbers → what you did last. The old
-   eight-tile quick-action grid is gone; it duplicated the nav and was
-   the loudest thing on a screen whose job is to get you into a session.
-   ═══════════════════════════════════════════════════════════════════════ */
-
-/* Due strip. Only rendered when something is genuinely due, so its
-   presence is itself the signal. */
 .due-strip{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3)}
 .due-item{
   display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
@@ -878,7 +769,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .due-meta{font-size:var(--fs-foot);font-weight:700;color:var(--accent);flex-shrink:0}
 .due-item.urgent .due-meta{color:var(--danger)}
 
-/* The start block: greeting, one primary action, one secondary. */
 .start-block{
   background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);
   padding:var(--sp-5);margin-bottom:var(--sp-3);box-shadow:var(--sh-1)
@@ -892,8 +782,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .start-alt .btn{flex:1}
 
-/* Streak strip. Reads as a record of days, not a decoration: the marks
-   are square-ish, the completed ones filled, today outlined. */
 .streak-card{
   background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);
   padding:var(--sp-4);margin-bottom:var(--sp-3)
@@ -919,7 +807,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .sk-d.today{border-color:var(--accent);color:var(--accent)}
 .sk-d.done.today{border-color:var(--accent-pressed);color:var(--on-accent)}
 
-/* Recent sessions — a log, so it reads as rows with the score last. */
 .sess-row{
   display:flex;align-items:center;gap:var(--sp-3);
   padding:var(--sp-3) 0;border-top:1px solid var(--sep)
@@ -940,9 +827,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .home-date{text-align:center;font-size:var(--fs-foot);color:var(--ink-3);margin-bottom:var(--sp-3)}
 
-/* Marquee — one line, one message at a time, no infinite scroll. The
-   old version animated forever, which on a study screen is a constant
-   distraction and a battery cost on a cheap phone. */
 .marquee-bar{
   display:flex;align-items:center;gap:var(--sp-2);
   background:var(--accent-soft);border:1px solid var(--accent-line);
@@ -962,9 +846,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .marquee-item strong{color:var(--accent);font-weight:700}
 .marquee-bar.urgent .marquee-item strong{color:var(--danger)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   QUIZ SURFACE — where the boldness is spent.
-   ═══════════════════════════════════════════════════════════════════════ */
 #quiz-wrap{max-width:720px;margin:0 auto}
 
 .qbar{
@@ -986,8 +867,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   flex:1;min-width:0;font-size:var(--fs-foot);font-weight:600;color:var(--ink-2);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap
 }
-/* Two rows, not three: counter+actions on the left, the timer as the
-   anchor on the right, tallies in the middle. */
 .qb-l2{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;min-height:56px}
 .qbz{display:flex;flex-direction:column;justify-content:center;gap:var(--sp-1);padding:var(--sp-2) var(--sp-3);min-width:0}
 .qbz + .qbz{border-left:1px solid var(--sep)}
@@ -1037,9 +916,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .qprog{height:3px;background:var(--bg-sunken);overflow:hidden}
 .qpf{height:100%;background:var(--accent);transition:width var(--dur-slow) var(--ease)}
 
-/* Question card + options. Options are the largest touch targets in the
-   app — a student taps thousands of them — so they get 48px minimum and
-   the full card width. */
 .qcard{
   background:var(--surface);border:1px solid var(--sep);
   border-radius:var(--r-panel);padding:var(--sp-4);margin-bottom:var(--sp-3);
@@ -1068,8 +944,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .eo.sel{background:var(--accent-soft);border-color:var(--accent)}
 .eo.sel .ok{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-/* Correct / wrong never rely on colour alone — the marker glyph changes
-   too, so it still reads for a colour-blind student. */
 .eo.shc,.eo.ok2{background:var(--success-soft);border-color:var(--success);color:var(--success)}
 .eo.shc .ok,.eo.ok2 .ok{background:var(--success);border-color:var(--success);color:#fff;font-size:0}
 .eo.shc .ok::after,.eo.ok2 .ok::after{content:'\2713';font-size:.85rem;font-family:var(--font)}
@@ -1102,7 +976,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .eqc.answered{border-left-color:var(--accent)}
 
-/* Result ring — the one celebratory moment, so it gets real size. */
 .rh{text-align:center;padding:var(--sp-5) var(--sp-4) var(--sp-3)}
 .ring{
   width:132px;height:132px;border-radius:50%;margin:0 auto var(--sp-4);
@@ -1114,9 +987,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .rs{font-size:var(--fs-t2);font-weight:650;color:var(--ink)}
 .rg{font-size:var(--fs-callout);color:var(--ink-2);margin-top:var(--sp-1)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   SUBJECTIVE — question of the day, exam papers, question list
-   ═══════════════════════════════════════════════════════════════════════ */
 .qotd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .qotd-meta{font-size:var(--fs-cap);color:var(--ink-3);font-weight:650}
 .qotd-marks{
@@ -1130,8 +1000,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   padding:var(--sp-4);margin-bottom:var(--sp-4);
   background:var(--surface-alt);border:1px solid var(--sep);border-radius:var(--r-card)
 }
-/* The timer is the whole screen during a timed write, so it is the
-   largest type anywhere in the product. */
 .qotd-timer{
   font-size:var(--fs-num-xl);font-weight:700;color:var(--ink);
   text-align:center;letter-spacing:-.02em;line-height:1;padding:var(--sp-3) 0
@@ -1173,6 +1041,50 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .qotd-done h3{font-size:var(--fs-t2);font-weight:650;color:var(--success);margin-bottom:var(--sp-2)}
 .qotd-done p{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.55}
 
+/* ── Post-submission cards ─────────────────────────────────────────
+   Shown in "My submissions". One card per submission, with the PDF
+   you uploaded, the score once it's marked, and the grader's note. */
+.subm-card{
+  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
+  padding:var(--sp-4);margin-bottom:var(--sp-3)
+}
+.subm-card.graded{border-left:3px solid var(--success)}
+.subm-card.pending{border-left:3px solid var(--warning)}
+.subm-card.rejected{border-left:3px solid var(--danger)}
+.subm-top{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3);flex-wrap:wrap;margin-bottom:var(--sp-2)}
+.subm-kind{font-size:var(--fs-callout);font-weight:650;color:var(--ink)}
+.subm-meta{font-size:var(--fs-cap);color:var(--ink-3);margin-top:2px;display:flex;gap:var(--sp-3);flex-wrap:wrap}
+.subm-q{font-size:var(--fs-foot);line-height:1.6;color:var(--ink-2);margin-bottom:var(--sp-3);
+  padding:var(--sp-3);background:var(--surface-alt);border-radius:var(--r-input);
+  max-height:120px;overflow:auto;white-space:pre-wrap}
+.subm-pdf-row{display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.subm-pdf-btn{
+  display:inline-flex;align-items:center;gap:var(--sp-1);
+  min-height:34px;padding:0 var(--sp-3);border-radius:var(--r-input);
+  background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line);
+  font-size:var(--fs-foot);font-weight:650;font-family:var(--font);
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
+}
+.subm-pdf-btn:hover{background:var(--accent);color:var(--on-accent)}
+.subm-grade{
+  display:flex;align-items:baseline;gap:var(--sp-2);
+  padding:var(--sp-3);border-radius:var(--r-input);
+  background:var(--success-soft);border:1px solid var(--success-line);margin-top:var(--sp-3)
+}
+.subm-grade .v{font-family:var(--mono);font-size:var(--fs-num-lg);font-weight:700;color:var(--success);line-height:1}
+.subm-grade .out{font-size:var(--fs-foot);color:var(--success);opacity:.75}
+.subm-grade .lbl{font-size:var(--fs-cap);color:var(--success);font-weight:650;margin-left:auto;text-align:right}
+.subm-feedback{
+  font-size:var(--fs-foot);line-height:1.55;color:var(--ink-2);
+  margin-top:var(--sp-2);padding:var(--sp-3);
+  background:var(--info-soft);border-left:3px solid var(--info);
+  border-radius:0 var(--r-input) var(--r-input) 0
+}
+.subm-empty{
+  text-align:center;padding:var(--sp-6) var(--sp-4);
+  font-size:var(--fs-callout);color:var(--ink-3)
+}
+
 .subj-group{
   background:var(--surface);border:1px solid var(--sep);
   border-radius:var(--r-card);overflow:hidden;margin-bottom:var(--sp-2)
@@ -1203,9 +1115,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .subj-q-row .qm.m5{background:var(--accent-soft);color:var(--accent)}
 .subj-q-row .qm.m10{background:var(--violet-soft);color:var(--violet)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   PSYCHO MODE — multi-chapter picker
-   ═══════════════════════════════════════════════════════════════════════ */
 .psy-hero{
   display:flex;align-items:center;gap:var(--sp-3);
   background:var(--violet-soft);border:1px solid var(--violet-line);
@@ -1230,9 +1139,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .ch-name{flex:1;min-width:0;font-size:var(--fs-foot);color:var(--ink-2)}
 .ch-cnt{font-family:var(--mono);font-size:var(--fs-cap);color:var(--ink-4);flex-shrink:0}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   ONLINE STUDY + PROGRESS
-   ═══════════════════════════════════════════════════════════════════════ */
 .on-card-banner{
   display:flex;align-items:center;gap:var(--sp-2);
   background:var(--info-soft);border:1px solid var(--info-line);
@@ -1266,9 +1172,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .fw-reset:hover{background:var(--danger-soft);color:var(--danger)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   TIMETABLE
-   ═══════════════════════════════════════════════════════════════════════ */
 .tt-clock{
   font-size:var(--fs-num-xl);font-weight:700;color:var(--ink);
   text-align:center;letter-spacing:-.02em;line-height:1;padding:var(--sp-3) 0
@@ -1295,9 +1198,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   color:var(--ink);font-size:var(--fs-body);font-family:var(--font);outline:none
 }
 .tt-form input:focus,.tt-form select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-/* Week grid. The original hardcoded a cyan that exists nowhere else in
-   the product and referenced an undefined --neon token, so "today"
-   rendered as transparent. Both replaced with the brand accent. */
 .tt-week-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .tt-week-grid{display:grid;grid-template-columns:repeat(7,minmax(84px,1fr));gap:var(--sp-1);min-width:600px}
 .tt-dayhd{
@@ -1322,9 +1222,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .tt-chip-x:hover{background:var(--danger-soft);color:var(--danger)}
 .tt-empty-col{text-align:center;color:var(--ink-4);font-size:var(--fs-cap);padding-top:var(--sp-3)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   OFFLINE CACHE + SERVER PROGRESS
-   ═══════════════════════════════════════════════════════════════════════ */
 .cpb{display:none;height:6px;background:var(--bg-sunken);border-radius:3px;overflow:hidden;margin:var(--sp-2) 0}
 .cpf{height:100%;width:0;background:var(--accent);border-radius:3px;transition:width var(--dur-slow) var(--ease)}
 .cg{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-2)}
@@ -1357,9 +1254,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .srv-sub{font-size:var(--fs-cap);color:var(--ink-3);margin-top:1px}
 .srv-meta{display:flex;gap:var(--sp-3);flex-wrap:wrap;font-size:var(--fs-cap);color:var(--ink-3);margin-top:var(--sp-2)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   TOOLBAR
-   ═══════════════════════════════════════════════════════════════════════ */
 .toolbar{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;margin-bottom:var(--sp-3)}
 .toolbar input,.toolbar select{
   min-height:38px;padding:.45rem var(--sp-3);
@@ -1370,9 +1264,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .toolbar input{flex:1;min-width:180px}
 .toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
-/* ═══════════════════════════════════════════════════════════════════════
-   PRINT — the timetable is the one thing students actually print.
-   ═══════════════════════════════════════════════════════════════════════ */
 @media print{
   html,body{background:#fff!important;color:#000!important;font-size:11pt}
   #tb,#sb,#bnav,#ov,#toasts,#bn-sheet,#bn-sheet-backdrop,#cache-autobadge,
@@ -1473,6 +1364,13 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         <button type="button" class="sb-item" id="nav-subj-list" onclick="UI.go('subj-list')">
           <span class="sb-ic"><i class="ph ph-list-dashes"></i></span>Browse questions
         </button>
+        <button type="button" class="sb-item" id="nav-subj-mine" onclick="UI.go('subj-mine')">
+          <span class="sb-ic"><i class="ph ph-file-text"></i></span>
+          <span class="grow">
+            <span style="display:flex;align-items:center;gap:.35rem">My submissions<span class="sb-badge" id="subj-mine-badge" hidden>0</span></span>
+            <span class="sb-sub" id="subj-mine-hint">Nothing submitted yet</span>
+          </span>
+        </button>
       </div>
 
       <div class="sb-sec">
@@ -1534,7 +1432,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div class="marquee-viewport"><div class="marquee-track" id="marquee-track"></div></div>
         </div>
 
-        <!-- Only rendered when something is actually due. -->
         <div class="due-strip" id="due-strip" hidden></div>
 
         <section class="start-block">
@@ -1610,6 +1507,23 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         </div>
         <div id="subj-qotd-body">
           <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading today's question…</p></div></div>
+        </div>
+      </div>
+
+      <!-- ─────────────── MY SUBMISSIONS ─────────────── -->
+      <div class="view" id="view-subj-mine">
+        <div class="pg-head">
+          <h2><i class="ph ph-file-text"></i> My submissions</h2>
+          <p>Everything you've sent for marking — with the PDF you uploaded, the score once it's marked, and any note from the marker.</p>
+        </div>
+        <div class="card" style="margin-bottom:var(--sp-3)">
+          <div class="bg">
+            <button class="btn btn-a" onclick="MY_SUBJ.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+            <button class="btn btn-quiet" onclick="UI.go('subj-qotd')"><i class="ph ph-sun-horizon"></i> Today's question</button>
+          </div>
+        </div>
+        <div id="subj-mine-body">
+          <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading your submissions…</p></div></div>
         </div>
       </div>
 
@@ -2152,12 +2066,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas — page layer.
-
-   app.js, objective.js and subjective.js own the engine; this file owns
-   the page. It wires the chrome those modules don't know about (bottom
-   tabs, section sheets, the due strip, the admin switch, per-file
-   coverage, personal Drive backup) and patches a small number of
-   engine behaviours that only make sense in this shell.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
@@ -2165,27 +2073,11 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 const $   = id => document.getElementById(id);
 const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
 
-/* ── escAttrJs, hardened ──────────────────────────────────────────────
-   A value interpolated inside a single-quoted JS string that itself
-   sits inside a double-quoted HTML attribute:
-       onclick="FN('${escAttrJs(x)}')"
-   The HTML parser decodes entities before the JS parser ever sees the
-   string, so the JS escape has to happen first and the HTML escape
-   second. shared.js ships an older single-pass version; this one wins
-   because it is assigned after that script has run. */
 window.escAttrJs = function escAttrJs(s){
   const js = String(s == null ? '' : s).replace(/[\\'"]/g, c => '\\' + c);
   return js.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 };
 
-/* ═══════════════════════════════════════════════════════════════════
-   1. Theme — one source of truth
-   ─────────────────────────────────────────────────────────────────
-   The pre-paint script sets .dark on <html>; app.js's UI.theme()
-   toggled it on <body>. With both in play a tap would add the class in
-   one place without removing it from the other, so switching to light
-   silently did nothing. Everything now keys off <html>.
-   ═══════════════════════════════════════════════════════════════════ */
 function applyTheme(dark){
   document.documentElement.classList.toggle('dark', dark);
   document.body.classList.remove('dark');
@@ -2196,19 +2088,10 @@ function applyTheme(dark){
 if (typeof UI !== 'undefined') {
   UI.theme = function(){ applyTheme(!document.documentElement.classList.contains('dark')); };
 }
-/* app.js's boot also adds .dark to <body>; strip it once the engine has
-   finished starting so the two never disagree. */
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => document.body.classList.remove('dark'), 0);
 });
 
-/* ═══════════════════════════════════════════════════════════════════
-   2. Quiz chrome
-   ─────────────────────────────────────────────────────────────────
-   The engine writes plain strings into the counter and topic slots;
-   these wrappers give them the shell's formatting without the engine
-   needing to know about it.
-   ═══════════════════════════════════════════════════════════════════ */
 function _cleanChip(id){
   const e = $(id);
   if (!e) return;
@@ -2247,8 +2130,6 @@ if (typeof QUIZ !== 'undefined') {
     _ctr('fc-ctr', 1, qs.length); _ctr('ex-ctr', 0, qs.length);
   };
 
-  /* Shuffle off by default: a student working through a chapter in
-     order expects it to stay in order. */
   const _origShowLimit = QUIZ._showLimitPicker.bind(QUIZ);
   QUIZ._showLimitPicker = function(qsArr, mode, chapterName, scope){
     _origShowLimit(qsArr, mode, chapterName, scope);
@@ -2273,8 +2154,6 @@ if (typeof QUIZ !== 'undefined') {
     _syncSkip();
   };
 
-  /* One timer drives the urgency state for both modes, rather than the
-     engine's tick and a second interval racing each other. */
   function _paintUrgency(){
     if (!S.quiz || !S.quiz.active) return;
     const el = S.quiz.mode === 'exam' ? $('ex-tmr') : null;
@@ -2291,9 +2170,6 @@ if (typeof QUIZ !== 'undefined') {
   };
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   3. Edge swipe opens the sidebar (desktop rail is always visible)
-   ═══════════════════════════════════════════════════════════════════ */
 let _tx = 0, _ty = 0;
 document.addEventListener('touchstart', e => { _tx = e.touches[0].clientX; _ty = e.touches[0].clientY; }, { passive:true });
 document.addEventListener('touchend', e => {
@@ -2302,9 +2178,6 @@ document.addEventListener('touchend', e => {
   if (_tx < 22 && dx > 60 && dy < 70) UI.sidebarToggle();
 }, { passive:true });
 
-/* ═══════════════════════════════════════════════════════════════════
-   4. Keyboard — Escape unwinds one layer at a time
-   ═══════════════════════════════════════════════════════════════════ */
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (typeof BN !== 'undefined' && BN._activeKey) { BN.close(); return; }
@@ -2319,13 +2192,6 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* ═══════════════════════════════════════════════════════════════════
-   5. Section sheets — what the five bottom tabs open
-   ─────────────────────────────────────────────────────────────────
-   Home is a tab in its own right; the other four each open a short
-   list. Nothing appears in both a tab and a sheet, so there is exactly
-   one route to every screen.
-   ═══════════════════════════════════════════════════════════════════ */
 const SECTIONS = {
   study: {
     title:'Study', icon:'ph-books',
@@ -2341,7 +2207,8 @@ const SECTIONS = {
     items:[
       { icon:'ph-sun-horizon',  label:'Question of the day', sub:'Timed write, then upload',  view:'subj-qotd' },
       { icon:'ph-note-pencil',  label:'Full paper',          sub:'100 marks, three hours',    view:'subj-exam' },
-      { icon:'ph-list-dashes',  label:'Browse questions',    sub:'The whole written bank',    view:'subj-list' }
+      { icon:'ph-list-dashes',  label:'Browse questions',    sub:'The whole written bank',    view:'subj-list' },
+      { icon:'ph-file-text',    label:'My submissions',      sub:'What you sent, and your score', view:'subj-mine' }
     ]
   },
   progress: {
@@ -2412,13 +2279,10 @@ window.BN = {
   }
 };
 
-/* ═══════════════════════════════════════════════════════════════════
-   6. Which tab is lit
-   ═══════════════════════════════════════════════════════════════════ */
 const TAB_FOR_VIEW = {
   'home':'bn-home',
   'online':'bn-study','local':'bn-study','psycho':'bn-study','weekly':'bn-study',
-  'subj-qotd':'bn-subjective','subj-exam':'bn-subjective','subj-list':'bn-subjective',
+  'subj-qotd':'bn-subjective','subj-exam':'bn-subjective','subj-list':'bn-subjective','subj-mine':'bn-subjective',
   'progress':'bn-progress','server-progress':'bn-progress',
   'bookmarks':'bn-progress','flagged':'bn-progress','wrong':'bn-progress',
   'timetable':'bn-more','offline':'bn-more','data':'bn-more'
@@ -2429,9 +2293,6 @@ function _updateBottomNav(v){
   if (b) b.classList.add('active');
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   7. Admin visibility
-   ═══════════════════════════════════════════════════════════════════ */
 function _setAdminVisible(v){
   ['tb-admin-btn','sb-admin-promo','bn-admin'].forEach(id => {
     const el = $(id);
@@ -2522,8 +2383,224 @@ window.APP_SWITCH = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   8. View routing — one wrapper around the engine's UI._goRaw
+   MY SUBMISSIONS — list your written submissions, open the uploaded
+   PDF, and see the score once it's marked. Data comes from
+   getMySubjectiveSubmissions; the PDF itself comes from
+   getMySubjectivePdf, a small endpoint that returns the bytes of a
+   submission you own.
    ═══════════════════════════════════════════════════════════════════ */
+window.MY_SUBJ = {
+  _loading: false,
+  _loaded: false,
+  _items: [],
+
+  _url(){
+    try { return (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || ''; }
+    catch(e){ return ''; }
+  },
+  _user(){
+    try { return (typeof S !== 'undefined' && S.user) ? S.user : null; }
+    catch(e){ return null; }
+  },
+  _online(){
+    try { return !!(typeof S !== 'undefined' && S.online && !S.forcedOffline); }
+    catch(e){ return navigator.onLine; }
+  },
+
+  async load(force){
+    const box = $('subj-mine-body');
+    if (!box) return;
+    if (this._loaded && !force) { this.render(); this.refreshHint(); return; }
+    if (this._loading) return;
+    this._loading = true;
+
+    box.innerHTML = '<div class="card"><div class="skel w80"></div><div class="skel w60"></div><div class="skel w100"></div></div>';
+
+    const user = this._user();
+    const url = this._url();
+
+    if (!user || !user.token) {
+      box.innerHTML = '<div class="card"><div class="empty">' +
+        '<div class="empty-i"><i class="ph ph-user"></i></div>' +
+        '<p>Not signed in</p>' +
+        '<p>Sign in to see your submissions.</p>' +
+        '</div></div>';
+      this._loading = false;
+      return;
+    }
+
+    if (!this._online()) {
+      box.innerHTML = '<div class="card"><div class="banner banner-warning">' +
+        '<i class="ph ph-wifi-slash"></i>' +
+        '<span>You are offline. Connect to the internet to see your submissions — nothing is lost while you wait.</span>' +
+        '</div></div>';
+      this._loading = false;
+      return;
+    }
+
+    if (!url) {
+      box.innerHTML = '<div class="card"><div class="banner banner-danger">' +
+        '<i class="ph ph-warning-circle"></i>' +
+        '<span>The backend address is not configured.</span>' +
+        '</div></div>';
+      this._loading = false;
+      return;
+    }
+
+    try {
+      const r = await fetch(url, {
+        method:'POST', headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify({
+          action:'getMySubjectiveSubmissions',
+          username:user.username,
+          token:user.token
+        })
+      });
+      const res = await r.json();
+      if (!res || !res.success) throw new Error((res && res.error) || 'Could not load your submissions.');
+      this._items = (res.submissions || []).slice().sort((a, b) => (b.submittedAt || 0) - (a.submittedAt || 0));
+      this._loaded = true;
+      this.render();
+      this.refreshHint();
+    } catch(e){
+      box.innerHTML = '<div class="card"><div class="banner banner-danger">' +
+        '<i class="ph ph-warning-circle"></i>' +
+        '<span>' + esc(e.message || 'Could not load.') +
+        ' <button class="btn btn-sm btn-quiet" onclick="MY_SUBJ.load(true)">Try again</button></span>' +
+        '</div></div>';
+    }
+    this._loading = false;
+  },
+
+  refreshHint(){
+    const n = this._items.length;
+    const pending = this._items.filter(s => s.status !== 'graded').length;
+    const badge = $('subj-mine-badge');
+    const hint = $('subj-mine-hint');
+    if (badge) {
+      badge.hidden = pending === 0;
+      badge.textContent = pending > 99 ? '99+' : pending;
+    }
+    if (hint) {
+      hint.textContent = n === 0 ? 'Nothing submitted yet'
+        : pending > 0 ? pending + ' awaiting marking'
+        : n === 1 ? '1 marked' : n + ' marked';
+    }
+  },
+
+  render(){
+    const box = $('subj-mine-body');
+    if (!box) return;
+    if (!this._items.length) {
+      box.innerHTML = '<div class="card"><div class="empty">' +
+        '<div class="empty-i"><i class="ph ph-file-text"></i></div>' +
+        '<p>No submissions yet</p>' +
+        '<p>Send in a written answer and it will show up here with the PDF you uploaded.</p>' +
+        '<div class="bg" style="justify-content:center;margin-top:var(--sp-4)">' +
+          '<button class="btn btn-a" onclick="UI.go(\'subj-qotd\')"><i class="ph ph-sun-horizon"></i> Today\'s question</button>' +
+        '</div>' +
+        '</div></div>';
+      return;
+    }
+    box.innerHTML = this._items.map(s => this._renderCard(s)).join('');
+  },
+
+  _renderCard(s){
+    const graded = s.status === 'graded';
+    const cls = graded ? 'graded' : s.status === 'rejected' ? 'rejected' : 'pending';
+    const kind = (s.kind === 'exam') ? 'Full paper' : 'Question of the day';
+    const marks = s.questionMarks || (s.kind === 'exam' ? 100 : 10);
+    const when = s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—';
+
+    const pdfBtn = s.pdfUrl
+      ? '<button class="subm-pdf-btn" onclick="MY_SUBJ.openPdf(\'' + escAttrJs(s.id) + '\')">' +
+          '<i class="ph ph-file-pdf"></i> Open my PDF</button>'
+      : '<span class="t-cap">No PDF attached</span>';
+
+    const statusChip = graded
+      ? '<span class="ctag tg">Marked</span>'
+      : s.status === 'rejected'
+        ? '<span class="ctag tr">Returned</span>'
+        : '<span class="ctag tw">Awaiting marking</span>';
+
+    const gradeBlock = graded
+      ? '<div class="subm-grade">' +
+          '<span class="v">' + (s.score != null ? s.score : '—') + '</span>' +
+          '<span class="out">/ ' + marks + '</span>' +
+          '<span class="lbl">' + (s.gradedBy ? 'marked by ' + esc(s.gradedBy) : '') + '</span>' +
+        '</div>'
+      : '';
+
+    const feedbackBlock = (graded && s.feedback)
+      ? '<div class="subm-feedback"><strong>Feedback:</strong> ' + esc(s.feedback) + '</div>'
+      : '';
+
+    const qText = s.questionText
+      ? '<div class="subm-q">' + esc(s.questionText) + '</div>'
+      : '';
+
+    return '<div class="subm-card ' + cls + '">' +
+      '<div class="subm-top">' +
+        '<div>' +
+          '<div class="subm-kind">' + kind + '</div>' +
+          '<div class="subm-meta">' +
+            '<span>' + esc(when) + '</span>' +
+            '<span>' + marks + ' marks</span>' +
+            (s.solveSec ? '<span>' + Math.round(s.solveSec / 60) + ' min spent</span>' : '') +
+          '</div>' +
+        '</div>' +
+        statusChip +
+      '</div>' +
+      qText +
+      '<div class="subm-pdf-row">' + pdfBtn + '</div>' +
+      gradeBlock +
+      feedbackBlock +
+    '</div>';
+  },
+
+  async openPdf(id){
+    const user = this._user();
+    const url = this._url();
+    if (!user || !user.token) { toast('Please log in again.'); return; }
+    if (!url) { toast('Backend not configured.'); return; }
+
+    const tab = window.open('about:blank', '_blank');
+    if (tab) {
+      try {
+        tab.document.write('<!doctype html><title>Loading</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading your PDF…</p></body>');
+        tab.document.close();
+      } catch(e){}
+    }
+    toast('Loading your PDF…');
+
+    try {
+      const r = await fetch(url, {
+        method:'POST', headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify({ action:'getMySubjectivePdf', username:user.username, token:user.token, id })
+      });
+      const res = await r.json();
+      if (!res || !res.success) throw new Error((res && res.error) || 'Could not load that PDF.');
+
+      const chars = atob(res.base64);
+      const bytes = new Uint8Array(chars.length);
+      for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+      const blobUrl = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'application/pdf' }));
+
+      if (tab) tab.location.href = blobUrl;
+      else window.open(blobUrl, '_blank');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 300000);
+    } catch(e){
+      if (tab) {
+        try {
+          tab.document.write('<!doctype html><body style="font-family:system-ui;padding:2rem;color:#b33"><h2>Could not load the PDF</h2><p>' + esc(e.message || '') + '</p></body>');
+          tab.document.close();
+        } catch(_){}
+      }
+      toast(e.message || 'Could not open that PDF.', 5000);
+    }
+  }
+};
+
 const _uigoraw = UI._goRaw.bind(UI);
 UI._goRaw = function(v){
   const alias = { 'subjective':'subj-qotd' };
@@ -2539,6 +2616,15 @@ UI._goRaw = function(v){
     if (outer && empty) empty.style.display = (outer.style.display === 'none') ? '' : 'none';
   }
 
+  if (real === 'subj-mine') {
+    MY_SUBJ.load(false);
+    document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
+    const active = $('nav-subj-mine');
+    if (active) active.classList.add('active');
+    setTimeout(_refreshHints, 50);
+    return;
+  }
+
   if ((real === 'subj-qotd' || real === 'subj-exam' || real === 'subj-list') && typeof SUBJ !== 'undefined') {
     if (typeof SUBJ.ready === 'function' && SUBJ.ready()) {
       if (typeof SUBJ._renderQotd === 'function') SUBJ._renderQotd();
@@ -2547,8 +2633,6 @@ UI._goRaw = function(v){
     } else if (typeof SUBJ.init === 'function') {
       SUBJ.init();
     }
-    /* The engine only knows about its own nav ids, so the three written
-       sections need their rail item lit by hand. */
     document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
     const active = $('nav-' + real);
     if (active) active.classList.add('active');
@@ -2578,9 +2662,6 @@ function _populateChapterFilter(){
   });
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   9. Custom paper builder
-   ═══════════════════════════════════════════════════════════════════ */
 window.SUBJ_BUILDER = {
   _populated: false,
   _populate(){
@@ -2620,12 +2701,6 @@ window.SUBJ_BUILDER = {
   }
 };
 
-/* ═══════════════════════════════════════════════════════════════════
-   10. What's due — the home strip, the rail hints, and the banner
-   ─────────────────────────────────────────────────────────────────
-   All three read from the same computed list, so they can never
-   disagree about whether something is waiting.
-   ═══════════════════════════════════════════════════════════════════ */
 function _briefDuration(ms){
   if (ms < 0) return 'now';
   const mins = Math.floor(ms / 60000);
@@ -2640,7 +2715,6 @@ function _briefDuration(ms){
 function _dueItems(){
   const out = [];
 
-  /* Question of the day */
   try {
     if (typeof SUBJ !== 'undefined' && SUBJ._hasBank && SUBJ._hasBank() && SUBJ._qotdPublicState) {
       const st = SUBJ._qotdPublicState();
@@ -2654,7 +2728,6 @@ function _dueItems(){
     }
   } catch(e){}
 
-  /* Weekly sets — live first, then the next unlock inside a day */
   try {
     if (typeof WEEKLY !== 'undefined') {
       const sets = WEEKLY.sets || [], attempts = WEEKLY.attempts || {};
@@ -2679,7 +2752,6 @@ function _dueItems(){
     }
   } catch(e){}
 
-  /* Spaced-repetition queue */
   try {
     if (typeof REV !== 'undefined' && REV.dueCount) {
       const n = REV.dueCount();
@@ -2713,8 +2785,6 @@ function _renderDueStrip(){
   ).join('');
 }
 
-/* The marquee shows one message, not an endless scroll. A study screen
-   should not have something moving on it permanently. */
 function _renderMarquee(){
   const bar = $('home-marquee'), track = $('marquee-track');
   if (!bar || !track) return;
@@ -2728,7 +2798,6 @@ function _renderMarquee(){
 
 window.SB_HINTS = {
   refresh(){
-    /* Question of the day hint */
     const qHint = $('subj-qotd-hint'), qBadge = $('subj-qotd-badge');
     if (qHint && qBadge && typeof SUBJ !== 'undefined') {
       const st = SUBJ._qotdPublicState ? SUBJ._qotdPublicState() : null;
@@ -2741,7 +2810,6 @@ window.SB_HINTS = {
       else                              { qHint.textContent = 'Back tomorrow';             qBadge.hidden = true; }
     }
 
-    /* Weekly hint */
     const wHint = $('weekly-hint'), wBadge = $('weekly-badge');
     if (wHint && wBadge && typeof WEEKLY !== 'undefined') {
       const sets = WEEKLY.sets || [], attempts = WEEKLY.attempts || {};
@@ -2763,21 +2831,25 @@ window.SB_HINTS = {
       }
     }
 
+    if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.refreshHint();
+
     _renderDueStrip();
     _renderMarquee();
   }
 };
 function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} }
 
-/* A 30-second cadence is enough for "unlocks in 4 hours"; the written
-   question runs its own one-second tick while it is on screen. */
 setInterval(_refreshHints, 30000);
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') _refreshHints(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    _refreshHints();
+    if (UI.cur === 'subj-mine' && typeof MY_SUBJ !== 'undefined' && MY_SUBJ._loaded) {
+      MY_SUBJ.load(true);
+    }
+  }
+});
 setTimeout(_refreshHints, 800);
 
-/* ═══════════════════════════════════════════════════════════════════
-   11. Badges the engine sets, plus the bottom-tab dot
-   ═══════════════════════════════════════════════════════════════════ */
 if (typeof HOME !== 'undefined' && HOME.updateBadges) {
   const _ub = HOME.updateBadges.bind(HOME);
   HOME.updateBadges = function(){
@@ -2790,9 +2862,6 @@ if (typeof HOME !== 'undefined' && HOME.updateBadges) {
   };
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   12. Sign-in hook + first paint of the admin controls
-   ═══════════════════════════════════════════════════════════════════ */
 if (typeof AUTH !== 'undefined' && AUTH._enter) {
   const _origEnter = AUTH._enter.bind(AUTH);
   AUTH._enter = function(u){
@@ -2803,6 +2872,7 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
       if (typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
       else { try { _setAdminVisible(!!(S.user && S.user.adminCapable)); } catch(e){} }
       _refreshHints();
+      if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load(true);
     }, 300);
   };
 }
@@ -2815,6 +2885,7 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
     if (user) {
       _setAdminVisible(!!user.adminCapable);
       if (typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
+      if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load(false);
       return;
     }
     if (++tries < 40) setTimeout(check, 250);
@@ -2822,8 +2893,6 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   check();
 })();
 
-/* The engine's offline bar says "serving from local cache". Rewrite it
-   in the words a student would use, without touching app.js. */
 (function(){
   const bar = $('offbar');
   if (!bar) return;
@@ -2834,9 +2903,6 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   }).observe(bar, { childList:true, characterData:true, subtree:true });
 })();
 
-/* ═══════════════════════════════════════════════════════════════════
-   13. Focus trap for the shared modal
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   const mbg = $('mbg');
   if (!mbg) return;
@@ -2872,9 +2938,6 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   }).observe(mbg, { attributes:true, attributeFilter:['class'] });
 })();
 
-/* ═══════════════════════════════════════════════════════════════════
-   14. Version label
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   try {
     const el = $('sb-version');
@@ -2884,9 +2947,6 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   } catch(e){}
 })();
 
-/* ═══════════════════════════════════════════════════════════════════
-   15. Personal Drive backup
-   ═══════════════════════════════════════════════════════════════════ */
 window.CLOUD_UI = (function(){
   function render(){
     const statusEl = $('cloud-status');
@@ -2945,8 +3005,6 @@ window.CLOUD_UI = (function(){
   return { render, signIn, signOut, backup, restore };
 })();
 
-/* Warm the Google client up the first time the rail's Progress item is
-   touched, so the sign-in popup isn't waiting on a cold CDN fetch. */
 document.addEventListener('click', function warm(e){
   if (e.target.closest && e.target.closest('#nav-progress, #bn-progress')) {
     if (typeof CLOUD !== 'undefined') CLOUD.init().catch(() => {});
@@ -2955,12 +3013,6 @@ document.addEventListener('click', function warm(e){
   }
 });
 
-/* ═══════════════════════════════════════════════════════════════════
-   16. Coverage by file
-   ─────────────────────────────────────────────────────────────────
-   POSTs rather than GETs: the session token must not end up in a URL,
-   browser history or an Apps Script request log.
-   ═══════════════════════════════════════════════════════════════════ */
 const SERVER_PROG = {
   _loaded:false, _loading:false, _sort:'most', _rows:[],
 
@@ -3038,7 +3090,6 @@ const SERVER_PROG = {
       });
     });
 
-    /* Build the fileId → label map once rather than once per row. */
     const refMap = new Map();
     if (typeof ChapterData !== 'undefined') {
       ChapterData.allFileRefs().forEach(r => refMap.set(r.fid, r));
@@ -3135,12 +3186,6 @@ const SERVER_PROG = {
 };
 window.SERVER_PROG = SERVER_PROG;
 
-/* ═══════════════════════════════════════════════════════════════════
-   17. Connection state
-   ─────────────────────────────────────────────────────────────────
-   The app keeps working offline from its own cache, so this only
-   surfaces the state and re-syncs the moment the signal comes back.
-   ═══════════════════════════════════════════════════════════════════ */
 (function(){
   let wasOffline = !navigator.onLine;
   function paint(){
@@ -3151,6 +3196,7 @@ window.SERVER_PROG = SERVER_PROG;
       toast('Back online.');
       try { if (typeof WEEKLY !== 'undefined') WEEKLY.retryUnsynced(); } catch(e){}
       _refreshHints();
+      if (typeof MY_SUBJ !== 'undefined' && UI.cur === 'subj-mine') MY_SUBJ.load(true);
     }
     wasOffline = off;
   }
