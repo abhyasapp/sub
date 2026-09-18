@@ -30,133 +30,53 @@
 <style>
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas Admin — self-contained design system + page styles.
-
-   Deliberately NOT importing design-system.css: this console owns its
-   own tokens so it can't drift when the student-facing stylesheet
-   changes, and so there is exactly one place to reason about surface,
-   spacing and status colour.
-
-   Direction: the admin console is a decision queue, not a dashboard.
-   Money, access and grading pass through it daily, so density and
-   legibility beat decoration. Neutrals are true graphite (no green
-   tint) so the one accent — Abhyas green — can carry real meaning:
-   active nav, live status, money that needs a decision.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── 1. Tokens — light ─────────────────────────────────────────────── */
 :root{
   color-scheme:light;
-
-  --bg:#F6F7F6;
-  --bg-grouped:#EFF1F0;
-  --surface:#FFFFFF;
-  --surface-2:#FFFFFF;
-  --scrim:rgba(20,23,26,.42);
-
-  --sep:#E4E6E4;
-  --sep-strong:#D3D7D4;
-
-  --ink:#14171A;
-  --ink-2:#565B5F;
-  --ink-3:#83888C;
-  --ink-4:#AFB4B6;
-  --on-accent:#FFFFFF;
-
-  --accent:#1E7A4C;
-  --accent-hover:#196741;
-  --accent-pressed:#145536;
-  --accent-soft:#E3F1EA;
-  --accent-rgb:30,122,76;
-
-  --success:#1E7A4C; --success-soft:#E3F1EA;
-  --warning:#9A5A0B; --warning-soft:#FAEFE0;
-  --danger:#B2372B;  --danger-soft:#FBE8E6;
-  --info:#23619F;    --info-soft:#E8F0FA;
-
-  --focus:#1E7A4C;
-  --selection:rgba(30,122,76,.18);
-
+  --bg:#F6F7F6;--bg-grouped:#EFF1F0;--surface:#FFFFFF;--surface-2:#FFFFFF;
+  --scrim:rgba(20,23,26,.42);--sep:#E4E6E4;--sep-strong:#D3D7D4;
+  --ink:#14171A;--ink-2:#565B5F;--ink-3:#83888C;--ink-4:#AFB4B6;--on-accent:#FFFFFF;
+  --accent:#1E7A4C;--accent-hover:#196741;--accent-pressed:#145536;--accent-soft:#E3F1EA;--accent-rgb:30,122,76;
+  --success:#1E7A4C;--success-soft:#E3F1EA;
+  --warning:#9A5A0B;--warning-soft:#FAEFE0;
+  --danger:#B2372B;--danger-soft:#FBE8E6;
+  --info:#23619F;--info-soft:#E8F0FA;
+  --focus:#1E7A4C;--selection:rgba(30,122,76,.18);
   --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
-
-  --fs-display:1.75rem;
-  --fs-t1:1.3125rem;
-  --fs-t2:1.0625rem;
-  --fs-t3:.9375rem;
-  --fs-body:.875rem;
-  --fs-callout:.8125rem;
-  --fs-foot:.75rem;
-  --fs-cap:.6875rem;
-
-  --sp-1:.25rem; --sp-2:.5rem;  --sp-3:.75rem; --sp-4:1rem;
-  --sp-5:1.25rem;--sp-6:1.5rem; --sp-8:2rem;   --sp-10:2.5rem;
-  --sp-12:3rem;  --sp-16:4rem;
-
-  --r-control:8px; --r-input:10px; --r-card:14px; --r-panel:16px; --r-sheet:22px; --r-full:999px;
-
+  --fs-display:1.75rem;--fs-t1:1.3125rem;--fs-t2:1.0625rem;--fs-t3:.9375rem;--fs-body:.875rem;
+  --fs-callout:.8125rem;--fs-foot:.75rem;--fs-cap:.6875rem;
+  --sp-1:.25rem;--sp-2:.5rem;--sp-3:.75rem;--sp-4:1rem;--sp-5:1.25rem;--sp-6:1.5rem;
+  --sp-8:2rem;--sp-10:2.5rem;--sp-12:3rem;--sp-16:4rem;
+  --r-control:8px;--r-input:10px;--r-card:14px;--r-panel:16px;--r-sheet:22px;--r-full:999px;
   --sh-1:0 1px 2px rgba(20,23,26,.05),0 1px 1px rgba(20,23,26,.03);
   --sh-2:0 4px 16px rgba(20,23,26,.08),0 1px 2px rgba(20,23,26,.05);
   --sh-modal:0 24px 64px rgba(20,23,26,.22),0 4px 16px rgba(20,23,26,.10);
-
-  --dur-fast:150ms; --dur-base:220ms; --dur-slow:320ms;
-  --ease:cubic-bezier(.4,0,.2,1);
-  --ease-out:cubic-bezier(0,0,.2,1);
-  --ease-spring:cubic-bezier(.32,1.35,.5,1);
-
-  --rail-w:250px; --rail-compact:72px; --topbar-h:54px; --content-max:1220px;
-  --safe-b:env(safe-area-inset-bottom,0px);
-  --safe-t:env(safe-area-inset-top,0px);
-
-  --z-sticky:10; --z-dropdown:200; --z-popover:300; --z-sheet:400;
-  --z-modal:500; --z-palette:600; --z-toast:700; --z-gate:800;
+  --dur-fast:150ms;--dur-base:220ms;--dur-slow:320ms;
+  --ease:cubic-bezier(.4,0,.2,1);--ease-out:cubic-bezier(0,0,.2,1);--ease-spring:cubic-bezier(.32,1.35,.5,1);
+  --rail-w:250px;--rail-compact:72px;--topbar-h:54px;--content-max:1220px;
+  --safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px);
+  --z-sticky:10;--z-dropdown:200;--z-popover:300;--z-sheet:400;--z-modal:500;--z-palette:600;--z-toast:700;--z-gate:800;
 }
-
-/* ── 2. Tokens — dark (tuned, not inverted) ────────────────────────── */
 .dark{
   color-scheme:dark;
-
-  --bg:#0F1213;
-  --bg-grouped:#171A1C;
-  --surface:#1A1E20;
-  --surface-2:#22272A;
-  --scrim:rgba(0,0,0,.58);
-
-  --sep:rgba(255,255,255,.08);
-  --sep-strong:rgba(255,255,255,.15);
-
-  --ink:#EFF2F1;
-  --ink-2:#9BA1A3;
-  --ink-3:#71777A;
-  --ink-4:#4D5254;
-  --on-accent:#05120C;
-
-  --accent:#41C98A;
-  --accent-hover:#5BD49C;
-  --accent-pressed:#31AA73;
-  --accent-soft:rgba(65,201,138,.15);
-  --accent-rgb:65,201,138;
-
-  --success:#41C98A; --success-soft:rgba(65,201,138,.15);
-  --warning:#E3A751; --warning-soft:rgba(227,167,81,.15);
-  --danger:#F0685F;  --danger-soft:rgba(240,104,95,.15);
-  --info:#5FAEE8;    --info-soft:rgba(95,174,232,.15);
-
-  --focus:#41C98A;
-  --selection:rgba(65,201,138,.25);
-
-  --sh-1:0 1px 2px rgba(0,0,0,.4);
-  --sh-2:0 6px 20px rgba(0,0,0,.45);
-  --sh-modal:0 28px 72px rgba(0,0,0,.62);
+  --bg:#0F1213;--bg-grouped:#171A1C;--surface:#1A1E20;--surface-2:#22272A;--scrim:rgba(0,0,0,.58);
+  --sep:rgba(255,255,255,.08);--sep-strong:rgba(255,255,255,.15);
+  --ink:#EFF2F1;--ink-2:#9BA1A3;--ink-3:#71777A;--ink-4:#4D5254;--on-accent:#05120C;
+  --accent:#41C98A;--accent-hover:#5BD49C;--accent-pressed:#31AA73;--accent-soft:rgba(65,201,138,.15);--accent-rgb:65,201,138;
+  --success:#41C98A;--success-soft:rgba(65,201,138,.15);
+  --warning:#E3A751;--warning-soft:rgba(227,167,81,.15);
+  --danger:#F0685F;--danger-soft:rgba(240,104,95,.15);
+  --info:#5FAEE8;--info-soft:rgba(95,174,232,.15);
+  --focus:#41C98A;--selection:rgba(65,201,138,.25);
+  --sh-1:0 1px 2px rgba(0,0,0,.4);--sh-2:0 6px 20px rgba(0,0,0,.45);--sh-modal:0 28px 72px rgba(0,0,0,.62);
 }
-
-/* ── 3. Reset + base ──────────────────────────────────────────────── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:100%;-webkit-text-size-adjust:100%}
-body{
-  font-family:var(--font);font-size:var(--fs-body);line-height:1.5;font-weight:450;
+body{font-family:var(--font);font-size:var(--fs-body);line-height:1.5;font-weight:450;
   background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;
-  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
-}
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r-control)}
 img,svg,video{display:block;max-width:100%}
@@ -174,12 +94,9 @@ a:hover{text-decoration:underline}
 hr{border:none;border-top:1px solid var(--sep);margin:var(--sp-4) 0}
 code,kbd,pre{font-family:var(--mono);font-size:.9em}
 b,strong{font-weight:600}
-
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
-
-/* ── 4. Type utilities ────────────────────────────────────────────── */
 .t-t1{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em;line-height:1.2}
 .t-t2{font-size:var(--fs-t2);font-weight:650;line-height:1.28}
 .t-t3{font-size:var(--fs-t3);font-weight:600;line-height:1.35}
@@ -192,23 +109,15 @@ b,strong{font-weight:600}
 .dim{color:var(--ink-3)}
 .truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.skip-link{
-  position:absolute;top:-100px;left:var(--sp-4);z-index:var(--z-toast);
+.skip-link{position:absolute;top:-100px;left:var(--sp-4);z-index:var(--z-toast);
   background:var(--accent);color:var(--on-accent);padding:var(--sp-2) var(--sp-4);
-  border-radius:var(--r-input);font-weight:600;font-size:var(--fs-callout);
-  transition:top var(--dur-fast) var(--ease)
-}
+  border-radius:var(--r-input);font-weight:600;font-size:var(--fs-callout);transition:top var(--dur-fast) var(--ease)}
 .skip-link:focus{top:var(--sp-2);text-decoration:none}
-
-/* ── 5. Buttons ───────────────────────────────────────────────────── */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
-  height:36px;padding:0 var(--sp-4);border-radius:var(--r-input);
-  border:1px solid transparent;font-size:var(--fs-callout);font-weight:600;
-  line-height:1;white-space:nowrap;user-select:none;
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  height:36px;padding:0 var(--sp-4);border-radius:var(--r-input);border:1px solid transparent;
+  font-size:var(--fs-callout);font-weight:600;line-height:1;white-space:nowrap;user-select:none;
   transition:background var(--dur-fast) var(--ease),border-color var(--dur-fast) var(--ease),
-             color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease);
-}
+             color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease),opacity var(--dur-fast) var(--ease);}
 .btn i{font-size:1.05em}
 .btn:active:not(:disabled){transform:scale(.97)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -227,92 +136,61 @@ b,strong{font-weight:600}
 .btn-lg{height:44px;padding:0 var(--sp-6);font-size:var(--fs-body)}
 .btn-block{width:100%}
 .btn.loading{color:transparent!important;pointer-events:none;position:relative}
-.btn.loading::after{
-  content:'';position:absolute;inset:0;margin:auto;width:15px;height:15px;
-  border:2px solid var(--ink-3);border-top-color:transparent;border-radius:50%;
-  animation:spin .7s linear infinite
-}
+.btn.loading::after{content:'';position:absolute;inset:0;margin:auto;width:15px;height:15px;
+  border:2px solid var(--ink-3);border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
 .btn-primary.loading::after{border-color:var(--on-accent);border-top-color:transparent}
 @keyframes spin{to{transform:rotate(360deg)}}
-
-.icon-btn{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:34px;height:34px;border-radius:var(--r-input);
-  background:transparent;color:var(--ink-2);flex-shrink:0;font-size:1.05rem;
-  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
-}
+.icon-btn{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border-radius:var(--r-input);background:transparent;color:var(--ink-2);flex-shrink:0;font-size:1.05rem;
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .icon-btn:hover{background:var(--bg-grouped);color:var(--ink)}
 .icon-btn:active{transform:scale(.94)}
 .icon-btn.danger:hover{background:var(--danger-soft);color:var(--danger)}
 .icon-btn:disabled{opacity:.4;cursor:not-allowed}
 .icon-btn.sm{width:30px;height:30px;font-size:.95rem}
-
-/* Row actions: quiet until the row is touched, so tables stay calm */
 .row-actions{display:inline-flex;gap:2px;justify-content:flex-end}
-
-/* ── 6. Forms ─────────────────────────────────────────────────────── */
 .field{display:flex;flex-direction:column;gap:var(--sp-1);margin-bottom:var(--sp-4)}
 .field:last-child{margin-bottom:0}
 .field > label,.field-label{font-size:var(--fs-foot);font-weight:600;color:var(--ink-2)}
 .field-hint{font-size:var(--fs-cap);color:var(--ink-3);line-height:1.45}
 .field-error{font-size:var(--fs-cap);color:var(--danger);display:flex;align-items:center;gap:.3rem}
-.input,.select,.textarea{
-  width:100%;height:38px;padding:0 var(--sp-3);
+.input,.select,.textarea{width:100%;height:38px;padding:0 var(--sp-3);
   background:var(--surface);border:1px solid var(--sep-strong);border-radius:var(--r-input);
   color:var(--ink);font-size:var(--fs-body);
-  transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)
-}
+  transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)}
 .textarea{height:auto;min-height:90px;padding:var(--sp-2) var(--sp-3);resize:vertical;line-height:1.55}
 .input:focus,.select:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .input::placeholder,.textarea::placeholder{color:var(--ink-4)}
 .input.invalid,.textarea.invalid{border-color:var(--danger)}
 .input[type=date],.input[type=datetime-local],.input[type=time]{padding-right:var(--sp-2)}
-.select{
-  cursor:pointer;appearance:none;padding-right:var(--sp-8);
+.select{cursor:pointer;appearance:none;padding-right:var(--sp-8);
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2383888C' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right var(--sp-3) center
-}
+  background-repeat:no-repeat;background-position:right var(--sp-3) center}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
 @media (max-width:540px){.field-row{grid-template-columns:1fr}}
 input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0}
-
 .pw-field{position:relative;display:flex}
 .pw-field .input{padding-right:2.5rem}
-.pw-field button{
-  position:absolute;right:4px;top:50%;transform:translateY(-50%);
-  width:30px;height:30px;display:flex;align-items:center;justify-content:center;
-  border-radius:var(--r-control);color:var(--ink-3)
-}
+.pw-field button{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:30px;height:30px;
+  display:flex;align-items:center;justify-content:center;border-radius:var(--r-control);color:var(--ink-3)}
 .pw-field button:hover{background:var(--bg-grouped);color:var(--ink)}
-
-.file-drop{
-  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.file-drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:var(--sp-1);background:var(--bg-grouped);border:1.5px dashed var(--sep-strong);
   border-radius:var(--r-card);padding:var(--sp-6) var(--sp-4);cursor:pointer;text-align:center;
-  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
-}
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
 .file-drop:hover,.file-drop:focus-within{border-color:var(--accent);background:var(--accent-soft)}
 .file-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
 .file-drop .fd-icon{font-size:1.5rem;color:var(--ink-3)}
 .file-drop .fd-main{font-size:var(--fs-callout);font-weight:600;color:var(--ink)}
 .file-drop .fd-sub{font-size:var(--fs-cap);color:var(--ink-3)}
-
-/* Segmented control */
 .segmented{display:inline-flex;padding:3px;background:var(--bg-grouped);border-radius:var(--r-input);gap:2px}
-.segmented button{
-  padding:var(--sp-1) var(--sp-3);border-radius:calc(var(--r-input) - 3px);
+.segmented button{padding:var(--sp-1) var(--sp-3);border-radius:calc(var(--r-input) - 3px);
   font-size:var(--fs-foot);font-weight:600;color:var(--ink-2);
-  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
-}
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .segmented button.active{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1)}
-
-/* ── 7. Badges / status — one system ──────────────────────────────── */
-.badge{
-  display:inline-flex;align-items:center;gap:.35rem;
-  padding:.18rem .5rem;border-radius:var(--r-full);
+.badge{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem .5rem;border-radius:var(--r-full);
   font-size:var(--fs-cap);font-weight:600;line-height:1.35;white-space:nowrap;
-  background:var(--bg-grouped);color:var(--ink-2)
-}
+  background:var(--bg-grouped);color:var(--ink-2)}
 .badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
 .badge.flat::before{display:none}
 .badge.flat{padding:.18rem .45rem}
@@ -321,87 +199,57 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:var(-
 .badge-warning{background:var(--warning-soft);color:var(--warning)}
 .badge-danger{background:var(--danger-soft);color:var(--danger)}
 .badge-info{background:var(--info-soft);color:var(--info)}
-
-/* Status → colour, in exactly one place */
 .st-trial,.st-pending,.st-payment_pending,.st-pending_review,.st-open,.st-scheduled,.st-ungraded
   {background:var(--warning-soft);color:var(--warning)}
 .st-active,.st-verified,.st-graded,.st-resolved,.st-live,.st-permanent
   {background:var(--success-soft);color:var(--success)}
 .st-expired,.st-rejected{background:var(--danger-soft);color:var(--danger)}
 .st-dismissed,.st-archived,.st-none{background:var(--bg-grouped);color:var(--ink-3)}
-
-/* ── 8. Avatar ────────────────────────────────────────────────────── */
-.avatar{
-  width:28px;height:28px;border-radius:var(--r-full);
-  background:var(--accent-soft);color:var(--accent);
-  display:inline-flex;align-items:center;justify-content:center;
-  font-size:.65rem;font-weight:700;letter-spacing:.3px;flex-shrink:0
-}
+.avatar{width:28px;height:28px;border-radius:var(--r-full);background:var(--accent-soft);color:var(--accent);
+  display:inline-flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;
+  letter-spacing:.3px;flex-shrink:0}
 .avatar.lg{width:46px;height:46px;font-size:1rem}
-
-/* ── 9. Panels / grouped rows ─────────────────────────────────────── */
-.panel{
-  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);
-  padding:var(--sp-5);margin-bottom:var(--sp-4)
-}
+.panel{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);
+  padding:var(--sp-5);margin-bottom:var(--sp-4)}
 .panel.flush{padding:0;overflow:hidden}
 .panel-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-3);margin-bottom:var(--sp-4)}
 .panel-hd h3{font-size:var(--fs-t3);font-weight:600;display:flex;align-items:center;gap:var(--sp-2)}
 .panel-hd .sub{font-size:var(--fs-foot);color:var(--ink-3);margin-top:3px;line-height:1.45}
 .panel-hd .acts{display:flex;align-items:center;gap:var(--sp-2);flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 .panel > p.lead{font-size:var(--fs-callout);color:var(--ink-2);margin-bottom:var(--sp-4);line-height:1.55;max-width:68ch}
-
 .rows{display:flex;flex-direction:column}
-.row{
-  display:flex;align-items:center;gap:var(--sp-3);
-  padding:var(--sp-3) 0;border-top:1px solid var(--sep)
-}
+.row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-3) 0;border-top:1px solid var(--sep)}
 .rows > .row:first-child{border-top:none}
 .row-main{flex:1;min-width:0}
 .row-title{font-size:var(--fs-callout);font-weight:600;color:var(--ink);display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
 .row-sub{font-size:var(--fs-cap);color:var(--ink-3);margin-top:2px}
-
-/* Definition list used in detail sheets */
 .dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--sp-3) var(--sp-4)}
 .dl div{min-width:0}
 .dl dt{font-size:var(--fs-cap);color:var(--ink-3);font-weight:550;margin-bottom:2px}
 .dl dd{font-size:var(--fs-callout);color:var(--ink);font-weight:500;overflow-wrap:anywhere}
-
-/* ── 10. App shell ────────────────────────────────────────────────── */
 #shell{display:flex;min-height:100vh}
 #app{display:none}
 #app.on{display:block}
-
-#rail{
-  width:var(--rail-w);flex-shrink:0;background:var(--surface);
-  border-right:1px solid var(--sep);display:flex;flex-direction:column;
-  padding:var(--sp-3);position:sticky;top:0;height:100vh;overflow-y:auto;
-  transition:width var(--dur-base) var(--ease)
-}
-#rail-brand{
-  display:flex;align-items:center;gap:var(--sp-2);
-  padding:var(--sp-2) var(--sp-2) var(--sp-4);font-weight:650;font-size:var(--fs-t3);color:var(--ink)
-}
+#rail{width:var(--rail-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--sep);
+  display:flex;flex-direction:column;padding:var(--sp-3);position:sticky;top:0;height:100vh;
+  overflow-y:auto;transition:width var(--dur-base) var(--ease)}
+#rail-brand{display:flex;align-items:center;gap:var(--sp-2);
+  padding:var(--sp-2) var(--sp-2) var(--sp-4);font-weight:650;font-size:var(--fs-t3);color:var(--ink)}
 #rail-brand img{width:26px;height:26px;border-radius:7px;flex-shrink:0}
 #rail-brand .sub{display:block;font-size:var(--fs-cap);color:var(--ink-3);font-weight:500;margin-top:1px}
 .rail-group{font-size:var(--fs-cap);font-weight:600;color:var(--ink-4);padding:var(--sp-4) var(--sp-2) var(--sp-1)}
-.rail-item{
-  display:flex;align-items:center;gap:var(--sp-2);width:100%;text-align:left;
+.rail-item{display:flex;align-items:center;gap:var(--sp-2);width:100%;text-align:left;
   padding:var(--sp-2);border-radius:var(--r-input);margin-bottom:1px;position:relative;
   font-size:var(--fs-callout);font-weight:550;color:var(--ink-2);
-  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
-}
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 .rail-item i{font-size:1.1rem;width:20px;text-align:center;flex-shrink:0}
 .rail-item:hover{background:var(--bg-grouped);color:var(--ink)}
 .rail-item.active{background:var(--accent-soft);color:var(--accent);font-weight:600}
-.rail-badge{
-  margin-left:auto;background:var(--danger);color:#fff;font-size:.625rem;font-weight:700;
+.rail-badge{margin-left:auto;background:var(--danger);color:#fff;font-size:.625rem;font-weight:700;
   min-width:18px;height:18px;border-radius:var(--r-full);
-  display:inline-flex;align-items:center;justify-content:center;padding:0 5px
-}
+  display:inline-flex;align-items:center;justify-content:center;padding:0 5px}
 .rail-foot{margin-top:auto;padding-top:var(--sp-3);border-top:1px solid var(--sep)}
 .rail-version{text-align:center;font-size:var(--fs-cap);color:var(--ink-4);padding-top:var(--sp-2)}
-
 @media (max-width:1100px){
   #rail{width:var(--rail-compact);align-items:center}
   #rail-brand span,.rail-group,.rail-item span,.rail-foot span,.rail-version{display:none}
@@ -411,12 +259,10 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:var(-
   .rail-foot{width:100%}
 }
 @media (max-width:820px){
-  #rail{
-    position:fixed;inset:0 auto 0 0;z-index:var(--z-sheet);width:284px;align-items:stretch;
+  #rail{position:fixed;inset:0 auto 0 0;z-index:var(--z-sheet);width:284px;align-items:stretch;
     transform:translateX(-102%);box-shadow:var(--sh-modal);
     padding-top:calc(var(--sp-3) + var(--safe-t));
-    transition:transform var(--dur-base) var(--ease-out)
-  }
+    transition:transform var(--dur-base) var(--ease-out)}
   #rail.open{transform:translateX(0)}
   #rail-brand span,.rail-group,.rail-item span,.rail-foot span,.rail-version{display:block}
   #rail-brand{justify-content:flex-start}
@@ -426,59 +272,41 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:var(-
 #rail-scrim{display:none;position:fixed;inset:0;z-index:calc(var(--z-sheet) - 1);background:var(--scrim);backdrop-filter:blur(3px)}
 #rail-scrim.show{display:block;animation:fade-in var(--dur-fast) var(--ease)}
 @keyframes fade-in{from{opacity:0}to{opacity:1}}
-
 #main-col{flex:1;min-width:0;display:flex;flex-direction:column}
-
-#topbar{
-  height:var(--topbar-h);flex-shrink:0;position:sticky;top:0;z-index:var(--z-sticky);
+#topbar{height:var(--topbar-h);flex-shrink:0;position:sticky;top:0;z-index:var(--z-sticky);
   display:flex;align-items:center;gap:var(--sp-2);padding:0 var(--sp-5);
   background:color-mix(in srgb,var(--bg) 86%,transparent);
-  backdrop-filter:blur(18px) saturate(1.5);border-bottom:1px solid var(--sep)
-}
+  backdrop-filter:blur(18px) saturate(1.5);border-bottom:1px solid var(--sep)}
 @media (max-width:640px){#topbar{padding:0 var(--sp-3)}}
 #rail-toggle{display:none}
 @media (max-width:820px){#rail-toggle{display:inline-flex}}
 #crumb{font-size:var(--fs-callout);font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex-shrink:1}
-
-#search-pill{
-  display:flex;align-items:center;gap:var(--sp-2);height:32px;padding:0 var(--sp-2) 0 var(--sp-3);
+#search-pill{display:flex;align-items:center;gap:var(--sp-2);height:32px;padding:0 var(--sp-2) 0 var(--sp-3);
   background:var(--bg-grouped);border-radius:var(--r-input);color:var(--ink-3);
   font-size:var(--fs-foot);margin-left:var(--sp-4);min-width:200px;
-  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
-}
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
 #search-pill:hover{background:var(--sep);color:var(--ink-2)}
 #search-pill .grow{flex:1;text-align:left}
-kbd{
-  font-family:var(--mono);font-size:.625rem;background:var(--surface);
-  border:1px solid var(--sep-strong);border-radius:5px;padding:2px 5px;color:var(--ink-3);line-height:1
-}
+kbd{font-family:var(--mono);font-size:.625rem;background:var(--surface);
+  border:1px solid var(--sep-strong);border-radius:5px;padding:2px 5px;color:var(--ink-3);line-height:1}
 @media (max-width:820px){#search-pill{min-width:0;padding:0 var(--sp-2);margin-left:auto}#search-pill .grow,#search-pill kbd{display:none}}
-
 #topbar-actions{margin-left:auto;display:flex;align-items:center;gap:2px}
 #sync-note{font-size:var(--fs-cap);color:var(--ink-3);margin-right:var(--sp-2);white-space:nowrap}
-#offline-pill{
-  display:none;align-items:center;gap:6px;height:26px;padding:0 var(--sp-3);
+#offline-pill{display:none;align-items:center;gap:6px;height:26px;padding:0 var(--sp-3);
   background:var(--warning-soft);color:var(--warning);border-radius:var(--r-full);
-  font-size:var(--fs-cap);font-weight:600;white-space:nowrap;margin-right:var(--sp-2)
-}
+  font-size:var(--fs-cap);font-weight:600;white-space:nowrap;margin-right:var(--sp-2)}
 #offline-pill.show{display:inline-flex}
 @media (max-width:900px){#sync-note{display:none}}
-
-/* Account menu */
 .menu-wrap{position:relative}
-.menu{
-  position:absolute;right:0;top:calc(100% + 6px);min-width:232px;
+.menu{position:absolute;right:0;top:calc(100% + 6px);min-width:232px;
   background:var(--surface-2);border:1px solid var(--sep);border-radius:var(--r-card);
-  box-shadow:var(--sh-modal);padding:var(--sp-1);z-index:var(--z-dropdown);display:none
-}
+  box-shadow:var(--sh-modal);padding:var(--sp-1);z-index:var(--z-dropdown);display:none}
 .menu.show{display:block;animation:menu-in var(--dur-fast) var(--ease-out)}
 @keyframes menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
 .menu-head{padding:var(--sp-3) var(--sp-3) var(--sp-2);border-bottom:1px solid var(--sep);margin-bottom:var(--sp-1)}
-.menu-item{
-  display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
+.menu-item{display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
   padding:var(--sp-2) var(--sp-3);border-radius:var(--r-control);
-  font-size:var(--fs-callout);color:var(--ink);font-weight:500
-}
+  font-size:var(--fs-callout);color:var(--ink);font-weight:500}
 .menu-item i{font-size:1rem;color:var(--ink-3);width:18px;text-align:center}
 .menu-item:hover{background:var(--bg-grouped)}
 .menu-item .kb{margin-left:auto}
@@ -486,30 +314,21 @@ kbd{
 .menu-item.danger i{color:var(--danger)}
 .menu-item.danger:hover{background:var(--danger-soft)}
 .menu-sep{height:1px;background:var(--sep);margin:var(--sp-1) 0}
-
 #content{flex:1;padding:var(--sp-6) var(--sp-6) var(--sp-16)}
 @media (max-width:640px){#content{padding:var(--sp-4) var(--sp-4) var(--sp-12)}}
 .inner{max-width:var(--content-max);margin:0 auto}
-
 .page-head{margin-bottom:var(--sp-5);display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
 .page-head h1{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em}
 .page-head p{font-size:var(--fs-callout);color:var(--ink-2);margin-top:3px;max-width:66ch}
 .page-head .acts{display:flex;gap:var(--sp-2);flex-wrap:wrap}
-
 .view{display:none}
 .view.on{display:block}
 .view.on.animate{animation:view-in var(--dur-base) var(--ease-out)}
 @keyframes view-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
-
-.section-head{
-  display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3);
-  margin:var(--sp-8) 0 var(--sp-3)
-}
+.section-head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-3);margin:var(--sp-8) 0 var(--sp-3)}
 .section-head:first-child{margin-top:0}
 .section-head h2{font-size:var(--fs-t3);font-weight:600}
 .section-head .hint{font-size:var(--fs-foot);color:var(--ink-3)}
-
-/* ── 11. Toolbar ──────────────────────────────────────────────────── */
 .toolbar{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;margin-bottom:var(--sp-3)}
 .toolbar .input,.toolbar .select{height:34px;width:auto}
 .toolbar .search{flex:1;min-width:190px;max-width:380px;padding-left:2rem;background-repeat:no-repeat;background-position:.6rem center;
@@ -517,16 +336,12 @@ kbd{
 .toolbar .spacer{margin-left:auto}
 .toolbar label.inline{display:flex;align-items:center;gap:var(--sp-2);font-size:var(--fs-foot);color:var(--ink-2);white-space:nowrap}
 .toolbar label.inline .input{width:auto;min-width:0}
-
-/* ── 12. Table ────────────────────────────────────────────────────── */
 .table-wrap{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);overflow:hidden;overflow:clip}
 table{width:100%;border-collapse:collapse;font-size:var(--fs-callout)}
-th{
-  position:sticky;top:var(--topbar-h);z-index:1;background:var(--bg-grouped);
+th{position:sticky;top:var(--topbar-h);z-index:1;background:var(--bg-grouped);
   text-align:left;padding:var(--sp-3) var(--sp-4);
   font-size:var(--fs-cap);font-weight:600;color:var(--ink-3);
-  border-bottom:1px solid var(--sep);user-select:none;white-space:nowrap
-}
+  border-bottom:1px solid var(--sep);user-select:none;white-space:nowrap}
 th.sortable{cursor:pointer}
 th.sortable:hover{color:var(--ink)}
 th .sort-ic{margin-left:3px;opacity:0;font-size:.75em}
@@ -541,15 +356,12 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .cell-user{display:flex;align-items:center;gap:var(--sp-2);min-width:0}
 .cell-user .nm{font-weight:600;color:var(--ink)}
 .cell-user .un{font-size:var(--fs-cap);color:var(--ink-3);font-family:var(--mono)}
-
 @media (max-width:900px){
   .table-wrap{border:none;background:transparent;border-radius:0;overflow:visible}
   table,tbody,tr,td{display:block}
   thead{display:none}
-  tbody tr{
-    background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
-    padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-2);position:relative
-  }
+  tbody tr{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
+    padding:var(--sp-3) var(--sp-4);margin-bottom:var(--sp-2);position:relative}
   tbody tr:hover td,tbody tr.selected td{background:transparent}
   tbody tr.selected{border-color:var(--accent);background:var(--accent-soft)}
   td{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);border:none;padding:var(--sp-1) 0;text-align:right}
@@ -561,59 +373,41 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   td.td-actions{justify-content:flex-end;padding-top:var(--sp-2);margin-top:var(--sp-2);border-top:1px solid var(--sep)}
   td.td-actions::before{display:none}
 }
-
-/* Bulk action bar */
-.bulk-bar{
-  display:none;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
+.bulk-bar{display:none;align-items:center;gap:var(--sp-2);flex-wrap:wrap;
   padding:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-3);
   background:var(--accent-soft);border:1px solid rgba(var(--accent-rgb),.28);
-  border-radius:var(--r-input);font-size:var(--fs-foot);color:var(--ink)
-}
+  border-radius:var(--r-input);font-size:var(--fs-foot);color:var(--ink)}
 .bulk-bar.show{display:flex;animation:bar-in var(--dur-fast) var(--ease-out)}
 .bulk-bar .count{font-weight:650}
 @keyframes bar-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
-
-/* ── 13. Pagination ───────────────────────────────────────────────── */
 .pagination{display:flex;align-items:center;justify-content:center;gap:var(--sp-1);margin-top:var(--sp-4);flex-wrap:wrap}
-.pagination button{
-  min-width:32px;height:32px;border-radius:var(--r-control);padding:0 var(--sp-2);
+.pagination button{min-width:32px;height:32px;border-radius:var(--r-control);padding:0 var(--sp-2);
   font-size:var(--fs-foot);font-weight:600;color:var(--ink-2);
-  transition:background var(--dur-fast) var(--ease)
-}
+  transition:background var(--dur-fast) var(--ease)}
 .pagination button:hover:not(:disabled){background:var(--bg-grouped);color:var(--ink)}
 .pagination button:disabled{opacity:.3;cursor:not-allowed}
 .pagination button.active{background:var(--accent);color:var(--on-accent)}
 .pagination .gap{color:var(--ink-4);padding:0 2px}
 .pagination .info{font-size:var(--fs-cap);color:var(--ink-3);margin-left:var(--sp-2)}
-
-/* ── 14. Today — decision queue ───────────────────────────────────── */
-.queue{
-  display:flex;flex-direction:column;background:var(--surface);
-  border:1px solid var(--sep);border-radius:var(--r-panel);overflow:hidden
-}
-.queue-row{
-  display:flex;align-items:center;gap:var(--sp-4);width:100%;text-align:left;
+.queue{display:flex;flex-direction:column;background:var(--surface);
+  border:1px solid var(--sep);border-radius:var(--r-panel);overflow:hidden}
+.queue-row{display:flex;align-items:center;gap:var(--sp-4);width:100%;text-align:left;
   padding:var(--sp-4) var(--sp-5);border-top:1px solid var(--sep);
-  transition:background var(--dur-fast) var(--ease)
-}
+  transition:background var(--dur-fast) var(--ease)}
 .queue-row:first-child{border-top:none}
 .queue-row:hover{background:var(--bg-grouped)}
 .queue-row:focus-visible{outline-offset:-2px}
-.q-icon{
-  width:38px;height:38px;border-radius:var(--r-input);flex-shrink:0;
+.q-icon{width:38px;height:38px;border-radius:var(--r-input);flex-shrink:0;
   display:flex;align-items:center;justify-content:center;font-size:1.05rem;
-  background:var(--bg-grouped);color:var(--ink-3)
-}
+  background:var(--bg-grouped);color:var(--ink-3)}
 .queue-row.urgent .q-icon{background:var(--warning-soft);color:var(--warning)}
 .queue-row.alert .q-icon{background:var(--danger-soft);color:var(--danger)}
 .queue-row.money .q-icon{background:var(--accent-soft);color:var(--accent)}
 .q-body{flex:1;min-width:0}
 .q-title{font-size:var(--fs-t3);font-weight:600;color:var(--ink)}
 .q-sub{font-size:var(--fs-foot);color:var(--ink-3);margin-top:1px}
-.q-count{
-  font-family:var(--mono);font-size:1.3rem;font-weight:700;color:var(--ink);
-  min-width:2.4ch;text-align:right;font-variant-numeric:tabular-nums
-}
+.q-count{font-family:var(--mono);font-size:1.3rem;font-weight:700;color:var(--ink);
+  min-width:2.4ch;text-align:right;font-variant-numeric:tabular-nums}
 .queue-row.clear .q-count{color:var(--ink-4);font-weight:500}
 .q-chev{color:var(--ink-4);font-size:1rem;flex-shrink:0}
 @media (max-width:560px){
@@ -621,34 +415,23 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   .q-icon{width:34px;height:34px}
   .q-title{font-size:var(--fs-callout)}
 }
-
-/* Metric strip (Dashboard) — filters, not vanity */
 .metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3)}
 @media (max-width:900px){.metrics{grid-template-columns:repeat(2,1fr)}}
-.metric{
-  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
+.metric{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
   padding:var(--sp-4);text-align:left;
-  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
-}
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)}
 .metric:hover{border-color:var(--sep-strong);background:var(--bg-grouped)}
 .metric .v{font-family:var(--mono);font-size:1.3rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
 .metric .l{font-size:var(--fs-cap);color:var(--ink-3);font-weight:600;margin-top:4px}
 .metric.on{border-color:var(--accent);background:var(--accent-soft)}
 .metric.on .l{color:var(--accent)}
-
-/* ── 15. Command palette ──────────────────────────────────────────── */
-#palette{
-  display:none;position:fixed;inset:0;z-index:var(--z-palette);
+#palette{display:none;position:fixed;inset:0;z-index:var(--z-palette);
   background:var(--scrim);backdrop-filter:blur(8px);
-  align-items:flex-start;justify-content:center;padding:10vh var(--sp-4) var(--sp-4)
-}
+  align-items:flex-start;justify-content:center;padding:10vh var(--sp-4) var(--sp-4)}
 #palette.show{display:flex}
-.palette-box{
-  width:100%;max-width:600px;background:var(--surface-2);
+.palette-box{width:100%;max-width:600px;background:var(--surface-2);
   border:1px solid var(--sep);border-radius:var(--r-sheet);
-  box-shadow:var(--sh-modal);overflow:hidden;
-  animation:palette-in var(--dur-base) var(--ease-spring)
-}
+  box-shadow:var(--sh-modal);overflow:hidden;animation:palette-in var(--dur-base) var(--ease-spring)}
 @keyframes palette-in{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
 .palette-input{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-4);border-bottom:1px solid var(--sep)}
 .palette-input i{color:var(--ink-3);font-size:1.1rem}
@@ -656,10 +439,8 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .palette-input input::placeholder{color:var(--ink-4);font-weight:450}
 .palette-list{max-height:52vh;overflow-y:auto;padding:var(--sp-2) 0}
 .palette-group{font-size:var(--fs-cap);font-weight:600;color:var(--ink-4);padding:var(--sp-2) var(--sp-4) var(--sp-1)}
-.palette-item{
-  display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
-  padding:var(--sp-2) var(--sp-4);font-size:var(--fs-callout);color:var(--ink)
-}
+.palette-item{display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
+  padding:var(--sp-2) var(--sp-4);font-size:var(--fs-callout);color:var(--ink)}
 .palette-item i{color:var(--ink-3);width:18px;text-align:center;flex-shrink:0;font-size:1rem}
 .palette-item.sel{background:var(--accent-soft)}
 .palette-item.sel i{color:var(--accent)}
@@ -668,31 +449,22 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .palette-foot{display:flex;gap:var(--sp-4);padding:var(--sp-2) var(--sp-4);border-top:1px solid var(--sep);font-size:var(--fs-cap);color:var(--ink-3);flex-wrap:wrap}
 .palette-foot span{display:flex;align-items:center;gap:4px}
 @media (max-width:560px){#palette{padding-top:6vh}.palette-foot{display:none}}
-
-/* ── 16. Overlays: dialogs, sheets, toasts ────────────────────────── */
-.overlay{
-  display:none;position:fixed;inset:0;z-index:var(--z-modal);
+.overlay{display:none;position:fixed;inset:0;z-index:var(--z-modal);
   background:var(--scrim);backdrop-filter:blur(5px);
-  align-items:center;justify-content:center;padding:var(--sp-4)
-}
+  align-items:center;justify-content:center;padding:var(--sp-4)}
 .overlay.show{display:flex}
-.dialog{
-  width:100%;max-width:440px;max-height:88vh;display:flex;flex-direction:column;
+.dialog{width:100%;max-width:440px;max-height:88vh;display:flex;flex-direction:column;
   background:var(--surface-2);border:1px solid var(--sep);border-radius:var(--r-sheet);
-  box-shadow:var(--sh-modal);animation:dialog-in var(--dur-base) var(--ease-spring);overflow:hidden
-}
+  box-shadow:var(--sh-modal);animation:dialog-in var(--dur-base) var(--ease-spring);overflow:hidden}
 .dialog.wide{max-width:680px}
 @keyframes dialog-in{from{opacity:0;transform:scale(.96) translateY(8px)}to{opacity:1;transform:none}}
-.dialog-hd{
-  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
-  padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--sep);flex-shrink:0
-}
+.dialog-hd{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);
+  padding:var(--sp-4) var(--sp-5);border-bottom:1px solid var(--sep);flex-shrink:0}
 .dialog-hd h3{font-size:var(--fs-t3);font-weight:650}
 .dialog-hd.danger h3{color:var(--danger)}
 .dialog-body{padding:var(--sp-5);overflow-y:auto;flex:1}
 .dialog-foot{display:flex;gap:var(--sp-2);padding:var(--sp-4) var(--sp-5);border-top:1px solid var(--sep);flex-shrink:0}
 .dialog-foot .btn{flex:1}
-
 @media (max-width:640px){
   .overlay{align-items:flex-end;padding:0}
   .dialog{max-width:none;max-height:90vh;border-radius:var(--r-sheet) var(--r-sheet) 0 0;border-bottom:none;
@@ -701,20 +473,14 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   .dialog-foot{padding-bottom:calc(var(--sp-4) + var(--safe-b))}
   @keyframes sheet-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
 }
-
-#toasts{
-  position:fixed;bottom:var(--sp-6);left:50%;transform:translateX(-50%);
+#toasts{position:fixed;bottom:var(--sp-6);left:50%;transform:translateX(-50%);
   z-index:var(--z-toast);display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);
-  pointer-events:none;width:calc(100vw - 2rem);max-width:400px
-}
+  pointer-events:none;width:calc(100vw - 2rem);max-width:400px}
 @media (max-width:820px){#toasts{bottom:calc(var(--sp-4) + var(--safe-b))}}
-.toast{
-  display:flex;align-items:flex-start;gap:var(--sp-2);width:100%;
+.toast{display:flex;align-items:flex-start;gap:var(--sp-2);width:100%;
   background:var(--ink);color:var(--bg);border-radius:var(--r-input);
   padding:var(--sp-3) var(--sp-4);font-size:var(--fs-callout);font-weight:500;line-height:1.45;
-  box-shadow:var(--sh-2);pointer-events:auto;
-  animation:toast-in var(--dur-base) var(--ease-spring)
-}
+  box-shadow:var(--sh-2);pointer-events:auto;animation:toast-in var(--dur-base) var(--ease-spring)}
 .dark .toast{background:var(--surface-2);border:1px solid var(--sep-strong);color:var(--ink)}
 .toast i{flex-shrink:0;font-size:1.05rem;margin-top:1px}
 .toast.success i{color:#41C98A}
@@ -723,157 +489,98 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .toast.out{animation:toast-out var(--dur-fast) var(--ease) forwards}
 @keyframes toast-in{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes toast-out{to{opacity:0;transform:translateY(-6px)}}
-
-/* ── 17. Empty / loading / error / banners ────────────────────────── */
 .empty{text-align:center;padding:var(--sp-12) var(--sp-4)}
 .empty i{font-size:1.75rem;color:var(--ink-4)}
 .empty .t{font-size:var(--fs-t3);font-weight:600;color:var(--ink);margin-top:var(--sp-3)}
 .empty .d{font-size:var(--fs-callout);color:var(--ink-3);margin:4px auto 0;max-width:38ch;line-height:1.5}
 .empty .a{margin-top:var(--sp-4);display:flex;gap:var(--sp-2);justify-content:center;flex-wrap:wrap}
 td .empty{padding:var(--sp-10) var(--sp-4)}
-
 .skeleton{background:var(--bg-grouped);border-radius:var(--r-control);height:14px;position:relative;overflow:hidden}
-.skeleton::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
-  animation:shimmer 1.3s ease infinite
-}
+.skeleton::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);animation:shimmer 1.3s ease infinite}
 .dark .skeleton::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)}
 @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
 .skeleton + .skeleton{margin-top:var(--sp-2)}
 .sk-40{width:40%}.sk-60{width:60%}.sk-80{width:80%}.sk-100{width:100%}
 .sk-block{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);padding:var(--sp-4);margin-bottom:var(--sp-2)}
-
 .inline-loader{display:inline-flex;align-items:center;gap:var(--sp-2);color:var(--ink-3);font-size:var(--fs-foot)}
-.inline-loader::before{
-  content:'';width:13px;height:13px;border:2px solid var(--sep-strong);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .7s linear infinite
-}
-
-.banner{
-  display:flex;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-3) var(--sp-4);
-  border-radius:var(--r-input);font-size:var(--fs-foot);margin-bottom:var(--sp-3);line-height:1.5
-}
+.inline-loader::before{content:'';width:13px;height:13px;border:2px solid var(--sep-strong);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite}
+.banner{display:flex;align-items:flex-start;gap:var(--sp-2);padding:var(--sp-3) var(--sp-4);
+  border-radius:var(--r-input);font-size:var(--fs-foot);margin-bottom:var(--sp-3);line-height:1.5}
 .banner i{flex-shrink:0;margin-top:1px;font-size:1rem}
 .banner-warning{background:var(--warning-soft);color:var(--warning)}
 .banner-danger{background:var(--danger-soft);color:var(--danger)}
 .banner-info{background:var(--info-soft);color:var(--info)}
 .banner-accent{background:var(--accent-soft);color:var(--accent)}
-
-/* Global progress bar — replaces the blocking spinner overlay */
-#busy{
-  position:fixed;top:0;left:0;right:0;height:2px;z-index:var(--z-toast);
-  background:transparent;pointer-events:none;opacity:0;transition:opacity var(--dur-fast) var(--ease)
-}
+#busy{position:fixed;top:0;left:0;right:0;height:2px;z-index:var(--z-toast);
+  background:transparent;pointer-events:none;opacity:0;transition:opacity var(--dur-fast) var(--ease)}
 #busy.on{opacity:1}
-#busy::after{
-  content:'';display:block;height:100%;width:38%;background:var(--accent);
-  animation:sweep 1.05s var(--ease) infinite
-}
+#busy::after{content:'';display:block;height:100%;width:38%;background:var(--accent);
+  animation:sweep 1.05s var(--ease) infinite}
 @keyframes sweep{0%{transform:translateX(-100%)}100%{transform:translateX(365%)}}
-
-/* ── 18. Tabs ─────────────────────────────────────────────────────── */
 .tabbar{display:flex;gap:var(--sp-5);border-bottom:1px solid var(--sep);margin-bottom:var(--sp-5);overflow-x:auto;scrollbar-width:none}
 .tabbar::-webkit-scrollbar{display:none}
-.tabbar button{
-  position:relative;padding:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-callout);font-weight:600;
+.tabbar button{position:relative;padding:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-callout);font-weight:600;
   color:var(--ink-3);display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap;
-  transition:color var(--dur-fast) var(--ease)
-}
+  transition:color var(--dur-fast) var(--ease)}
 .tabbar button:hover{color:var(--ink-2)}
 .tabbar button.active{color:var(--ink)}
-.tabbar button.active::after{
-  content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);border-radius:2px
-}
-.tab-count{
-  background:var(--warning-soft);color:var(--warning);font-size:.625rem;font-weight:700;
-  padding:1px 6px;border-radius:var(--r-full)
-}
-
-/* ── 19. Gate (sign-in) ───────────────────────────────────────────── */
-#gate{
-  position:fixed;inset:0;z-index:var(--z-gate);display:flex;align-items:center;justify-content:center;
-  background:var(--bg);padding:var(--sp-4)
-}
-.gate-card{
-  width:100%;max-width:392px;background:var(--surface);
+.tabbar button.active::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+.tab-count{background:var(--warning-soft);color:var(--warning);font-size:.625rem;font-weight:700;
+  padding:1px 6px;border-radius:var(--r-full)}
+#gate{position:fixed;inset:0;z-index:var(--z-gate);display:flex;align-items:center;justify-content:center;
+  background:var(--bg);padding:var(--sp-4)}
+.gate-card{width:100%;max-width:392px;background:var(--surface);
   border:1px solid var(--sep);border-radius:var(--r-sheet);
-  padding:var(--sp-8) var(--sp-6);box-shadow:var(--sh-2);
-  animation:gate-in var(--dur-slow) var(--ease-out)
-}
+  padding:var(--sp-8) var(--sp-6);box-shadow:var(--sh-2);animation:gate-in var(--dur-slow) var(--ease-out)}
 @keyframes gate-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .gate-card img.mark{width:52px;height:52px;margin:0 auto var(--sp-4);border-radius:13px}
 .gate-card h1{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em;text-align:center}
 .gate-card .gsub{font-size:var(--fs-callout);color:var(--ink-2);text-align:center;margin:4px 0 var(--sp-6)}
-.gate-err{
-  display:none;align-items:flex-start;gap:var(--sp-2);
+.gate-err{display:none;align-items:flex-start;gap:var(--sp-2);
   background:var(--danger-soft);color:var(--danger);
-  border-radius:var(--r-input);padding:var(--sp-3);font-size:var(--fs-foot);margin-bottom:var(--sp-4);line-height:1.45
-}
+  border-radius:var(--r-input);padding:var(--sp-3);font-size:var(--fs-foot);margin-bottom:var(--sp-4);line-height:1.45}
 .gate-err.show{display:flex}
 .gate-alt{text-align:center;margin-top:var(--sp-5);font-size:var(--fs-foot);color:var(--ink-3)}
-
-/* ── 20. Feature-specific ─────────────────────────────────────────── */
-
-/* Permission editor */
 .perm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(196px,1fr));gap:var(--sp-4)}
 .perm-group-t{font-size:var(--fs-cap);font-weight:650;color:var(--ink-3);margin-bottom:var(--sp-1)}
-.perm-row{
-  display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-2);
-  border-radius:var(--r-control);cursor:pointer;font-size:var(--fs-foot);color:var(--ink-2);min-height:30px
-}
+.perm-row{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-2);
+  border-radius:var(--r-control);cursor:pointer;font-size:var(--fs-foot);color:var(--ink-2);min-height:30px}
 .perm-row:hover{background:var(--bg-grouped);color:var(--ink)}
-.perm-pill{
-  display:inline-flex;align-items:center;font-size:var(--fs-cap);font-weight:550;
-  background:var(--bg-grouped);border-radius:var(--r-full);padding:2px 8px;color:var(--ink-2)
-}
+.perm-pill{display:inline-flex;align-items:center;font-size:var(--fs-cap);font-weight:550;
+  background:var(--bg-grouped);border-radius:var(--r-full);padding:2px 8px;color:var(--ink-2)}
 .perm-pill.more{background:transparent;border:1px dashed var(--sep-strong);color:var(--ink-3)}
 .admin-perms{display:none;margin-top:var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--sep)}
 .admin-perms.show{display:block;animation:view-in var(--dur-fast) var(--ease-out)}
-
-/* User picker */
 .picker{position:relative}
-.picker-list{
-  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:var(--z-dropdown);
+.picker-list{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:var(--z-dropdown);
   background:var(--surface-2);border:1px solid var(--sep);border-radius:var(--r-card);
-  box-shadow:var(--sh-2);max-height:264px;overflow-y:auto;display:none;padding:var(--sp-1)
-}
+  box-shadow:var(--sh-2);max-height:264px;overflow-y:auto;display:none;padding:var(--sp-1)}
 .picker-list.show{display:block}
-.picker-item{
-  display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);width:100%;text-align:left;
-  padding:var(--sp-2) var(--sp-2);border-radius:var(--r-control);font-size:var(--fs-callout)
-}
+.picker-item{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-3);width:100%;text-align:left;
+  padding:var(--sp-2) var(--sp-2);border-radius:var(--r-control);font-size:var(--fs-callout)}
 .picker-item:hover,.picker-item.sel{background:var(--bg-grouped)}
 .picker-item .nm{font-weight:600;color:var(--ink)}
 .picker-item .un{font-family:var(--mono);font-size:var(--fs-cap);color:var(--ink-3)}
 .picker-empty{padding:var(--sp-4);text-align:center;color:var(--ink-3);font-size:var(--fs-foot)}
-
-/* Submission (grading) cards */
-.sub-card{
-  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
-  padding:var(--sp-4);margin-bottom:var(--sp-2)
-}
+.sub-card{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
+  padding:var(--sp-4);margin-bottom:var(--sp-2)}
 .sub-card.graded{background:var(--bg-grouped)}
 .sub-top{display:flex;justify-content:space-between;gap:var(--sp-3);align-items:flex-start;flex-wrap:wrap}
 .sub-user{font-weight:600;font-size:var(--fs-callout);display:flex;align-items:center;gap:var(--sp-2)}
 .sub-meta{font-size:var(--fs-cap);color:var(--ink-3);display:flex;flex-wrap:wrap;gap:var(--sp-3);margin-top:3px}
-.sub-q{
-  background:var(--bg-grouped);border-radius:var(--r-control);padding:var(--sp-3);
+.sub-q{background:var(--bg-grouped);border-radius:var(--r-control);padding:var(--sp-3);
   margin-top:var(--sp-3);font-size:var(--fs-foot);line-height:1.6;white-space:pre-wrap;
-  max-height:130px;overflow:auto;color:var(--ink-2)
-}
+  max-height:130px;overflow:auto;color:var(--ink-2)}
 .sub-acts{display:flex;gap:var(--sp-2);flex-wrap:wrap;align-items:center;margin-top:var(--sp-3)}
 .grade-input{width:5.2rem;height:32px;text-align:center;font-family:var(--mono);font-weight:600}
 .feedback-input{flex:1;min-width:180px;height:32px}
 .sub-score{font-size:var(--fs-callout);color:var(--success);font-weight:700;font-family:var(--mono)}
 .sub-feedback{font-size:var(--fs-foot);color:var(--ink-2);margin-top:var(--sp-2);padding-left:var(--sp-3);border-left:2px solid var(--sep-strong)}
-
-/* Smart-paste preview rows */
-.sp-row{
-  display:grid;grid-template-columns:28px 1fr 190px 76px 32px;gap:var(--sp-2);align-items:center;
+.sp-row{display:grid;grid-template-columns:28px 1fr 190px 76px 32px;gap:var(--sp-2);align-items:center;
   background:var(--surface);border:1px solid var(--sep);border-left:3px solid var(--success);
-  padding:var(--sp-2) var(--sp-3);border-radius:var(--r-control)
-}
+  padding:var(--sp-2) var(--sp-3);border-radius:var(--r-control)}
 .sp-row.mid{border-left-color:var(--warning)}
 .sp-row.low{border-left-color:var(--danger)}
 .sp-row.dropped{opacity:.4}
@@ -886,19 +593,13 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
   .sp-row .select{grid-area:s}.sp-row .input{grid-area:m}
   .sp-row .icon-btn{grid-area:x}
 }
-
-/* QOTD summary */
 .qotd-head{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);padding:var(--sp-5);margin-bottom:var(--sp-4)}
-.qotd-text{
-  font-size:var(--fs-callout);line-height:1.65;color:var(--ink);background:var(--bg-grouped);
-  border-radius:var(--r-control);padding:var(--sp-3);margin-top:var(--sp-3);white-space:pre-wrap
-}
+.qotd-text{font-size:var(--fs-callout);line-height:1.65;color:var(--ink);background:var(--bg-grouped);
+  border-radius:var(--r-control);padding:var(--sp-3);margin-top:var(--sp-3);white-space:pre-wrap}
 .qotd-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-3);margin-top:var(--sp-4)}
 .qotd-stats div{text-align:left}
 .qotd-stats strong{display:block;font-family:var(--mono);font-size:var(--fs-t2);font-weight:700;color:var(--ink)}
 .qotd-stats span{font-size:var(--fs-cap);color:var(--ink-3);font-weight:550}
-
-/* Maintenance rows */
 .maint{display:flex;align-items:flex-end;gap:var(--sp-3);flex-wrap:wrap;padding:var(--sp-4) 0;border-top:1px solid var(--sep)}
 .maint:first-of-type{border-top:none;padding-top:0}
 .maint .info{flex:1;min-width:210px}
@@ -907,8 +608,6 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
 .maint .num{width:96px}
 .maint .field{margin-bottom:0}
 @media (max-width:620px){.maint{align-items:stretch}.maint .btn{width:100%}.maint .num{width:100%}}
-
-/* Missed-question cards */
 .miss{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);padding:var(--sp-4)}
 .miss-top{display:flex;justify-content:space-between;gap:var(--sp-4);align-items:flex-start}
 .miss-q{font-size:var(--fs-callout);line-height:1.55;flex:1;min-width:0}
@@ -917,30 +616,20 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
 .miss-rate .l{font-size:var(--fs-cap);color:var(--ink-3)}
 .miss-tags{display:flex;flex-wrap:wrap;gap:var(--sp-1);margin-top:var(--sp-2)}
 .miss-meta{font-size:var(--fs-cap);color:var(--ink-3);margin-top:var(--sp-2);display:flex;flex-wrap:wrap;gap:var(--sp-3)}
-
-/* Activity log */
 .log{display:flex;gap:var(--sp-4);padding:var(--sp-3) 0;border-top:1px solid var(--sep);font-size:var(--fs-callout)}
 .log:first-child{border-top:none}
 .log time{font-family:var(--mono);font-size:var(--fs-cap);color:var(--ink-3);width:74px;flex-shrink:0;padding-top:2px}
 .log .act{font-weight:600;color:var(--ink)}
 .log .who{color:var(--ink-2)}
 .log .det{color:var(--ink-3);font-size:var(--fs-foot);margin-top:2px}
-
-/* Score distribution bars */
 .dist{display:grid;grid-template-columns:58px 1fr 40px;gap:var(--sp-2);align-items:center;font-size:var(--fs-foot);margin-bottom:3px}
 .dist .rg{color:var(--ink-3);font-family:var(--mono)}
 .dist .track{height:6px;background:var(--bg-grouped);border-radius:3px;overflow:hidden}
 .dist .fill{height:100%;background:var(--accent);border-radius:3px}
 .dist .ct{text-align:right;font-family:var(--mono)}
-
-/* Copy button */
-.copy-btn{
-  display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
-  border-radius:6px;color:var(--ink-3);font-size:.8rem;vertical-align:middle
-}
+.copy-btn{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  border-radius:6px;color:var(--ink-3);font-size:.8rem;vertical-align:middle}
 .copy-btn:hover{background:var(--bg-grouped);color:var(--ink)}
-
-/* Utility */
 .flex{display:flex}.col{flex-direction:column}.center{align-items:center}
 .between{justify-content:space-between}.wrap{flex-wrap:wrap}.grow{flex:1;min-width:0}
 .g1{gap:var(--sp-1)}.g2{gap:var(--sp-2)}.g3{gap:var(--sp-3)}.g4{gap:var(--sp-4)}
@@ -950,6 +639,24 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
 .stack3{display:flex;flex-direction:column;gap:var(--sp-3)}
 .right{text-align:right}
 .hidden,[hidden]{display:none!important}
+
+/* ── 21. Annotate overlay ─────────────────────────────────────────── */
+#ov-annotate{position:fixed;inset:0;z-index:900;display:none;background:var(--bg);flex-direction:column}
+#ov-annotate.show{display:flex}
+.an-topbar{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-4);
+  border-bottom:1px solid var(--sep);background:var(--surface);flex-wrap:wrap;flex-shrink:0}
+.an-topbar .grow{flex:1}
+.an-tool{width:34px;height:34px;border-radius:var(--r-input);display:flex;align-items:center;justify-content:center;
+  color:var(--ink-2);background:var(--bg-grouped)}
+.an-tool.active{background:var(--accent);color:var(--on-accent)}
+.an-swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--sep-strong);cursor:pointer;flex-shrink:0}
+.an-swatch.active{border-color:var(--ink)}
+#an-canvas-wrap{flex:1;overflow:auto;display:flex;justify-content:center;padding:var(--sp-6);background:var(--bg-grouped)}
+#an-stage{position:relative;box-shadow:var(--sh-2);background:#fff;flex-shrink:0}
+#an-page-canvas,#an-overlay-canvas{position:absolute;top:0;left:0}
+#an-overlay-canvas{cursor:crosshair;touch-action:none}
+.an-pagebar{display:flex;align-items:center;gap:var(--sp-2);justify-content:center;padding:var(--sp-2);
+  border-top:1px solid var(--sep);background:var(--surface);flex-shrink:0}
 </style>
 </head>
 <body>
@@ -1560,6 +1267,48 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
   </div>
 </div>
 
+<!-- ═══════════════════════ ANNOTATE OVERLAY ═══════════════════════ -->
+<div id="ov-annotate">
+  <div class="an-topbar">
+    <button class="icon-btn" onclick="PDF_ANNOTATE.close()" aria-label="Close"><i class="ph ph-x"></i></button>
+    <span class="t-callout" style="font-weight:600" id="an-title">Annotate</span>
+
+    <div class="grow"></div>
+
+    <button class="an-tool active" id="an-tool-pen" onclick="PDF_ANNOTATE.setTool('pen')" title="Pen"><i class="ph ph-pen"></i></button>
+    <button class="an-tool" id="an-tool-highlighter" onclick="PDF_ANNOTATE.setTool('highlighter')" title="Highlighter"><i class="ph ph-highlighter-circle"></i></button>
+    <button class="an-tool" id="an-tool-text" onclick="PDF_ANNOTATE.setTool('text')" title="Add text"><i class="ph ph-text-t"></i></button>
+    <button class="an-tool" id="an-tool-eraser" onclick="PDF_ANNOTATE.setTool('eraser')" title="Eraser"><i class="ph ph-eraser"></i></button>
+
+    <span class="an-swatch active" style="background:#e02020" onclick="PDF_ANNOTATE.setColor('#e02020',this)"></span>
+    <span class="an-swatch" style="background:#1e7a4c" onclick="PDF_ANNOTATE.setColor('#1e7a4c',this)"></span>
+    <span class="an-swatch" style="background:#1a56db" onclick="PDF_ANNOTATE.setColor('#1a56db',this)"></span>
+    <span class="an-swatch" style="background:#111" onclick="PDF_ANNOTATE.setColor('#111111',this)"></span>
+
+    <select class="select" id="an-width" onchange="PDF_ANNOTATE.width=+this.value" style="height:30px;width:70px">
+      <option value="2">Thin</option><option value="4" selected>Med</option><option value="8">Thick</option>
+    </select>
+
+    <button class="icon-btn" onclick="PDF_ANNOTATE.undo()" title="Undo"><i class="ph ph-arrow-u-up-left"></i></button>
+    <button class="icon-btn" onclick="PDF_ANNOTATE.clearPage()" title="Clear this page"><i class="ph ph-trash"></i></button>
+
+    <button class="btn btn-primary btn-sm" id="an-save" onclick="PDF_ANNOTATE.save()"><i class="ph ph-check"></i> Save &amp; replace</button>
+  </div>
+
+  <div id="an-canvas-wrap">
+    <div id="an-stage">
+      <canvas id="an-page-canvas"></canvas>
+      <canvas id="an-overlay-canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="an-pagebar">
+    <button class="icon-btn sm" onclick="PDF_ANNOTATE.prevPage()" aria-label="Previous page"><i class="ph ph-caret-left"></i></button>
+    <span class="t-cap" id="an-pageinfo">Page 1 / 1</span>
+    <button class="icon-btn sm" onclick="PDF_ANNOTATE.nextPage()" aria-label="Next page"><i class="ph ph-caret-right"></i></button>
+  </div>
+</div>
+
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <script src="version.js"></script>
@@ -1568,14 +1317,14 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
 <script src="subjective_chapters.js"></script>
 <script src="subjective-data.js"></script>
 <script src="subjective.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script>
-/* ═══════════════════════════════════════════════════════════════════════
-   Abhyas Admin — application code.
-
-   Structure: helpers → chrome (toast/busy/confirm/modal/focus) → core
-   (ADMIN: auth, fetch, permissions, refresh) → features. Every feature
-   module owns its own render and nothing else reaches into its DOM.
-   ═══════════════════════════════════════════════════════════════════════ */
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+  }
+</script>
+<script>
 'use strict';
 
 const GAS_URL  = ABHYAS_CONFIG.GAS_URL;
@@ -1585,21 +1334,13 @@ const LS_USER  = 'abhyas_session';
 const $  = id => document.getElementById(id);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 
-/* ── Escaping ───────────────────────────────────────────────────────── */
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-/* Value interpolated inside a single-quoted JS string inside a
-   double-quoted HTML attribute: JS-escape first (runtime sees it after
-   the HTML parser has already decoded entities), then HTML-escape. */
 function escAttrJs(s){
   const js = String(s == null ? '' : s).replace(/[\\'"]/g, c => '\\' + c);
   return js.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-
-/* Pull a Drive file ID out of anything a submission might carry:
-   a /file/d/<ID>/view URL, a ?id=<ID> link, a bare ID, or a data: URI
-   (which we reject — those never resolve server-side). */
 function driveFileId(u){
   const s = String(u == null ? '' : u).trim();
   if (!s) return '';
@@ -1610,8 +1351,6 @@ function driveFileId(u){
             s.match(/\/([-\w]{25,})(?:\/|$)/);
   return m ? m[1] : '';
 }
-
-/* ── Formatting ─────────────────────────────────────────────────────── */
 function relTime(ts){
   if (!ts) return '—';
   const t = typeof ts === 'number' ? ts : new Date(ts).getTime();
@@ -1646,8 +1385,6 @@ function badge(status, label){
 }
 function plural(n, one, many){ return n + ' ' + (n === 1 ? one : (many || one + 's')); }
 
-/* ── Theme + password visibility (local, so this page never depends on
-     whichever shared.js build is deployed) ──────────────────────────── */
 if (typeof window.toggleTheme !== 'function') {
   window.toggleTheme = function(){
     const dark = document.documentElement.classList.toggle('dark');
@@ -1671,13 +1408,11 @@ function copyText(text, label){
   );
 }
 
-/* Filters survive a reload, so a half-finished review isn't lost. */
 const FSTATE = {
   get(k, fb){ try { return sessionStorage.getItem('abhyas_f_' + k) ?? fb; } catch(e){ return fb; } },
   set(k, v){ try { sessionStorage.setItem('abhyas_f_' + k, v); } catch(e){} }
 };
 
-/* ═══════════════════════════ TOASTS ═══════════════════════════ */
 const TOAST = {
   ICONS: { success:'ph-check-circle', error:'ph-warning-circle', warning:'ph-warning', info:'ph-info' },
   show(msg, kind = 'info', duration = 3600){
@@ -1694,9 +1429,6 @@ const TOAST = {
   }
 };
 
-/* ═════════════════════ GLOBAL BUSY INDICATOR ═════════════════════
-   A top progress bar instead of a blocking overlay: the console stays
-   readable and scrollable while a request is in flight. */
 const BUSY = {
   _n: 0,
   start(){ this._n++; $('busy').classList.add('on'); $('busy').setAttribute('aria-hidden','false'); },
@@ -1704,7 +1436,6 @@ const BUSY = {
   reset(){ this._n = 0; $('busy').classList.remove('on'); }
 };
 
-/* ═══════════════════════════ FOCUS TRAP ═══════════════════════════ */
 const FOCUS_TRAP = {
   _state: {},
   _list(root){
@@ -1740,7 +1471,6 @@ const FOCUS_TRAP = {
   }
 };
 
-/* ═══════════════════════════ MODALS ═══════════════════════════ */
 const MODAL = {
   open(name){
     $('ov-' + name).classList.add('show');
@@ -1756,8 +1486,6 @@ const MODAL = {
     if (!document.querySelector('.overlay.show')) document.body.style.overflow = '';
   },
   closeAll(){ ['review','user','sheet','confirm','pwd'].forEach(n => this.close(n)); },
-  /* Generic content sheet — used for weekly-set creation, admin
-     invitation, weekly results and previews. */
   sheet(title, html, opts = {}){
     $('tt-sheet').textContent = title;
     $('bd-sheet').innerHTML = html;
@@ -1766,7 +1494,6 @@ const MODAL = {
   }
 };
 
-/* ═══════════════════════════ CONFIRM ═══════════════════════════ */
 const CONFIRM = {
   _resolve: null,
   ask({ title, body, confirmText, tone, requireType }){
@@ -1808,7 +1535,6 @@ const CONFIRM = {
   }
 };
 
-/* ═══════════════════════════ ADMIN CORE ═══════════════════════════ */
 const ADMIN = {
   creds: null,
   _perms: null,
@@ -1822,14 +1548,11 @@ const ADMIN = {
   },
   state: { uPage:1, pPage:1, lPage:1, qrPage:1, uPerPage:15, pPerPage:15, lPerPage:20, qrPerPage:10 },
 
-  /* ── Session ───────────────────────────────────────────────── */
   init(){
     const saved = localStorage.getItem(LS_ADMIN);
     if (!saved) { if (matchMedia('(pointer:fine)').matches) $('ad-user').focus(); return; }
     try {
       this.creds = JSON.parse(saved);
-      // A week-old token shouldn't fire a batch of doomed requests on
-      // boot. Real expiry is caught by the server in post().
       if (this.creds.expires && Date.now() > this.creds.expires) {
         localStorage.removeItem(LS_ADMIN); this.creds = null; return;
       }
@@ -1914,13 +1637,8 @@ const ADMIN = {
   },
   hideErr(){ $('gate-err').classList.remove('show'); },
 
-  /* ── Transport ─────────────────────────────────────────────── */
   async post(action, params = {}, opts = {}){
     if (!opts.skipTokenCheck && !this.creds?.token) throw new Error('Not signed in.');
-    // Always POST — credentials never travel in a URL.
-    // Token expiry is deliberately not checked client-side: the server
-    // slides the TTL on activity, and a fixed 24h from login would sign
-    // an active session out early.
     const body = { action, ...params, adminToken: this.creds?.token };
     const r = await fetch(GAS_URL, { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error('The server is unreachable right now (' + r.status + ').');
@@ -1938,7 +1656,6 @@ const ADMIN = {
     return data;
   },
 
-  /* ── Permissions ───────────────────────────────────────────── */
   async loadPermissions(){
     try {
       const r = await this.post('adminListAdmins');
@@ -1976,7 +1693,6 @@ const ADMIN = {
     if (active && active.hidden) UI.nav('today');
   },
 
-  /* ── Data refresh ──────────────────────────────────────────── */
   ALL_SCOPES: ['stats','users','payments','settings','logs','admins','weeklysets','qreports'],
 
   async refresh(scope){
@@ -2071,7 +1787,6 @@ const ADMIN = {
     set('st-rejected', s.payments?.rejected);
   },
 
-  /* ── Export ────────────────────────────────────────────────── */
   toCSV(headers, rows){
     const e = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
     return [headers.map(e).join(','), ...rows.map(r => r.map(e).join(','))].join('\n');
@@ -2102,7 +1817,6 @@ const ADMIN = {
     this.downloadCSV(csv, 'payments_' + (rows.length === this.data.payments.length ? 'all' : 'filtered') + '.csv');
   },
 
-  /* ── Screenshots / password ────────────────────────────────── */
   async downloadScreenshot(url, filename){
     TOAST.show('Preparing download', 'info', 2000);
     BUSY.start();
@@ -2155,7 +1869,6 @@ const ADMIN = {
   }
 };
 
-/* ═══════════════════════════ TODAY ═══════════════════════════ */
 const TODAY = {
   render(){
     const el = $('queue');
@@ -2205,7 +1918,6 @@ const TODAY = {
   }
 };
 
-/* ═══════════════════════════ BADGES ═══════════════════════════ */
 const BADGES = {
   set(id, n){
     const el = $(id);
@@ -2222,7 +1934,6 @@ const BADGES = {
   }
 };
 
-/* ═══════════════════════ COMMAND PALETTE ═══════════════════════ */
 const PALETTE = {
   _items: [], _filtered: [], _idx: 0, _bound: false,
 
@@ -2296,7 +2007,6 @@ const PALETTE = {
     this._items = items;
   },
 
-  /* Subsequence match, so "usr" finds "Users" and "rp" finds "Reports". */
   _score(item, term){
     const hay = (item.title + ' ' + (item.sub || '') + ' ' + item.group).toLowerCase();
     if (hay.includes(term)) return item.title.toLowerCase().startsWith(term) ? 0 : 1;
@@ -2347,7 +2057,6 @@ const PALETTE = {
   }
 };
 
-/* ═══════════════════════ EXPIRING TRIALS ═══════════════════════ */
 const EXPIRING = {
   async load(){
     const box = $('expiring-list');
@@ -2386,7 +2095,6 @@ const EXPIRING = {
   }
 };
 
-/* ═══════════════════════════ ADMINS ═══════════════════════════ */
 const ADMINS = {
   _list: [], _isOwner: false, _labels: {}, _selected: null,
 
@@ -2481,7 +2189,6 @@ const ADMINS = {
     BUSY.stop();
   },
 
-  /* ── Add-admin sheet ───────────────────────────────────────── */
   openPromote(){
     this._selected = null;
     this._modeVal = 'existing';
@@ -2491,7 +2198,6 @@ const ADMINS = {
         '<button class="active" id="ap-tab-existing" onclick="ADMINS._mode(\'existing\')">Existing student</button>' +
         '<button id="ap-tab-new" onclick="ADMINS._mode(\'new\')">New account</button>' +
       '</div>' +
-
       '<div id="ap-existing">' +
         '<p class="t-callout mb4">They keep their password and their study access — you are only adding an admin role.</p>' +
         '<div class="field picker">' +
@@ -2501,13 +2207,11 @@ const ADMINS = {
         '</div>' +
         '<div id="promote-selected" hidden></div>' +
       '</div>' +
-
       '<div id="ap-new" hidden>' +
         '<p class="t-callout mb4">Use this only for someone who does not study on Abhyas. They will have no student account to fall back on.</p>' +
         '<div class="field"><label for="ca-user">Username</label><input class="input" type="text" id="ca-user" placeholder="letters, numbers, . _ -" autocapitalize="none"></div>' +
         '<div class="field"><label for="ca-pass">Temporary password</label><input class="input" type="text" id="ca-pass" placeholder="At least 6 characters"></div>' +
       '</div>' +
-
       '<div class="field mt4"><span class="field-label">What they can do</span>' +
         '<span class="field-hint">You can change this at any time.</span>' +
         '<div class="perm-grid mt2" id="promote-perms">' + (this.GROUPS.map(g => {
@@ -2518,7 +2222,6 @@ const ADMINS = {
           '</div>';
         }).join('') || '<p class="t-foot">Permissions load with the admin list — refresh and try again.</p>') + '</div>' +
       '</div>' +
-
       '<div class="flex g2 mt4"><button class="btn btn-primary btn-block" id="ap-submit" onclick="ADMINS.submit()">Add admin</button></div>'
     );
   },
@@ -2629,7 +2332,6 @@ const ADMINS = {
   }
 };
 
-/* ═══════════════════════════ UPKEEP ═══════════════════════════ */
 const MAINTENANCE = {
   async _run(label, action, params, toastFn){
     BUSY.start();
@@ -2685,7 +2387,6 @@ const MAINTENANCE = {
   }
 };
 
-/* ═══════════════════════ CHAPTER LOOKUP ═══════════════════════ */
 const CHAPTERS = {
   _map: null, _levels: null,
   _build(){
@@ -2708,7 +2409,6 @@ const CHAPTERS = {
   allChapters(){ this._build(); return [...new Set([...this._map.values()].map(v => v.chapter))].sort(); }
 };
 
-/* ═══════════════════ MOST-MISSED QUESTIONS ═══════════════════ */
 const MISSED = {
   lastResults: [], _built: false,
   _buildFilters(){
@@ -2745,7 +2445,6 @@ const MISSED = {
           '<div class="a"><button class="btn btn-quiet" onclick="MISSED.clearFilters()">Reset filters</button></div></div>';
         return;
       }
-      /* Pull the question text so the list reads as questions, not IDs. */
       const cache = {};
       await Promise.all([...new Set(res.results.map(r => r.fileId))].map(async fid => {
         try {
@@ -2787,7 +2486,6 @@ const MISSED = {
   }
 };
 
-/* ═══════════════════════ WEEKLY SETS ═══════════════════════ */
 const WEEKLYSETS = {
   list: [], uploadedFileId: '', _lastResults: null,
 
@@ -3017,7 +2715,6 @@ const WEEKLYSETS = {
   }
 };
 
-/* ═══════════════════════ QUESTION REPORTS ═══════════════════════ */
 const QREPORTS = {
   all: [], filter: 'open', chapterFilter: 'all', reasonFilter: 'all', searchTerm: '', _t: null,
   REASON: { wrong_answer:'Wrong answer', unclear:'Unclear wording', typo:'Typo or formatting', other:'Other' },
@@ -3122,7 +2819,7 @@ const QREPORTS = {
   async setStatus(id, status){
     const item = this.all.find(r => r.id === id);
     const prev = item?.status;
-    if (item) { item.status = status; this.render(this.all); }   // optimistic
+    if (item) { item.status = status; this.render(this.all); }
     try {
       const res = await ADMIN.post('adminUpdateQuestionReportStatus', { id, status });
       if (!res.success) throw new Error(res.error || 'Update failed.');
@@ -3145,7 +2842,6 @@ const QREPORTS = {
   }
 };
 
-/* ═══════════════════ SUBJECTIVE — shared store ═══════════════════ */
 const SUBJ_STORE = {
   all: [], loaded: false, loading: false,
   async load(force){
@@ -3178,22 +2874,39 @@ const SUBJ_TABS = {
   }
 };
 
-/* Shared grading-card renderer — QOTD and exams differ only in
-   default marks, the question snapshot, and which module saves. */
+/* ── Grading card ──────────────────────────────────────────────────
+   Actions per submission: Open PDF, Replace PDF, Annotate PDF.
+   Annotate opens the in-browser drawing layer (PDF_ANNOTATE) and,
+   on save, posts the flattened PDF back through the same
+   adminReplaceSubmissionPdf endpoint that Replace PDF uses. */
 function gradeCard(s, ns, defaultMarks, showQuestion){
   const graded = s.status === 'graded';
   const marks = s.questionMarks || defaultMarks;
   const id = escAttrJs(s.id);
+  const hasPdf = !!(s.pdfUrl && driveFileId(s.pdfUrl));
+  const replaced = !!s.pdfReplacedAt;
+  const canGrade = ADMIN.can('subjective_grade');
   return '<div class="sub-card' + (graded ? ' graded' : '') + '">' +
     '<div class="sub-top">' +
       '<div><div class="sub-user"><span class="avatar">' + esc(initials(s.username)) + '</span>' + esc(s.username) + '</div>' +
       '<div class="sub-meta"><span title="' + esc(fullTime(s.submittedAt)) + '">' + relTime(s.submittedAt) + '</span>' +
       '<span>Out of ' + marks + '</span></div></div>' +
-      badge(graded ? 'graded' : 'ungraded', graded ? 'Graded' : 'Needs a score') +
+      '<div class="flex g2 center wrap">' +
+        (replaced ? '<span class="badge badge-success flat" title="Replaced ' + esc(fullTime(s.pdfReplacedAt)) + (s.pdfReplacedBy ? ' by ' + esc(s.pdfReplacedBy) : '') + '"><i class="ph ph-check-circle"></i> PDF updated</span>' : '') +
+        badge(graded ? 'graded' : 'ungraded', graded ? 'Graded' : 'Needs a score') +
+      '</div>' +
     '</div>' +
     (showQuestion && s.questionText ? '<div class="sub-q">' + esc(s.questionText) + '</div>' : '') +
     '<div class="sub-acts">' +
-      '<button class="btn btn-secondary btn-sm" onclick=\'openPdf(' + JSON.stringify(String(s.pdfUrl || '')) + ')\'><i class="ph ph-file-pdf"></i> Open answer PDF</button>' +
+      (hasPdf
+        ? '<button class="btn btn-secondary btn-sm" onclick=\'openPdf(' + JSON.stringify(String(s.pdfUrl)) + ')\'><i class="ph ph-file-pdf"></i> Open answer PDF</button>'
+        : '<button class="btn btn-secondary btn-sm" disabled><i class="ph ph-file-pdf"></i> No PDF attached</button>') +
+      (hasPdf && canGrade
+        ? '<button class="btn btn-quiet btn-sm" onclick="SUBJ_PDF.open(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\',\'' + escAttrJs(s.pdfUrl || '') + '\')" title="Overwrite the Drive file with an uploaded copy"><i class="ph ph-upload-simple"></i> Replace PDF</button>'
+        : '') +
+      (hasPdf && canGrade
+        ? '<button class="btn btn-quiet btn-sm" onclick="PDF_ANNOTATE.open(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\',\'' + escAttrJs(s.pdfUrl || '') + '\')" title="Draw on the PDF directly"><i class="ph ph-highlighter-circle"></i> Annotate PDF</button>'
+        : '') +
       (graded
         ? '<span class="sub-score">' + s.score + ' / ' + marks + '</span>' +
           '<span class="t-cap">by ' + esc(s.gradedBy || 'admin') + '</span>' +
@@ -3227,7 +2940,6 @@ async function saveGrade(ns, id, maxMarks, rerender){
   BUSY.stop();
 }
 
-/* Re-grade uses the same sheet as everything else, not window.prompt. */
 function regradeSheet(ns, id, defaultMarks, rerender){
   const s = SUBJ_STORE.all.find(x => x.id === id);
   if (!s) return;
@@ -3258,7 +2970,6 @@ async function _regradeCommit(id, marks){
   btn.classList.remove('loading');
 }
 
-/* ─────────────── Question of the day ─────────────── */
 const SUBJ_QOTD = {
   async load(force){
     const list = $('qotd-list');
@@ -3313,7 +3024,6 @@ const SUBJ_QOTD = {
   regrade(id){ regradeSheet('SUBJ_QOTD', id, 10, () => this.render()); }
 };
 
-/* ─────────────── Exam papers ─────────────── */
 const SUBJ_EXAM = {
   async load(force){
     const list = $('exam-list');
@@ -3341,6 +3051,364 @@ const SUBJ_EXAM = {
   regrade(id){ regradeSheet('SUBJ_EXAM', id, 100, () => this.render()); }
 };
 
+/* ═══════════════ REPLACE PDF — upload and overwrite ═══════════════════
+   For when the admin already has a replacement file (edited externally).
+   The in-browser annotation flow lives in PDF_ANNOTATE below; both
+   paths land on the same backend endpoint. */
+const SUBJ_PDF = {
+  _ctx: null,
+  _file: null,
+
+  open(id, username, pdfUrl){
+    const fileId = driveFileId(pdfUrl);
+    if (!fileId) {
+      TOAST.show('That submission has no Drive file to replace', 'error');
+      return;
+    }
+    this._ctx = { id, username, fileId, pdfUrl };
+    this._file = null;
+
+    MODAL.sheet('Replace PDF — ' + username,
+      '<div class="banner banner-warning"><i class="ph ph-warning"></i><span>' +
+        'The file in Drive is <b>overwritten in place</b>. The URL the student already has will point at the new content the moment you finish. ' +
+        'A backup of the original is kept for 30 days.' +
+      '</span></div>' +
+      '<dl class="dl mb4">' +
+        '<div><dt>Student</dt><dd class="mono">' + esc(username) + '</dd></div>' +
+        '<div><dt>Drive file</dt><dd class="mono" style="overflow-wrap:anywhere">' + esc(fileId) + '</dd></div>' +
+      '</dl>' +
+      '<div class="field"><span class="field-label">Step 1 — get the original</span>' +
+        '<div class="flex g2 wrap mt2">' +
+          '<button class="btn btn-secondary btn-sm" onclick="SUBJ_PDF.downloadOriginal()"><i class="ph ph-download-simple"></i> Download original</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick=\'openPdf(' + JSON.stringify(String(pdfUrl)) + ')\'><i class="ph ph-arrow-square-out"></i> Open in a new tab</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="MODAL.close(\'sheet\');PDF_ANNOTATE.open(\'' + escAttrJs(id) + '\',\'' + escAttrJs(username) + '\',\'' + escAttrJs(pdfUrl) + '\')"><i class="ph ph-highlighter-circle"></i> Annotate here instead</button>' +
+        '</div>' +
+        '<span class="field-hint mt2">Annotate in this console, or in any external PDF editor and save the copy to your device.</span>' +
+      '</div>' +
+      '<div class="field"><span class="field-label">Step 2 — upload the replacement</span>' +
+        '<label class="file-drop" for="pdf-replace-file" style="margin-top:var(--sp-2)">' +
+          '<input type="file" id="pdf-replace-file" accept="application/pdf,.pdf" onchange="SUBJ_PDF.onFile(this)">' +
+          '<i class="ph ph-file-pdf fd-icon"></i>' +
+          '<span class="fd-main" id="pdf-replace-name">Choose the updated PDF</span>' +
+          '<span class="fd-sub">Must be a PDF · under 10 MB</span>' +
+        '</label>' +
+      '</div>' +
+      '<div class="flex g2 mt4">' +
+        '<button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\')">Cancel</button>' +
+        '<button class="btn btn-primary" style="flex:1" id="pdf-replace-go" disabled onclick="SUBJ_PDF.commit()">Upload &amp; replace</button>' +
+      '</div>',
+      { wide:false });
+  },
+
+  downloadOriginal(){
+    if (!this._ctx) return;
+    const name = (this._ctx.username || 'submission') + '_original.pdf';
+    ADMIN.downloadScreenshot(this._ctx.pdfUrl, name);
+  },
+
+  onFile(input){
+    const f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) {
+      TOAST.show('That file is over 10 MB', 'error', 5000);
+      input.value = '';
+      $('pdf-replace-name').textContent = 'Choose the updated PDF';
+      this._file = null;
+      $('pdf-replace-go').disabled = true;
+      return;
+    }
+    const looksLikePdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if (!looksLikePdf) {
+      TOAST.show('That is not a PDF', 'error', 5000);
+      input.value = '';
+      $('pdf-replace-name').textContent = 'Choose the updated PDF';
+      this._file = null;
+      $('pdf-replace-go').disabled = true;
+      return;
+    }
+    this._file = f;
+    $('pdf-replace-name').textContent = f.name + ' · ' + (f.size / 1024).toFixed(0) + ' KB';
+    $('pdf-replace-go').disabled = false;
+  },
+
+  async commit(){
+    if (!this._file || !this._ctx) return;
+    const ctx = this._ctx;
+    const file = this._file;
+
+    const ok = await CONFIRM.ask({
+      title: 'Replace the PDF',
+      body: 'The Drive file is <b>overwritten</b>. <b>' + esc(ctx.username) + '</b> will see the new version immediately. ' +
+            'A backup of the original is kept for 30 days.',
+      confirmText: 'Replace', tone: 'danger'
+    });
+    if (!ok) return;
+
+    const btn = $('pdf-replace-go');
+    btn.classList.add('loading');
+    BUSY.start();
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = () => rej(new Error('Could not read that file.'));
+        r.readAsDataURL(file);
+      });
+
+      const res = await ADMIN.post('adminReplaceSubmissionPdf', {
+        id: ctx.id,
+        fileId: ctx.fileId,
+        fileData: dataUrl,
+        filename: file.name
+      });
+      if (!res.success) throw new Error(res.error || 'Replace failed.');
+
+      TOAST.show('PDF replaced — ' + ctx.username + ' now sees the updated version', 'success', 5000);
+      MODAL.close('sheet');
+
+      await SUBJ_STORE.load(true);
+      if (SUBJ_TABS.current === 'qotd') SUBJ_QOTD.render();
+      if (SUBJ_TABS.current === 'exam') SUBJ_EXAM.render();
+    } catch(e){
+      TOAST.show(e.message || 'Could not replace that PDF', 'error', 6000);
+    }
+    BUSY.stop();
+    btn.classList.remove('loading');
+  }
+};
+
+/* ═══════════════════ IN-BROWSER PDF ANNOTATION ═════════════════════════
+   pdf.js renders each page to a canvas; pdf-lib rebuilds a new PDF with
+   one JPEG per page, the annotations burned in. Saving posts the result
+   through adminReplaceSubmissionPdf — the Drive file is overwritten at
+   the same fileId, so the student sees the marked-up version the moment
+   this returns. */
+const PDF_ANNOTATE = {
+  ctx: null,
+  pdfDoc: null,
+  scale: 1.6,
+  pageNum: 1,
+  numPages: 1,
+  tool: 'pen',
+  color: '#e02020',
+  width: 4,
+  annotations: {},
+  _drawing: false,
+  _current: null,
+  _originalBytes: null,
+
+  async open(id, username, pdfUrl){
+    if (typeof pdfjsLib === 'undefined' || typeof PDFLib === 'undefined') {
+      TOAST.show('The PDF libraries did not load — check your connection and reload', 'error', 6000);
+      return;
+    }
+    const fileId = driveFileId(pdfUrl);
+    if (!fileId) return TOAST.show('That submission has no Drive file to annotate', 'error');
+
+    this.ctx = { id, username, fileId, pdfUrl };
+    this.annotations = {};
+    this.pageNum = 1;
+
+    $('an-title').textContent = 'Annotate — ' + username;
+    $('ov-annotate').classList.add('show');
+    document.body.style.overflow = 'hidden';
+    $('an-save').classList.add('loading');
+    $('an-save').disabled = true;
+
+    try {
+      const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl, fileId });
+      if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
+      const bytes = Uint8Array.from(atob(res.base64), c => c.charCodeAt(0));
+      this._originalBytes = bytes;
+      this.pdfDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      this.numPages = this.pdfDoc.numPages;
+      await this.renderPage(1);
+    } catch(e){
+      TOAST.show(e.message || 'Could not open that PDF', 'error', 6000);
+      this.close();
+      return;
+    }
+    $('an-save').classList.remove('loading');
+    $('an-save').disabled = false;
+  },
+
+  close(){
+    $('ov-annotate').classList.remove('show');
+    if (!document.querySelector('.overlay.show')) document.body.style.overflow = '';
+    this.pdfDoc = null;
+    this._originalBytes = null;
+  },
+
+  async renderPage(n){
+    this.pageNum = Math.max(1, Math.min(this.numPages, n));
+    const page = await this.pdfDoc.getPage(this.pageNum);
+    const viewport = page.getViewport({ scale: this.scale });
+
+    const pc = $('an-page-canvas'), oc = $('an-overlay-canvas');
+    pc.width = oc.width = viewport.width;
+    pc.height = oc.height = viewport.height;
+    $('an-stage').style.width = viewport.width + 'px';
+    $('an-stage').style.height = viewport.height + 'px';
+
+    await page.render({ canvasContext: pc.getContext('2d'), viewport }).promise;
+    this._bindOverlay(oc);
+    this._redrawOverlay();
+    $('an-pageinfo').textContent = 'Page ' + this.pageNum + ' / ' + this.numPages;
+  },
+  prevPage(){ if (this.pageNum > 1) this.renderPage(this.pageNum - 1); },
+  nextPage(){ if (this.pageNum < this.numPages) this.renderPage(this.pageNum + 1); },
+
+  setTool(t){
+    this.tool = t;
+    $$('.an-tool').forEach(b => b.classList.remove('active'));
+    const el = $('an-tool-' + t);
+    if (el) el.classList.add('active');
+  },
+  setColor(c, el){
+    this.color = c;
+    $$('.an-swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+  },
+
+  _pos(e, canvas){
+    const r = canvas.getBoundingClientRect();
+    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
+  },
+
+  _bindOverlay(canvas){
+    canvas.onpointerdown = e => {
+      if (this.tool === 'text') return this._placeText(e, canvas);
+      this._drawing = true;
+      try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
+      this._current = { tool: this.tool, color: this.color, width: this.width, points: [this._pos(e, canvas)] };
+      (this.annotations[this.pageNum] ??= []).push(this._current);
+    };
+    canvas.onpointermove = e => {
+      if (!this._drawing) return;
+      this._current.points.push(this._pos(e, canvas));
+      this._redrawOverlay();
+    };
+    canvas.onpointerup = canvas.onpointerleave = canvas.onpointercancel = () => {
+      this._drawing = false;
+      this._current = null;
+    };
+  },
+
+  _placeText(e, canvas){
+    const pos = this._pos(e, canvas);
+    const text = prompt('Comment text:');
+    if (!text) return;
+    (this.annotations[this.pageNum] ??= []).push({
+      tool: 'text', color: this.color, x: pos.x, y: pos.y, text, size: 18 + this.width * 2
+    });
+    this._redrawOverlay();
+  },
+
+  _redrawOverlay(){
+    const oc = $('an-overlay-canvas'), ctx = oc.getContext('2d');
+    ctx.clearRect(0, 0, oc.width, oc.height);
+    const list = this.annotations[this.pageNum] || [];
+    list.forEach(a => this._paintAnnotation(ctx, a));
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+  },
+
+  _paintAnnotation(ctx, a){
+    if (a.tool === 'text') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = a.color;
+      ctx.font = a.size + 'px Inter, sans-serif';
+      ctx.fillText(a.text, a.x, a.y);
+      return;
+    }
+    ctx.globalCompositeOperation = a.tool === 'eraser' ? 'destination-out' : 'source-over';
+    ctx.globalAlpha = a.tool === 'highlighter' ? 0.35 : 1;
+    ctx.strokeStyle = a.color;
+    ctx.lineWidth = a.tool === 'highlighter' ? a.width * 4 : a.width;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    a.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  },
+
+  undo(){
+    const list = this.annotations[this.pageNum];
+    if (list && list.length) { list.pop(); this._redrawOverlay(); }
+  },
+  clearPage(){
+    this.annotations[this.pageNum] = [];
+    this._redrawOverlay();
+  },
+
+  async save(){
+    if (!this.ctx) return;
+    const ok = await CONFIRM.ask({
+      title: 'Save annotated PDF',
+      body: 'This overwrites the Drive file for <b>' + esc(this.ctx.username) +
+            '</b>. They will see the marked-up version immediately. The original is backed up automatically.',
+      confirmText: 'Save & replace', tone: 'danger'
+    });
+    if (!ok) return;
+
+    const btn = $('an-save');
+    btn.classList.add('loading');
+    BUSY.start();
+    try {
+      const outDoc = await PDFLib.PDFDocument.create();
+      for (let n = 1; n <= this.numPages; n++) {
+        const jpegDataUrl = await this._compositePage(n);
+        const jpegBytes = Uint8Array.from(atob(jpegDataUrl.split(',')[1]), c => c.charCodeAt(0));
+        const img = await outDoc.embedJpg(jpegBytes);
+        const page = outDoc.addPage([img.width, img.height]);
+        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      }
+      const outBytes = await outDoc.save();
+
+      let binary = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < outBytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, outBytes.subarray(i, i + CHUNK));
+      }
+      const dataUrl = 'data:application/pdf;base64,' + btoa(binary);
+
+      const res = await ADMIN.post('adminReplaceSubmissionPdf', {
+        id: this.ctx.id, fileId: this.ctx.fileId,
+        fileData: dataUrl, filename: 'annotated_' + this.ctx.username + '.pdf'
+      });
+      if (!res.success) throw new Error(res.error || 'Replace failed.');
+
+      TOAST.show('Saved — ' + this.ctx.username + ' now sees the annotated version', 'success', 5000);
+      this.close();
+      await SUBJ_STORE.load(true);
+      if (SUBJ_TABS.current === 'qotd') SUBJ_QOTD.render();
+      if (SUBJ_TABS.current === 'exam') SUBJ_EXAM.render();
+    } catch(e){
+      TOAST.show(e.message || 'Could not save', 'error', 6000);
+    }
+    BUSY.stop();
+    btn.classList.remove('loading');
+  },
+
+  async _compositePage(n){
+    const page = await this.pdfDoc.getPage(n);
+    const viewport = page.getViewport({ scale: this.scale });
+    const c = document.createElement('canvas');
+    c.width = viewport.width; c.height = viewport.height;
+    const ctx = c.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    const list = this.annotations[n] || [];
+    list.forEach(a => this._paintAnnotation(ctx, a));
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    return c.toDataURL('image/jpeg', 0.85);
+  }
+};
+
 async function openPdf(pdfUrl){
   if (!pdfUrl) return TOAST.show('No PDF was attached to this submission', 'warning');
 
@@ -3362,8 +3430,6 @@ async function openPdf(pdfUrl){
   } catch(e){}
 
   try {
-    /* Send both keys: the backend accepts either, and passing fileId
-       takes the fragile URL-regex branch out of the path. */
     const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl, fileId });
     if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
 
@@ -3383,7 +3449,6 @@ async function openPdf(pdfUrl){
   }
 }
 
-/* ═══════════════════ ADD QUESTIONS (smart paste) ═══════════════════ */
 const SUBJADMIN = {
   _preview: [],
   parse(){
@@ -3518,7 +3583,6 @@ const SUBJ_UPLOAD = {
   }
 };
 
-/* ═══════════════════════ PROGRESS IMPORT ═══════════════════════ */
 const IMPORT = {
   onFilePicked(){
     const file = $('imp-file').files?.[0];
@@ -3578,7 +3642,6 @@ const IMPORT = {
   }
 };
 
-/* ═══════════════════════════ SETTINGS ═══════════════════════════ */
 const SETTINGS = {
   load(){
     const s = ADMIN.data.settings || {};
@@ -3597,8 +3660,6 @@ const SETTINGS = {
     } else { preview.hidden = true; status.textContent = 'No QR uploaded yet'; }
   },
 
-  /* Settings live in a spreadsheet cell, so the image has to fit.
-     Step the quality down until it does rather than failing outright. */
   onQrFile(evt){
     const file = evt.target.files[0];
     if (!file) return;
@@ -3664,9 +3725,6 @@ const SETTINGS = {
       if (res.success) {
         TOAST.show('Changes saved', 'success');
       } else {
-        // Batch failed — fall back to one request per key, and report
-        // exactly which ones didn't stick. A partial save must never
-        // read as "saved".
         const results = await Promise.all(settings.map(s =>
           ADMIN.post('adminUpdateSettings', { key:s.key, value:s.value })
             .then(r => ({ key:s.key, ok: !!(r && r.success), error: r?.error }))
@@ -3683,7 +3741,6 @@ const SETTINGS = {
   }
 };
 
-/* ═══════════════════════════ ACTIVITY ═══════════════════════════ */
 const LOGS = {
   _t: null,
   debounced(){ clearTimeout(this._t); this._t = setTimeout(() => this.filter(), 250); },
@@ -3725,7 +3782,6 @@ const LOGS = {
   goPage(p){ ADMIN.state.lPage = p; this.renderPage(this._rows()); UI.scrollTop(); }
 };
 
-/* ═══════════════════════════ PAGINATION ═══════════════════════════ */
 const PAGINATION = {
   render(containerId, current, total, cb, count){
     const el = $(containerId);
@@ -3743,7 +3799,6 @@ const PAGINATION = {
   }
 };
 
-/* Paints the sort arrow and aria-sort on whichever table asks. */
 function paintSort(tableId, key, dir){
   $$('#' + tableId + ' th.sortable').forEach(th => {
     const on = th.dataset.k === key;
@@ -3754,7 +3809,6 @@ function paintSort(tableId, key, dir){
   });
 }
 
-/* ═══════════════════════════ STUDENTS ═══════════════════════════ */
 const USERS = {
   selected: new Set(), _lastIdx: null, _rows: [], _t: null,
   _sortKey: 'createdAt', _sortDir: -1,
@@ -3872,7 +3926,6 @@ const USERS = {
     return 'Permanent';
   },
 
-  /* ── Selection ─────────────────────────────────────────────── */
   toggle(username, event){
     if (event && event.shiftKey && this._lastIdx !== null) {
       const idx = this._rows.findIndex(r => r.username === username);
@@ -3907,7 +3960,6 @@ const USERS = {
     this.updateBulkBar();
   },
 
-  /* ── Bulk ──────────────────────────────────────────────────── */
   async bulkGrantAccess(duration){
     if (!this.selected.size) return;
     const ok = await CONFIRM.ask({
@@ -3951,7 +4003,6 @@ const USERS = {
     ADMIN.refresh(['stats','users','payments']);
   },
 
-  /* ── Detail / edit ─────────────────────────────────────────── */
   view(username){
     const u = (ADMIN.data.users || []).find(x => x.username === username);
     if (!u) return;
@@ -4081,7 +4132,6 @@ const USERS = {
   }
 };
 
-/* ═══════════════════════════ PAYMENTS ═══════════════════════════ */
 const PAYMENTS = {
   selected: new Set(), _lastIdx: null, _rows: [], _t: null,
   _sortKey: 'submittedAt', _sortDir: -1,
@@ -4278,7 +4328,6 @@ const PAYMENTS = {
   }
 };
 
-/* ── Payment review dialog: one screen, verify or reject from it ── */
 MODAL.openReview = function(username){
   const p = (ADMIN.data.payments || []).find(x => x.username === username);
   if (!p) return;
@@ -4354,7 +4403,6 @@ MODAL.confirmReview = async function(username, status){
   btn.classList.remove('loading');
 };
 
-/* ═══════════════════════════ NAVIGATION ═══════════════════════════ */
 const UI = {
   current: 'today',
   TITLES: {
@@ -4417,7 +4465,7 @@ const UI = {
   railClose(){
     $('rail').classList.remove('open');
     $('rail-scrim').classList.remove('show');
-    if (!document.querySelector('.overlay.show')) document.body.style.overflow = '';
+    if (!document.querySelector('.overlay.show') && !$('ov-annotate').classList.contains('show')) document.body.style.overflow = '';
   },
 
   toggleMenu(e){
@@ -4432,13 +4480,9 @@ const UI = {
   }
 };
 
-/* ═══════════════════════════ WIRING ═══════════════════════════ */
-
-/* Sign-in form — a real form, so password managers and Enter work. */
 $('gate-form').addEventListener('submit', e => { e.preventDefault(); ADMIN.login(); });
 ['ad-user','ad-pass'].forEach(id => $(id).addEventListener('input', () => ADMIN.hideErr()));
 
-/* Mac users see ⌘, everyone else Ctrl. */
 if (/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)) {
   $('kbd-hint').textContent = '⌘K';
   $$('.menu-item .kb').forEach(k => k.textContent = '⌘K');
@@ -4462,6 +4506,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault(); PALETTE.open(); return;
   }
   if (e.key === 'Escape') {
+    if ($('ov-annotate').classList.contains('show')) { PDF_ANNOTATE.close(); return; }
     if ($('palette').classList.contains('show')) { PALETTE.close(); return; }
     UI.closeMenu();
     if ($('ov-confirm').classList.contains('show')) { CONFIRM._no(); return; }
@@ -4477,11 +4522,9 @@ document.addEventListener('keydown', e => {
   }
 });
 
-/* Quiet background refresh of whatever the person is looking at.
-   Skipped while a dialog is open so nothing moves under their hands. */
 setInterval(() => {
   if (document.hidden || !ADMIN.creds) return;
-  if (document.querySelector('.overlay.show, #palette.show')) return;
+  if (document.querySelector('.overlay.show, #palette.show') || $('ov-annotate').classList.contains('show')) return;
   const scope = ({
     today:['stats'], dashboard:['stats'], users:['users'], payments:['payments'],
     admins:['admins'], weeklysets:['weeklysets'], qreports:['qreports'],
@@ -4493,8 +4536,6 @@ setInterval(() => {
 setInterval(() => ADMIN.paintSync(), 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) ADMIN.paintSync(); });
 
-/* Label the rail's exit correctly: "Switch to student" only when the
-   same person is signed in on both sides. */
 (function(){
   try {
     const s = JSON.parse(localStorage.getItem(LS_USER) || 'null');
@@ -4512,9 +4553,6 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) ADMI
   } catch(e){}
 })();
 
-/* ── Connection status ──
-   The console stays usable offline (rendered data is already in memory);
-   we only surface the state and re-sync the moment we're back. */
 (function(){
   const pill = $('offline-pill');
   let wasOffline = !navigator.onLine;
