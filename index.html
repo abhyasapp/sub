@@ -3,7 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F2F4F3">
+<meta name="theme-color" content="#F2F4F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Abhyas">
+<meta name="format-detection" content="telephone=no">
 <meta name="color-scheme" content="light dark">
 <script src="config.js"></script>
 <script>(function(){
@@ -19,6 +25,15 @@
       if (m) m.setAttribute('content', '#080B14');
     }
   } catch(e) {}
+})();</script>
+<script>(function(){
+  /* A returning student with a saved session should never see the sign-in
+     form flash before the redirect. Mark the document now; APP.setMode()
+     clears it the moment the real destination is known. */
+  try{
+    var s = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
+    if (s && s.type && s.username) document.documentElement.classList.add('boot-session');
+  }catch(e){}
 })();</script>
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
@@ -185,7 +200,9 @@
 html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 body{
   font-family:var(--font);font-size:var(--fs-body);line-height:1.5;
-  background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;
+  background:var(--bg);color:var(--ink);overflow-x:hidden;
+  min-height:100vh;min-height:100dvh;
+  overscroll-behavior-y:none;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale
 }
 :focus{outline:none}
@@ -215,8 +232,27 @@ a:hover{text-decoration:underline}
 .t-cap{font-size:var(--fs-cap);color:var(--ink-3)}
 [hidden]{display:none!important}
 
+/* iOS Safari zooms the whole page whenever a focused field is under 16px.
+   Everything else stays on the 14px scale; only real inputs are bumped. */
+@media (pointer:coarse){
+  .input,input,select,textarea{font-size:16px}
+  .trial-panel .timer{font-size:2rem}
+}
+/* Kills the 300ms double-tap zoom delay on every tappable thing. */
+button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manipulation}
+
+/* Boot gate: hide the sign-in form while a saved session is resolved. */
+html.boot-session #auth-tabs,
+html.boot-session #form-login,
+html.boot-session #g-signin-wrap{display:none!important}
+#boot-wait{display:none}
+html.boot-session #boot-wait{display:block}
+
+/* Toasts clear the cookie notice instead of stacking on top of it. */
+body.cookie-open #toasts{bottom:calc(var(--sp-5) + var(--safe-b) + 80px)}
+
 /* ── Page frame ───────────────────────────────────────────────────── */
-.page{max-width:460px;margin:0 auto;padding:var(--sp-6) var(--sp-4) var(--sp-16)}
+.page{max-width:460px;margin:0 auto;padding:calc(var(--sp-5) + var(--safe-t)) var(--sp-4) var(--sp-10)}
 .wide{max-width:680px;margin:0 auto;padding:0 var(--sp-4)}
 
 .theme-toggle{
@@ -229,8 +265,8 @@ a:hover{text-decoration:underline}
 .theme-toggle:hover{color:var(--ink);background:var(--bg-sunken)}
 
 /* ── Masthead ─────────────────────────────────────────────────────── */
-.mast{text-align:center;margin-bottom:var(--sp-6)}
-.mast img{width:56px;height:56px;margin:0 auto var(--sp-3);border-radius:14px}
+.mast{text-align:center;margin-bottom:var(--sp-5)}
+.mast img{width:52px;height:52px;margin:0 auto var(--sp-2);border-radius:13px}
 .mast h1{font-size:var(--fs-display);font-weight:700;letter-spacing:-.022em}
 .mast .tag{font-size:var(--fs-callout);color:var(--ink-2);margin-top:var(--sp-1)}
 .mast .what{font-size:var(--fs-foot);color:var(--ink-3);margin-top:var(--sp-1)}
@@ -240,7 +276,7 @@ a:hover{text-decoration:underline}
    button cannot work, and saying so up front beats a failed tap. */
 .net{
   display:inline-flex;align-items:center;gap:var(--sp-2);
-  margin:var(--sp-4) auto 0;padding:.3rem var(--sp-3);
+  margin:var(--sp-3) auto 0;padding:.3rem var(--sp-3);
   border-radius:var(--r-full);background:var(--bg-sunken);
   font-size:var(--fs-cap);color:var(--ink-2);font-weight:550
 }
@@ -252,7 +288,7 @@ a:hover{text-decoration:underline}
 /* ── The card ─────────────────────────────────────────────────────── */
 .card{
   background:var(--surface);border:1px solid var(--sep);
-  border-radius:var(--r-sheet);padding:var(--sp-6);box-shadow:var(--sh-2)
+  border-radius:var(--r-sheet);padding:var(--sp-5);box-shadow:var(--sh-2)
 }
 @media (max-width:420px){.card{padding:var(--sp-5) var(--sp-4);border-radius:var(--r-panel)}}
 
@@ -428,7 +464,7 @@ a:hover{text-decoration:underline}
 }
 
 /* ── Below the fold ───────────────────────────────────────────────── */
-.section{margin-top:var(--sp-16)}
+.section{margin-top:var(--sp-12)}
 .section h2{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em;margin-bottom:var(--sp-2)}
 .section > p.lede{font-size:var(--fs-callout);color:var(--ink-2);line-height:1.7;margin-bottom:var(--sp-5);max-width:62ch}
 
@@ -467,7 +503,7 @@ details.faq p{
 }
 
 .foot{
-  margin-top:var(--sp-16);padding-top:var(--sp-5);border-top:1px solid var(--sep);
+  margin-top:var(--sp-12);padding-top:var(--sp-5);border-top:1px solid var(--sep);
   text-align:center;font-size:var(--fs-cap);color:var(--ink-4)
 }
 
@@ -514,7 +550,7 @@ details.faq p{
     <h1>Abhyas</h1>
     <p class="tag">Your path to mastery</p>
     <p class="what">Loksewa Civil Engineering practice — online or offline</p>
-    <div class="net"><span class="ndot" id="ndot"></span><span id="nstat">Checking the connection…</span></div>
+    <div class="net" role="status" aria-live="polite"><span class="ndot" id="ndot" aria-hidden="true"></span><span id="nstat">Checking the connection…</span></div>
   </header>
 
   <div class="card" id="main-card">
@@ -525,6 +561,13 @@ details.faq p{
         <div class="spin-lg"></div>
         <p>Welcome back<span id="redir-name"></span> — opening your dashboard.</p>
         <button class="btn btn-sec" onclick="APP.logout()">Not you? Log out</button>
+      </div>
+    </div>
+
+    <div id="boot-wait">
+      <div class="redirect-card" style="padding:var(--sp-8) var(--sp-2) var(--sp-4)">
+        <div class="spin-lg"></div>
+        <p>Checking your session…</p>
       </div>
     </div>
 
@@ -635,6 +678,13 @@ details.faq p{
         <div class="timer" id="trial-timer">23:59:59</div>
         <div class="note">Pay any time to keep your access permanently.</div>
       </div>
+      <div class="banner banner-warning" id="verify-banner" style="display:none">
+        <i class="ph ph-envelope-simple"></i>
+        <div style="flex:1">
+          <div id="verify-text">Confirm your email address so you can reset your password later.</div>
+          <button class="btn btn-sm btn-sec" style="width:auto;margin-top:var(--sp-2)" id="verify-resend" onclick="APP.resendVerification()">Send the link again</button>
+        </div>
+      </div>
       <div class="banner banner-info" id="mobile-prompt-trial" style="display:none">
         <i class="ph ph-phone"></i>
         <div style="flex:1">
@@ -705,6 +755,7 @@ details.faq p{
         <div class="big" id="st-icon"><i class="ph ph-clock-countdown"></i></div>
         <h2 id="st-title">Payment sent</h2>
         <p id="st-msg">We've got it. An admin will check it and your access opens as soon as it's approved.</p>
+        <button class="btn" id="btn-recheck" onclick="APP.refreshAccess(false)">Check if it's approved</button>
         <button class="btn btn-sec" onclick="APP.logout()">Back to sign in</button>
       </div>
     </div>
@@ -915,8 +966,15 @@ const APP = {
 
   /* ── Session storage ────────────────────────────────────────────── */
   getSession(){
-    try { const raw = localStorage.getItem(LS_USER); return raw ? JSON.parse(raw) : null; }
-    catch(e){ localStorage.removeItem(LS_USER); return null; }
+    try {
+      const raw = localStorage.getItem(LS_USER);
+      if (!raw) return null;
+      const s = JSON.parse(raw);
+      if (!s || !s.type || !s.username) return null;
+      if (s.type === 'user' && (!s.access || typeof s.access !== 'object')) s.access = { level:'unknown' };
+      return s;
+    }
+    catch(e){ try { localStorage.removeItem(LS_USER); } catch(_){} return null; }
   },
   saveSession(obj){ this.session = obj; try { localStorage.setItem(LS_USER, JSON.stringify(obj)); } catch(e){} },
   clearSession(){ this.session = null; try { localStorage.removeItem(LS_USER); } catch(e){} },
@@ -931,6 +989,7 @@ const APP = {
   /* ── Mode switching ─────────────────────────────────────────────── */
   setMode(m){
     this.mode = m;
+    document.documentElement.classList.remove('boot-session');
 
     const tabs = $('auth-tabs');
     if (tabs) {
@@ -965,15 +1024,20 @@ const APP = {
       this._payRefreshTimer = null;
     }
 
-    if (m === 'trial')   this.renderMobilePrompt('mobile-prompt-trial');
+    if (m === 'trial')   { this.renderMobilePrompt('mobile-prompt-trial'); this.renderVerifyPrompt(); }
     if (m === 'payment') this.renderMobilePrompt('mobile-prompt-pay');
+
+    /* While a payment is with an admin, check quietly for the approval so
+       the student doesn't have to sign out and back in to notice it. */
+    if (m === 'status') this.startStatusPoll(); else this.stopStatusPoll();
 
     /* Only move focus when the person asked for the switch — never on
        the first paint, which would scroll a phone to the field and pop
        the keyboard before they've read anything. */
     if (this._userSwitched) {
       const first = $('form-' + m)?.querySelector('input:not([type=hidden])');
-      if (first && matchMedia('(pointer:fine)').matches) setTimeout(() => first.focus(), 60);
+      const fine = !window.matchMedia || matchMedia('(pointer:fine)').matches;
+      if (first && fine) setTimeout(() => first.focus(), 60);
     }
     this._userSwitched = true;
   },
@@ -982,20 +1046,39 @@ const APP = {
   hideErr(){ $('err').classList.remove('show'); },
 
   /* ── Transport ──────────────────────────────────────────────────── */
-  async api(action, params = {}, method = 'GET'){
+  /* Apps Script can hang for a long time on a poor connection, so every
+     call carries its own deadline rather than leaving a button spinning
+     forever. Credentials always go by POST — the backend rejects them in
+     a query string, and a URL would end up in history and the request log. */
+  async api(action, params = {}, method = 'POST', timeoutMs = 20000){
+    const ctl = ('AbortController' in window) ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
     try {
+      let r;
       if (method === 'GET') {
         const qs = new URLSearchParams(params).toString();
-        const r = await fetch(GAS_URL + '?action=' + action + (qs ? '&' + qs : ''), { cache:'no-store' });
-        return await r.json();
+        r = await fetch(GAS_URL + '?action=' + action + (qs ? '&' + qs : ''),
+                        { cache:'no-store', signal: ctl && ctl.signal });
+      } else {
+        r = await fetch(GAS_URL, {
+          method:'POST', headers:{ 'Content-Type':'text/plain' },
+          body: JSON.stringify({ action, ...params }),
+          signal: ctl && ctl.signal
+        });
       }
-      const r = await fetch(GAS_URL, {
-        method:'POST', headers:{ 'Content-Type':'text/plain' },
-        body: JSON.stringify({ action, ...params })
-      });
-      return await r.json();
+      if (!r.ok) return { success:false, error:'The server replied with an error (' + r.status + '). Try again in a moment.' };
+      const data = await r.json();
+      if (data && data.sessionInvalid) this.clearSession();
+      return data;
     } catch(e){
-      return { success:false, error:'Could not reach the server. Check your connection and try again.' };
+      if (e && e.name === 'AbortError') {
+        return { success:false, error:'That took too long. Check your connection and try again.' };
+      }
+      return { success:false, error: navigator.onLine
+        ? 'Could not reach the server. Try again in a moment.'
+        : 'You are offline. Reconnect and try again.' };
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   },
 
@@ -1059,6 +1142,14 @@ const APP = {
 
     if (res.isAdmin) {
       this.saveAdminToken(u, res.adminToken, res.expiresInMs);
+
+      /* The backend refuses every admin action until the starter password is
+         replaced, so send them straight to the console that can do it. */
+      if (res.mustChangePassword) {
+        this.toast('Set a new admin password to carry on.', 5000);
+        setTimeout(() => { window.location.href = 'admin.html'; }, 500);
+        return;
+      }
 
       /* Dual-role accounts land in the student app; the admin console is
          one tap away from inside it. */
@@ -1140,10 +1231,18 @@ const APP = {
       type:'user', username:user, name, email, mobile,
       token: res.token,
       access: { level:'trial', trialExpiresAt: res.trialExpiresAt, permanent:false },
-      settings: {}, lastVerified: Date.now()
+      settings: {}, lastVerified: Date.now(),
+      emailVerified: res.emailVerified === true
     });
     this.startTrialTimer(new Date(res.trialExpiresAt));
     this.setMode('trial');
+    const vt = $('verify-text');
+    if (vt) {
+      vt.textContent = res.verificationEmailSent
+        ? 'We sent a confirmation link to ' + email + '. Open it so you can reset your password later.'
+        : 'Confirm your email address so you can reset your password later.';
+    }
+    this.renderVerifyPrompt();
   },
 
   /* ── Routing by access level ────────────────────────────────────── */
@@ -1156,7 +1255,8 @@ const APP = {
       username: user.username || res.username,
       name: user.name, email: user.email, mobile: user.mobile || '',
       token: res.token, access, settings: res.settings || {},
-      lastVerified: Date.now(), adminCapable: !!res.adminCapable
+      lastVerified: Date.now(), adminCapable: !!res.adminCapable,
+      emailVerified: user.emailVerified !== false
     });
 
     if (access.level === 'permanent') {
@@ -1276,8 +1376,12 @@ const APP = {
         this.setMode('payment');
         return;
       }
+      /* The trial length is an admin setting, so it can exceed a day —
+         "2d 05:14:09" reads better than "53:14:09". */
       const pad = n => String(n).padStart(2, '0');
-      el.textContent = pad(Math.floor(diff / 3600000)) + ':' +
+      const days = Math.floor(diff / 86400000);
+      const hours = days ? Math.floor((diff % 86400000) / 3600000) : Math.floor(diff / 3600000);
+      el.textContent = (days ? days + 'd ' : '') + pad(hours) + ':' +
                        pad(Math.floor((diff % 3600000) / 60000)) + ':' +
                        pad(Math.floor((diff % 60000) / 1000));
     };
@@ -1305,6 +1409,75 @@ const APP = {
     this.toast('Mobile number saved.');
   },
 
+  /* ── Email verification ─────────────────────────────────────────── */
+  renderVerifyPrompt(){
+    const el = $('verify-banner');
+    if (!el) return;
+    const s = this.session;
+    const unverified = !!(s && s.emailVerified === false);
+    el.style.display = unverified ? 'flex' : 'none';
+  },
+  async resendVerification(){
+    if (!this.session || !this.online) return this.showErr('You need a connection to send that again.');
+    const btn = $('verify-resend');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    const res = await this.api('resendVerification', { username:this.session.username, token:this.session.token });
+    if (btn) { btn.disabled = false; btn.textContent = 'Send the link again'; }
+    if (!res.success) return this.showErr(res.error || 'Could not send that email right now.');
+    if (res.alreadyVerified) {
+      this.session.emailVerified = true;
+      this.saveSession(this.session);
+      this.renderVerifyPrompt();
+      return this.toast('Your email is already confirmed.');
+    }
+    this.toast('Sent — open the link in your inbox.', 5000);
+  },
+
+  /* ── Access refresh (payment awaiting review) ────────────────────── */
+  startStatusPoll(){
+    this.stopStatusPoll();
+    this._statusTimer = setInterval(() => this.refreshAccess(true), 30000);
+  },
+  stopStatusPoll(){
+    if (this._statusTimer) { clearInterval(this._statusTimer); this._statusTimer = null; }
+  },
+  async refreshAccess(quiet){
+    if (!this.session || this.session.type !== 'user') return;
+    if (!this.online) { if (!quiet) this.showErr('You are offline. Reconnect and try again.'); return; }
+    const btn = $('btn-recheck');
+    if (!quiet && btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Checking…'; }
+    const res = await this.api('checkSession', { token:this.session.token, username:this.session.username });
+    if (!quiet && btn) { btn.disabled = false; btn.textContent = "Check if it's approved"; }
+    if (!res.success) {
+      if (res.sessionInvalid) {
+        this.stopStatusPoll();
+        this.showErr('Your session expired. Sign in again to pick up where you left off.');
+        this.setMode('login');
+        return;
+      }
+      if (!quiet) this.showErr(res.error || 'Could not check that right now.');
+      return;
+    }
+    const access = computeAccessLevel(res, res.user || {});
+    if (access.level === 'permanent') {
+      this.stopStatusPoll();
+      this.session.access = access;
+      this.saveSession(this.session);
+      this.toast('Payment approved — opening your dashboard.');
+      this.enterDashboard(this.session.name || this.session.username);
+      return;
+    }
+    if (access.level === 'expired') {
+      this.session.access = access;
+      this.saveSession(this.session);
+      $('pay-banner').style.display = 'flex';
+      this.setMode('payment');
+      this.toast('That payment was not approved. Check the details and send it again.', 6000);
+      return;
+    }
+    if (!quiet) this.toast('Still with the admin — we will open your dashboard as soon as it is approved.', 5000);
+  },
+
   /* ── Payment ────────────────────────────────────────────────────── */
   async loadPaymentUI(){
     this.updatePayButtonState();
@@ -1313,7 +1486,7 @@ const APP = {
 
     if (this.online) {
       try {
-        const r = await this.api('getSettings', {});   // public, no credentials
+        const r = await this.api('getSettings', {}, 'GET');   // public, no credentials
         if (r.success) s = r.settings || {};
         else { fetchFailed = true; console.warn('getSettings returned success:false —', r.error || '(no message)'); }
       } catch(e){ fetchFailed = true; console.warn('getSettings threw —', e); }
@@ -1403,6 +1576,7 @@ const APP = {
 
   logout(){
     this.clearTrialTimer();
+    this.stopStatusPoll();
     this.clearSession();
     try { localStorage.removeItem(LS_ADMIN); } catch(e){}
     this.fileData = null;
@@ -1444,10 +1618,12 @@ const COOKIE_NOTICE = {
   init(){
     try { if (localStorage.getItem(this.KEY) === '1') return; } catch(e){ return; }
     $('cookie-banner').hidden = false;
+    document.body.classList.add('cookie-open');
   },
   accept(){
     try { localStorage.setItem(this.KEY, '1'); } catch(e){}
     $('cookie-banner').hidden = true;
+    document.body.classList.remove('cookie-open');
   }
 };
 

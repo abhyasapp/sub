@@ -22,5 +22,20 @@
           cloud-sync.js Personal Drive backup, manifest.json PWA
           metadata, firebase-config.js, aligned SW shell list,
           admin permissions UI, Smart Paste upload/commit
+   1.08 — client realigned with backend v1.11: getFile now sends the
+          session (GETFILE_REQUIRES_AUTH) and is paced under the
+          per-account rate limit; students read their own marked PDF
+          through getMySubmissionPdf; admins read and annotate answer
+          papers through adminDownloadSubmissionPdf; annotations are
+          stamped onto the original PDF instead of flattening it;
+          fixed the ReferenceError that aborted SUBJ.init(); shared
+          pdf-viewer.js precached; iOS focus-zoom and 100dvh fixes.
+   1.09 — one shared PDF surface (pdf-viewer.js) for students and admins:
+          reader mode plus an annotation mode that stores ink in PDF
+          points and stamps it onto the original pages. The console's
+          duplicate viewer is gone. Mobile quiz gained a fixed
+          Back / Next / Finish bar above the tab bar, a density pass so a
+          question and its options fit one screen, and guards against a
+          double tap skipping a question or submitting twice.
    ═══════════════════════════════════════════════════════════════════════ */
-const APP_VERSION = '1.07';
+const APP_VERSION = '1.09';

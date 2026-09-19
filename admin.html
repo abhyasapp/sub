@@ -3,8 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F6F7F6">
+<meta name="theme-color" content="#F6F7F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0F1213" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Abhyas Admin">
+<meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex,nofollow">
 <script src="config.js"></script>
 <script>(function(){
   try{
@@ -86,7 +92,8 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{height:100%;-webkit-text-size-adjust:100%}
 body{font-family:var(--font);font-size:var(--fs-body);line-height:1.5;font-weight:450;
-  background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;
+  background:var(--bg);color:var(--ink);overflow-x:hidden;
+  min-height:100vh;min-height:100dvh;overscroll-behavior-y:none;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 :focus{outline:none}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r-control)}
@@ -238,12 +245,12 @@ input[type=checkbox],input[type=radio]{width:16px;height:16px;accent-color:var(-
 .dl div{min-width:0}
 .dl dt{font-size:var(--fs-cap);color:var(--ink-3);font-weight:550;margin-bottom:2px}
 .dl dd{font-size:var(--fs-callout);color:var(--ink);font-weight:500;overflow-wrap:anywhere}
-#shell{display:flex;min-height:100vh}
+#shell{display:flex;min-height:100vh;min-height:100dvh}
 #app{display:none}
 #app.on{display:block}
 #rail{width:var(--rail-w);flex-shrink:0;background:var(--surface);border-right:1px solid var(--sep);
-  display:flex;flex-direction:column;padding:var(--sp-3);position:sticky;top:0;height:100vh;
-  overflow-y:auto;transition:width var(--dur-base) var(--ease)}
+  display:flex;flex-direction:column;padding:var(--sp-3);position:sticky;top:0;height:100vh;height:100dvh;
+  overflow-y:auto;overscroll-behavior:contain;transition:width var(--dur-base) var(--ease)}
 #rail-brand{display:flex;align-items:center;gap:var(--sp-2);
   padding:var(--sp-2) var(--sp-2) var(--sp-4);font-weight:650;font-size:var(--fs-t3);color:var(--ink)}
 #rail-brand img{width:26px;height:26px;border-radius:7px;flex-shrink:0}
@@ -325,8 +332,8 @@ kbd{font-family:var(--mono);font-size:.625rem;background:var(--surface);
 .menu-item.danger i{color:var(--danger)}
 .menu-item.danger:hover{background:var(--danger-soft)}
 .menu-sep{height:1px;background:var(--sep);margin:var(--sp-1) 0}
-#content{flex:1;padding:var(--sp-6) var(--sp-6) var(--sp-16)}
-@media (max-width:640px){#content{padding:var(--sp-4) var(--sp-4) var(--sp-12)}}
+#content{flex:1;padding:var(--sp-5) var(--sp-5) var(--sp-12)}
+@media (max-width:640px){#content{padding:var(--sp-3) var(--sp-3) calc(var(--sp-10) + var(--safe-b))}}
 .inner{max-width:var(--content-max);margin:0 auto}
 .page-head{margin-bottom:var(--sp-5);display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);flex-wrap:wrap}
 .page-head h1{font-size:var(--fs-t1);font-weight:700;letter-spacing:-.017em}
@@ -484,8 +491,10 @@ td.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
   .dialog-foot{padding-bottom:calc(var(--sp-4) + var(--safe-b))}
   @keyframes sheet-in{from{transform:translateY(100%)}to{transform:translateY(0)}}
 }
+/* Above the shared PDF reader (10010) — a failed save has to be visible
+   while the paper is still open. */
 #toasts{position:fixed;bottom:var(--sp-6);left:50%;transform:translateX(-50%);
-  z-index:var(--z-toast);display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);
+  z-index:10030;display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);
   pointer-events:none;width:calc(100vw - 2rem);max-width:400px}
 @media (max-width:820px){#toasts{bottom:calc(var(--sp-4) + var(--safe-b))}}
 .toast{display:flex;align-items:flex-start;gap:var(--sp-2);width:100%;
@@ -665,27 +674,28 @@ html.session-bridge .gate-alt,
 .right{text-align:right}
 .hidden,[hidden]{display:none!important}
 
-/* ── 21. Annotate overlay ─────────────────────────────────────────── */
-#ov-annotate{position:fixed;inset:0;z-index:900;display:none;background:var(--bg);flex-direction:column}
-#ov-annotate.show{display:flex}
-.an-topbar{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-4);
-  border-bottom:1px solid var(--sep);background:var(--surface);flex-wrap:wrap;flex-shrink:0}
-.an-topbar .grow{flex:1}
-.an-tool{width:34px;height:34px;border-radius:var(--r-input);display:flex;align-items:center;justify-content:center;
-  color:var(--ink-2);background:var(--bg-grouped)}
-.an-tool.active{background:var(--accent);color:var(--on-accent)}
-.an-swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--sep-strong);cursor:pointer;flex-shrink:0}
-.an-swatch.active{border-color:var(--ink)}
-#an-canvas-wrap{flex:1;overflow:auto;display:flex;justify-content:center;padding:var(--sp-6);background:var(--bg-grouped)}
-#an-stage{position:relative;box-shadow:var(--sh-2);background:#fff;flex-shrink:0}
-#an-page-canvas,#an-overlay-canvas{position:absolute;top:0;left:0}
-#an-overlay-canvas{cursor:crosshair;touch-action:none}
-.an-pagebar{display:flex;align-items:center;gap:var(--sp-2);justify-content:center;padding:var(--sp-2);
-  border-top:1px solid var(--sep);background:var(--surface);flex-shrink:0}
-/* Dialogs opened while the annotate overlay (z-index:900) is up must
-   sit above it — otherwise the confirm dialog opens behind and the
-   user never sees it. */
-#ov-confirm,#ov-pwd,#ov-review,#ov-user,#ov-sheet{ z-index:1000; }
+/* iOS Safari zooms the page whenever a focused field is under 16px — which
+   on this console means every search box and every score field. */
+@media (pointer:coarse){
+  .input,.select,.textarea,input,select,textarea,.grade-input,.feedback-input{font-size:16px}
+}
+button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manipulation}
+.dialog-body,.palette-list,.picker-list,#rail,.sub-q,.table-wrap{overscroll-behavior:contain}
+
+/* Tighter on a phone: this console is used one-handed between classes. */
+@media (max-width:640px){
+  .panel{padding:var(--sp-4);border-radius:var(--r-card)}
+  .page-head{margin-bottom:var(--sp-4)}
+  .section-head{margin:var(--sp-6) 0 var(--sp-2)}
+  .sub-card{padding:var(--sp-3)}
+  .toolbar{gap:var(--sp-1)}
+  .toolbar .search{min-width:140px}
+}
+
+/* Dialogs must sit above the shared PDF viewer (z-index 10010), otherwise a
+   confirm opened from the marking screen renders behind it and never gets
+   answered. */
+#ov-confirm,#ov-pwd,#ov-review,#ov-user,#ov-sheet{ z-index:10020; }
 </style>
 </head>
 <body>
@@ -1040,7 +1050,10 @@ html.session-bridge .gate-alt,
 
         <div id="subj-panel-qotd" role="tabpanel">
           <div class="toolbar">
+            <button class="icon-btn sm" onclick="SUBJ_QOTD.shiftDate(-1)" aria-label="Previous day" title="Previous day"><i class="ph ph-caret-left"></i></button>
             <label class="inline">Date <input class="input" type="date" id="qotd-date" onchange="SUBJ_QOTD.render()"></label>
+            <button class="icon-btn sm" onclick="SUBJ_QOTD.shiftDate(1)" aria-label="Next day" title="Next day"><i class="ph ph-caret-right"></i></button>
+            <button class="btn btn-quiet btn-sm" onclick="SUBJ_QOTD.goToday()">Today</button>
             <select class="select" id="qotd-status" onchange="SUBJ_QOTD.render()" aria-label="Status">
               <option value="all">All</option><option value="pending">Ungraded</option><option value="graded">Graded</option>
             </select>
@@ -1300,48 +1313,6 @@ html.session-bridge .gate-alt,
   </div>
 </div>
 
-<!-- ═══════════════════════ ANNOTATE OVERLAY ═══════════════════════ -->
-<div id="ov-annotate">
-  <div class="an-topbar">
-    <button class="icon-btn" onclick="PDF_ANNOTATE.close()" aria-label="Close"><i class="ph ph-x"></i></button>
-    <span class="t-callout" style="font-weight:600" id="an-title">Annotate</span>
-
-    <div class="grow"></div>
-
-    <button class="an-tool active" id="an-tool-pen" onclick="PDF_ANNOTATE.setTool('pen')" title="Pen"><i class="ph ph-pen"></i></button>
-    <button class="an-tool" id="an-tool-highlighter" onclick="PDF_ANNOTATE.setTool('highlighter')" title="Highlighter"><i class="ph ph-highlighter-circle"></i></button>
-    <button class="an-tool" id="an-tool-text" onclick="PDF_ANNOTATE.setTool('text')" title="Add text"><i class="ph ph-text-t"></i></button>
-    <button class="an-tool" id="an-tool-eraser" onclick="PDF_ANNOTATE.setTool('eraser')" title="Eraser"><i class="ph ph-eraser"></i></button>
-
-    <span class="an-swatch active" style="background:#e02020" onclick="PDF_ANNOTATE.setColor('#e02020',this)"></span>
-    <span class="an-swatch" style="background:#1e7a4c" onclick="PDF_ANNOTATE.setColor('#1e7a4c',this)"></span>
-    <span class="an-swatch" style="background:#1a56db" onclick="PDF_ANNOTATE.setColor('#1a56db',this)"></span>
-    <span class="an-swatch" style="background:#111" onclick="PDF_ANNOTATE.setColor('#111111',this)"></span>
-
-    <select class="select" id="an-width" onchange="PDF_ANNOTATE.width=+this.value" style="height:30px;width:70px">
-      <option value="2">Thin</option><option value="4" selected>Med</option><option value="8">Thick</option>
-    </select>
-
-    <button class="icon-btn" onclick="PDF_ANNOTATE.undo()" title="Undo"><i class="ph ph-arrow-u-up-left"></i></button>
-    <button class="icon-btn" onclick="PDF_ANNOTATE.clearPage()" title="Clear this page"><i class="ph ph-trash"></i></button>
-
-    <button class="btn btn-primary btn-sm" id="an-save" onclick="PDF_ANNOTATE.save()"><i class="ph ph-check"></i> Save &amp; replace</button>
-  </div>
-
-  <div id="an-canvas-wrap">
-    <div id="an-stage">
-      <canvas id="an-page-canvas"></canvas>
-      <canvas id="an-overlay-canvas"></canvas>
-    </div>
-  </div>
-
-  <div class="an-pagebar">
-    <button class="icon-btn sm" onclick="PDF_ANNOTATE.prevPage()" aria-label="Previous page"><i class="ph ph-caret-left"></i></button>
-    <span class="t-cap" id="an-pageinfo">Page 1 / 1</span>
-    <button class="icon-btn sm" onclick="PDF_ANNOTATE.nextPage()" aria-label="Next page"><i class="ph ph-caret-right"></i></button>
-  </div>
-</div>
-
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <script src="version.js"></script>
@@ -1357,6 +1328,7 @@ html.session-bridge .gate-alt,
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 </script>
+<script src="pdf-viewer.js"></script>
 <script>
 'use strict';
 
@@ -1637,6 +1609,14 @@ const ADMIN = {
     this._gateBusy(true);
     document.documentElement.classList.add('session-bridge');
 
+    /* If the exchange never settles — a hung request, a dead deployment —
+       fall back to the password form rather than a permanent spinner. */
+    clearTimeout(this._bridgeTimer);
+    this._bridgeTimer = setTimeout(() => {
+      this._gateBusy(false);
+      document.documentElement.classList.remove('session-bridge');
+    }, 12000);
+
     this.post('adminSwitchFromUser',
               { username: s.username, token: userToken },
               { skipTokenCheck: true })
@@ -1671,6 +1651,7 @@ const ADMIN = {
     const g = $('gate'), b = $('gate-busy');
     if (g) g.classList.toggle('busy', on);
     if (b) b.hidden = !on;
+    if (!on) clearTimeout(this._bridgeTimer);
   },
 
   async login(){
@@ -1755,7 +1736,14 @@ const ADMIN = {
   async post(action, params = {}, opts = {}){
     if (!opts.skipTokenCheck && !this.creds?.token) throw new Error('Not signed in.');
     const body = { action, ...params, adminToken: this.creds?.token };
-    const r = await fetch(GAS_URL, { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) });
+    let r;
+    try {
+      r = await fetch(GAS_URL, { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) });
+    } catch (netErr) {
+      throw new Error(navigator.onLine
+        ? 'Could not reach the server. Try again in a moment.'
+        : 'You are offline — reconnect and try again.');
+    }
     if (!r.ok) throw new Error('The server is unreachable right now (' + r.status + ').');
     const data = await r.json();
     if (data && data.success === false && /admin auth failed/i.test(data.error || '')) {
@@ -1819,7 +1807,11 @@ const ADMIN = {
         stats:      () => this.post('adminStats'),
         users:      () => this.post('adminListUsers'),
         payments:   () => this.post('adminListPayments'),
-        settings:   () => this.post('getSettings'),
+        /* adminGetSettings returns the private_* / secret_* keys too; the
+           public endpoint strips them, so it is only the fallback. */
+        settings:   () => this.post('adminGetSettings')
+                            .then(r => (r && r.success) ? r : this.post('getSettings'))
+                            .catch(() => this.post('getSettings')),
         logs:       () => this.post('adminListLogs').catch(() => ({success:false, logs:[]})),
         admins:     () => this.post('adminListAdmins').catch(() => ({success:false, admins:[]})),
         weeklysets: () => this.post('adminListWeeklySets').catch(() => ({success:false, sets:[]})),
@@ -1930,6 +1922,32 @@ const ADMIN = {
       rows.map(p => [p.username, p.name || '', p.txId, this.data.settings.paymentAmount || 100, p.status, p.submittedAt || '', p.remarks || ''])
     );
     this.downloadCSV(csv, 'payments_' + (rows.length === this.data.payments.length ? 'all' : 'filtered') + '.csv');
+  },
+
+  /* Screenshots are private in Drive (and the upkeep tool makes older ones
+     private too), so an <img src> pointed at the Drive URL renders nothing.
+     Pull the bytes through the console and show them inline instead. */
+  async renderScreenshot(containerId, url, username){
+    const box = $(containerId);
+    if (!box) return;
+    try {
+      const fileId = driveFileId(url);
+      if (!fileId) throw new Error('This record does not point to a readable Drive file.');
+      const res = await this.post('adminDownloadScreenshot', { url, fileId });
+      if (!res.success) throw new Error(res.error || 'Could not load the screenshot.');
+      const el = $(containerId);
+      if (!el) return;
+      if (/pdf/i.test(res.mimeType || '')) {
+        el.innerHTML = '<p class="t-foot">The student attached a PDF. Use Download to open it.</p>';
+        return;
+      }
+      el.innerHTML = '<img alt="Payment screenshot from ' + esc(username || 'this student') + '" src="data:' +
+        esc(res.mimeType || 'image/png') + ';base64,' + res.base64 +
+        '" style="max-width:100%;max-height:320px;border-radius:var(--r-card);border:1px solid var(--sep)">';
+    } catch(e){
+      const el = $(containerId);
+      if (el) el.innerHTML = '<p class="t-foot">Could not load the screenshot: ' + esc(e.message || '') + '</p>';
+    }
   },
 
   async downloadScreenshot(url, filename){
@@ -2375,6 +2393,7 @@ const ADMINS = {
           '<span style="min-width:0"><span class="nm truncate" style="display:block">' + esc(u.name || u.username) + '</span>' +
           '<span class="un truncate" style="display:block">' + esc(u.username) + (u.email ? ' · ' + esc(u.email) : '') + '</span></span>' +
         '</span>' + badge(u.status || 'trial') +
+        (u.emailVerified ? '' : '<span class="badge badge-warning flat" title="They must confirm their email before they can be made an admin">unconfirmed email</span>') +
       '</button>').join('');
     list.classList.add('show');
   },
@@ -2958,14 +2977,21 @@ const QREPORTS = {
 };
 
 const SUBJ_STORE = {
-  all: [], loaded: false, loading: false,
+  all: [], loaded: false, loading: false, truncated: false, totalCount: 0,
   async load(force){
     if (this.loaded && !force) return this.all;
     if (this.loading) return this.all;
     this.loading = true;
     try {
       const r = await ADMIN.post('adminListSubjectiveSubmissions', { status: '' });
-      if (r.success) { this.all = r.submissions || []; this.loaded = true; BADGES.update(); TODAY.render(); }
+      if (r.success) {
+        this.all = r.submissions || [];
+        this.truncated = !!r.truncated;
+        this.totalCount = r.totalCount || this.all.length;
+        this.loaded = true;
+        BADGES.update();
+        TODAY.render();
+      }
     } catch(e){}
     this.loading = false;
     return this.all;
@@ -2991,9 +3017,9 @@ const SUBJ_TABS = {
 
 /* ── Grading card ──────────────────────────────────────────────────
    Actions per submission: Open PDF, Replace PDF, Annotate PDF.
-   Annotate opens the in-browser drawing layer (PDF_ANNOTATE) and,
-   on save, posts the flattened PDF back through the same
-   adminReplaceSubmissionPdf endpoint that Replace PDF uses. */
+   Annotate opens the shared PDF viewer in marking mode and, on save,
+   posts the marked PDF back through the same adminReplaceSubmissionPdf
+   endpoint that Replace PDF uses. */
 function gradeCard(s, ns, defaultMarks, showQuestion){
   const graded = s.status === 'graded';
   const marks = s.questionMarks || defaultMarks;
@@ -3014,13 +3040,13 @@ function gradeCard(s, ns, defaultMarks, showQuestion){
     (showQuestion && s.questionText ? '<div class="sub-q">' + esc(s.questionText) + '</div>' : '') +
     '<div class="sub-acts">' +
       (hasPdf
-        ? '<button class="btn btn-secondary btn-sm" onclick=\'openPdf(' + JSON.stringify(String(s.pdfUrl)) + ')\'><i class="ph ph-file-pdf"></i> Open answer PDF</button>'
+        ? '<button class="btn btn-secondary btn-sm" onclick="openPdf(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\')"><i class="ph ph-file-pdf"></i> Open answer PDF</button>'
         : '<button class="btn btn-secondary btn-sm" disabled><i class="ph ph-file-pdf"></i> No PDF attached</button>') +
       (hasPdf && canGrade
         ? '<button class="btn btn-quiet btn-sm" onclick="SUBJ_PDF.open(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\',\'' + escAttrJs(s.pdfUrl || '') + '\')" title="Overwrite the Drive file with an uploaded copy"><i class="ph ph-upload-simple"></i> Replace PDF</button>'
         : '') +
       (hasPdf && canGrade
-        ? '<button class="btn btn-quiet btn-sm" onclick="PDF_ANNOTATE.open(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\',\'' + escAttrJs(s.pdfUrl || '') + '\')" title="Draw on the PDF directly"><i class="ph ph-highlighter-circle"></i> Annotate PDF</button>'
+        ? '<button class="btn btn-quiet btn-sm" onclick="PDF_ANNOTATE.open(\'' + id + '\',\'' + escAttrJs(s.username || '') + '\',\'' + escAttrJs(s.pdfUrl || '') + '\')" title="Read and mark the paper in the browser"><i class="ph ph-highlighter-circle"></i> Mark the paper</button>'
         : '') +
       (graded
         ? '<span class="sub-score">' + s.score + ' / ' + marks + '</span>' +
@@ -3117,7 +3143,17 @@ const SUBJ_QOTD = {
     const avg = graded.length ? Math.round(graded.reduce((a, s) => a + (Number(s.score) || 0), 0) / graded.length * 10) / 10 : '—';
     const sample = items[0];
 
-    banner.innerHTML = '<div class="qotd-head">' +
+    /* The backend returns the most recent 500 submissions. Say so rather
+       than letting an older date look empty. */
+    const truncNote = (SUBJ_STORE.truncated && !items.length)
+      ? '<div class="banner banner-warning"><i class="ph ph-warning"></i><span>' +
+        'The most recent ' + SUBJ_STORE.all.length + ' of ' + SUBJ_STORE.totalCount +
+        ' submissions are loaded, so this day may be further back than that. ' +
+        '<button class="btn btn-sm btn-secondary" style="margin-left:.4rem" onclick="SUBJ_QOTD.loadDay()">Fetch ' +
+        esc(dateStr) + ' from the server</button></span></div>'
+      : '';
+
+    banner.innerHTML = truncNote + '<div class="qotd-head">' +
       '<h3 class="t-t3">' + (sample ? 'The question students answered' : 'Nothing submitted on this date') + '</h3>' +
       (sample
         ? '<div class="qotd-text">' + esc(sample.questionText || 'The question text was not stored with these submissions.') + '</div>' +
@@ -3135,6 +3171,46 @@ const SUBJ_QOTD = {
       : '<div class="empty"><i class="ph ph-sun-horizon"></i><div class="t">No submissions for ' + esc(dateStr) + '</div>' +
         '<div class="d">Change the date above to look at another day.</div></div>';
   },
+  /* Pulls one specific day straight from the server and folds it into the
+     store, for when the day sits behind the 500-row window. */
+  async loadDay(){
+    const dateStr = $('qotd-date').value;
+    if (!dateStr) return;
+    BUSY.start();
+    try {
+      const r = await ADMIN.post('adminListSubjectiveSubmissions', {
+        kind: 'qotd', dateFrom: dateStr, dateTo: dateStr
+      });
+      if (!r.success) throw new Error(r.error || 'Could not load that day.');
+      const fetched = r.submissions || [];
+      if (!fetched.length) {
+        TOAST.show('Nothing was submitted on ' + dateStr, 'info', 4000);
+      } else {
+        const seen = new Set(SUBJ_STORE.all.map(s => s.id));
+        fetched.forEach(s => { if (!seen.has(s.id)) SUBJ_STORE.all.push(s); });
+        TOAST.show('Loaded ' + plural(fetched.length, 'submission') + ' from ' + dateStr, 'success');
+      }
+      this.render();
+    } catch(e){
+      /* An older deployment predates the date filter — say so plainly. */
+      TOAST.show(/dateFrom|Unknown action/i.test(e.message || '')
+        ? 'This backend build does not support fetching a single day yet. Redeploy code.gs (v1.12).'
+        : (e.message || 'Could not load that day.'), 'error', 7000);
+    }
+    BUSY.stop();
+  },
+  _setDate(dt){
+    const p = n => String(n).padStart(2, '0');
+    $('qotd-date').value = dt.getFullYear() + '-' + p(dt.getMonth() + 1) + '-' + p(dt.getDate());
+    this.render();
+  },
+  shiftDate(days){
+    const cur = $('qotd-date').value;
+    const base = cur ? new Date(cur + 'T12:00:00') : new Date();
+    base.setDate(base.getDate() + days);
+    this._setDate(base);
+  },
+  goToday(){ this._setDate(new Date()); },
   save(id, marks){ saveGrade('SUBJ_QOTD', id, marks, () => this.render()); },
   regrade(id){ regradeSheet('SUBJ_QOTD', id, 10, () => this.render()); }
 };
@@ -3195,8 +3271,8 @@ const SUBJ_PDF = {
       '<div class="field"><span class="field-label">Step 1 — get the original</span>' +
         '<div class="flex g2 wrap mt2">' +
           '<button class="btn btn-secondary btn-sm" onclick="SUBJ_PDF.downloadOriginal()"><i class="ph ph-download-simple"></i> Download original</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick=\'openPdf(' + JSON.stringify(String(pdfUrl)) + ')\'><i class="ph ph-arrow-square-out"></i> Open in a new tab</button>' +
-          '<button class="btn btn-primary btn-sm" onclick="MODAL.close(\'sheet\');PDF_ANNOTATE.open(\'' + escAttrJs(id) + '\',\'' + escAttrJs(username) + '\',\'' + escAttrJs(pdfUrl) + '\')"><i class="ph ph-highlighter-circle"></i> Annotate here instead</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openPdf(\'' + escAttrJs(id) + '\',\'' + escAttrJs(username) + '\')"><i class="ph ph-eye"></i> View the original</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="MODAL.close(\'sheet\');PDF_ANNOTATE.open(\'' + escAttrJs(id) + '\',\'' + escAttrJs(username) + '\',\'' + escAttrJs(pdfUrl) + '\')"><i class="ph ph-highlighter-circle"></i> Mark it here instead</button>' +
         '</div>' +
         '<span class="field-hint mt2">Annotate in this console, or in any external PDF editor and save the copy to your device.</span>' +
       '</div>' +
@@ -3215,10 +3291,24 @@ const SUBJ_PDF = {
       { wide:false });
   },
 
-  downloadOriginal(){
+  async downloadOriginal(){
     if (!this._ctx) return;
     const name = (this._ctx.username || 'submission') + '_original.pdf';
-    ADMIN.downloadScreenshot(this._ctx.pdfUrl, name);
+    TOAST.show('Preparing the download', 'info', 2000);
+    BUSY.start();
+    try {
+      const res = await fetchSubmissionPdf(this._ctx.id);
+      const chars = atob(res.base64);
+      const bytes = new Uint8Array(chars.length);
+      for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      TOAST.show('Downloaded', 'success');
+    } catch(e){ TOAST.show(e.message || 'Download failed', 'error', 6000); }
+    BUSY.stop();
   },
 
   onFile(input){
@@ -3292,279 +3382,184 @@ const SUBJ_PDF = {
   }
 };
 
-/* ═══════════════════ IN-BROWSER PDF ANNOTATION ═════════════════════════
-   pdf.js renders each page to a canvas; pdf-lib rebuilds a new PDF with
-   one JPEG per page, the annotations burned in. Saving posts the result
-   through adminReplaceSubmissionPdf — the Drive file is overwritten at
-   the same fileId, so the student sees the marked-up version the moment
-   this returns. */
+/* ═══════════════ MARKING A PAPER — adapter over the shared viewer ═══════
+   The console no longer ships its own PDF surface. It opens the same
+   pdf-viewer.js the students read with, in annotation mode, so both sides
+   see identical rendering, zoom, paging and find. This module only does the
+   part that is genuinely admin-specific: take the ink overlays the viewer
+   produces, stamp them onto the ORIGINAL PDF with pdf-lib, and upload the
+   result through adminReplaceSubmissionPdf.
+
+   Stamping rather than flattening is what keeps the student's scan sharp and
+   its text selectable. Pages that were never marked keep their exact bytes.
+   ═══════════════════════════════════════════════════════════════════════ */
 const PDF_ANNOTATE = {
   ctx: null,
-  pdfDoc: null,
-  scale: 1.6,
-  pageNum: 1,
-  numPages: 1,
-  tool: 'pen',
-  color: '#e02020',
-  width: 4,
-  annotations: {},
-  _drawing: false,
-  _current: null,
-  _originalBytes: null,
 
-  async open(id, username, pdfUrl){
-    if (typeof pdfjsLib === 'undefined' || typeof PDFLib === 'undefined') {
-      TOAST.show('The PDF libraries did not load — check your connection and reload', 'error', 6000);
-      return;
+  open(id, username, pdfUrl){
+    if (typeof PDFVIEW === 'undefined') {
+      return TOAST.show('The PDF viewer did not load — reload the page and try again', 'error', 6000);
+    }
+    if (typeof PDFLib === 'undefined') {
+      return TOAST.show('pdf-lib did not load, so marks cannot be saved — check your connection and reload', 'error', 6000);
     }
     const fileId = driveFileId(pdfUrl);
-    if (!fileId) return TOAST.show('That submission has no Drive file to annotate', 'error');
+    if (!fileId) return TOAST.show('That submission has no Drive file to mark', 'error');
 
     this.ctx = { id, username, fileId, pdfUrl };
-    this.annotations = {};
-    this.pageNum = 1;
-
-    $('an-title').textContent = 'Annotate — ' + username;
-    $('ov-annotate').classList.add('show');
-    document.body.style.overflow = 'hidden';
-    $('an-save').classList.add('loading');
-    $('an-save').disabled = true;
-
-    try {
-      const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl, fileId });
-      if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
-      const bytes = Uint8Array.from(atob(res.base64), c => c.charCodeAt(0));
-      this._originalBytes = bytes;
-      this.pdfDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
-      this.numPages = this.pdfDoc.numPages;
-      await this.renderPage(1);
-    } catch(e){
-      TOAST.show(e.message || 'Could not open that PDF', 'error', 6000);
-      this.close();
-      return;
-    }
-    $('an-save').classList.remove('loading');
-    $('an-save').disabled = false;
-  },
-
-  close(){
-    $('ov-annotate').classList.remove('show');
-    if (!document.querySelector('.overlay.show')) document.body.style.overflow = '';
-    this.pdfDoc = null;
-    this._originalBytes = null;
-  },
-
-  async renderPage(n){
-    this.pageNum = Math.max(1, Math.min(this.numPages, n));
-    const page = await this.pdfDoc.getPage(this.pageNum);
-    const viewport = page.getViewport({ scale: this.scale });
-
-    const pc = $('an-page-canvas'), oc = $('an-overlay-canvas');
-    pc.width = oc.width = viewport.width;
-    pc.height = oc.height = viewport.height;
-    $('an-stage').style.width = viewport.width + 'px';
-    $('an-stage').style.height = viewport.height + 'px';
-
-    await page.render({ canvasContext: pc.getContext('2d'), viewport }).promise;
-    this._bindOverlay(oc);
-    this._redrawOverlay();
-    $('an-pageinfo').textContent = 'Page ' + this.pageNum + ' / ' + this.numPages;
-  },
-  prevPage(){ if (this.pageNum > 1) this.renderPage(this.pageNum - 1); },
-  nextPage(){ if (this.pageNum < this.numPages) this.renderPage(this.pageNum + 1); },
-
-  setTool(t){
-    this.tool = t;
-    $$('.an-tool').forEach(b => b.classList.remove('active'));
-    const el = $('an-tool-' + t);
-    if (el) el.classList.add('active');
-  },
-  setColor(c, el){
-    this.color = c;
-    $$('.an-swatch').forEach(s => s.classList.remove('active'));
-    el.classList.add('active');
-  },
-
-  _pos(e, canvas){
-    const r = canvas.getBoundingClientRect();
-    const cx = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
-    const cy = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
-    return { x: cx * (canvas.width / r.width), y: cy * (canvas.height / r.height) };
-  },
-
-  _bindOverlay(canvas){
-    canvas.onpointerdown = e => {
-      if (this.tool === 'text') return this._placeText(e, canvas);
-      this._drawing = true;
-      try { canvas.setPointerCapture(e.pointerId); } catch(_) {}
-      this._current = { tool: this.tool, color: this.color, width: this.width, points: [this._pos(e, canvas)] };
-      (this.annotations[this.pageNum] ??= []).push(this._current);
-    };
-    canvas.onpointermove = e => {
-      if (!this._drawing) return;
-      this._current.points.push(this._pos(e, canvas));
-      this._redrawOverlay();
-    };
-    canvas.onpointerup = canvas.onpointerleave = canvas.onpointercancel = () => {
-      this._drawing = false;
-      this._current = null;
-    };
-  },
-
-  _placeText(e, canvas){
-    const pos = this._pos(e, canvas);
-    const text = prompt('Comment text:');
-    if (!text) return;
-    (this.annotations[this.pageNum] ??= []).push({
-      tool: 'text', color: this.color, x: pos.x, y: pos.y, text, size: 18 + this.width * 2
+    PDFVIEW.open({
+      title: 'Marking — ' + username,
+      filename: 'marked_' + username + '.pdf',
+      annotate: {
+        saveLabel: 'Save & send',
+        autosave: false,          /* an explicit save — this overwrites their paper */
+        onSave: (overlays, info) => PDF_ANNOTATE._commit(overlays, info)
+      },
+      load: async () => {
+        const res = await fetchSubmissionPdf(id);
+        return { base64: res.base64, filename: res.filename };
+      }
     });
-    this._redrawOverlay();
   },
 
-  _redrawOverlay(){
-    const oc = $('an-overlay-canvas'), ctx = oc.getContext('2d');
-    ctx.clearRect(0, 0, oc.width, oc.height);
-    const list = this.annotations[this.pageNum] || [];
-    list.forEach(a => this._paintAnnotation(ctx, a));
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-  },
+  close(){ if (typeof PDFVIEW !== 'undefined') PDFVIEW.close(); },
 
-  _paintAnnotation(ctx, a){
-    if (a.tool === 'text') {
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = a.color;
-      ctx.font = a.size + 'px Inter, sans-serif';
-      ctx.fillText(a.text, a.x, a.y);
-      return;
-    }
-    ctx.globalCompositeOperation = a.tool === 'eraser' ? 'destination-out' : 'source-over';
-    ctx.globalAlpha = a.tool === 'highlighter' ? 0.35 : 1;
-    ctx.strokeStyle = a.color;
-    ctx.lineWidth = a.tool === 'highlighter' ? a.width * 4 : a.width;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath();
-    a.points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-  },
+  /* Returns true on success; anything else leaves the viewer's save chip in
+     its failed state with the marks still on screen. */
+  async _commit(overlays, info){
+    const ctx = this.ctx;
+    if (!ctx) return false;
+    if (!overlays.length) { TOAST.show('Nothing has been marked yet', 'warning'); return false; }
 
-  undo(){
-    const list = this.annotations[this.pageNum];
-    if (list && list.length) { list.pop(); this._redrawOverlay(); }
-  },
-  clearPage(){
-    this.annotations[this.pageNum] = [];
-    this._redrawOverlay();
-  },
-
-   async save(){
-    if (!this.ctx) return;
-    if (!this.pdfDoc) {
-      TOAST.show('The PDF is no longer loaded — close the overlay and reopen the annotation view.', 'error', 6000);
-      return;
-    }
     const ok = await CONFIRM.ask({
-      title: 'Save annotated PDF',
-      body: 'This overwrites the Drive file for <b>' + esc(this.ctx.username) +
-            '</b>. They will see the marked-up version immediately. The original is backed up automatically.',
-      confirmText: 'Save & replace', tone: 'danger'
+      title: 'Send the marked paper',
+      body: 'This replaces the paper <b>' + esc(ctx.username) + '</b> sees, on ' +
+            plural(overlays.length, 'page') + '. Your marks go on top of their original pages, ' +
+            'so the scan keeps its quality. The original is backed up automatically.',
+      confirmText: 'Save & send', tone: 'danger'
     });
-    if (!ok) return;
+    if (!ok) return false;
 
-    const btn = $('an-save');
-    btn.classList.add('loading');
     BUSY.start();
     try {
-      const outDoc = await PDFLib.PDFDocument.create();
-      for (let n = 1; n <= this.numPages; n++) {
-        const jpegDataUrl = await this._compositePage(n);
-        const jpegBytes = Uint8Array.from(atob(jpegDataUrl.split(',')[1]), c => c.charCodeAt(0));
-        const img = await outDoc.embedJpg(jpegBytes);
-        const page = outDoc.addPage([img.width, img.height]);
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-      }
-      const outBytes = await outDoc.save();
-
+      const bytes = await this._stamp(overlays, info);
       let binary = '';
       const CHUNK = 0x8000;
-      for (let i = 0; i < outBytes.length; i += CHUNK) {
-        binary += String.fromCharCode.apply(null, outBytes.subarray(i, i + CHUNK));
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
       }
-      const dataUrl = 'data:application/pdf;base64,' + btoa(binary);
-
       const res = await ADMIN.post('adminReplaceSubmissionPdf', {
-        id: this.ctx.id, fileId: this.ctx.fileId,
-        fileData: dataUrl, filename: 'annotated_' + this.ctx.username + '.pdf'
+        id: ctx.id, fileId: ctx.fileId,
+        fileData: 'data:application/pdf;base64,' + btoa(binary),
+        filename: 'marked_' + ctx.username + '.pdf'
       });
-      if (!res.success) throw new Error(res.error || 'Replace failed.');
+      if (!res.success) throw new Error(res.error || 'The server refused the upload.');
 
-      TOAST.show('Saved — ' + this.ctx.username + ' now sees the annotated version', 'success', 5000);
-      this.close();
+      TOAST.show(ctx.username + ' can now see the marked paper', 'success', 5000);
       await SUBJ_STORE.load(true);
       if (SUBJ_TABS.current === 'qotd') SUBJ_QOTD.render();
       if (SUBJ_TABS.current === 'exam') SUBJ_EXAM.render();
+      return true;
     } catch(e){
-      TOAST.show(e.message || 'Could not save', 'error', 6000);
+      TOAST.show(e.message || 'Could not save the marked paper', 'error', 7000);
+      return false;
+    } finally {
+      BUSY.stop();
     }
-    BUSY.stop();
-    btn.classList.remove('loading');
   },
 
-  async _compositePage(n){
-    const page = await this.pdfDoc.getPage(n);
-    const viewport = page.getViewport({ scale: this.scale });
-    const c = document.createElement('canvas');
-    c.width = viewport.width; c.height = viewport.height;
-    const ctx = c.getContext('2d');
-    await page.render({ canvasContext: ctx, viewport }).promise;
+  /* Overlay-on-original where possible; flatten only if pdf-lib cannot
+     reopen the file or a page is rotated, and say so when that happens. */
+  async _stamp(overlays, info){
+    try {
+      const doc = await PDFLib.PDFDocument.load(info.bytes.slice());
+      const pages = doc.getPages();
+      if (pages.length !== info.pageCount) throw new Error('page count mismatch');
+      for (const o of overlays) {
+        const page = pages[o.page - 1];
+        if (!page) throw new Error('missing page ' + o.page);
+        if (((page.getRotation().angle % 360) + 360) % 360 !== 0) throw new Error('rotated page');
+        const png = await doc.embedPng(Uint8Array.from(atob(o.dataUrl.split(',')[1]), c => c.charCodeAt(0)));
+        const size = page.getSize();
+        page.drawImage(png, { x: 0, y: 0, width: size.width, height: size.height });
+      }
+      return await doc.save();
+    } catch(e){
+      console.warn('[marking] overlay failed, flattening instead:', e && e.message);
+      TOAST.show('This PDF could not take an overlay, so it is being flattened to images.', 'warning', 6000);
+      return await this._flatten(overlays, info);
+    }
+  },
 
-    const list = this.annotations[n] || [];
-    list.forEach(a => this._paintAnnotation(ctx, a));
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    return c.toDataURL('image/jpeg', 0.85);
+  async _flatten(overlays, info){
+    if (typeof pdfjsLib === 'undefined') throw new Error('The PDF engine is not available.');
+    const src = await pdfjsLib.getDocument({ data: info.bytes.slice() }).promise;
+    const byPage = {};
+    overlays.forEach(o => { byPage[o.page] = o; });
+    const out = await PDFLib.PDFDocument.create();
+    for (let n = 1; n <= src.numPages; n++) {
+      const page = await src.getPage(n);
+      const vp = page.getViewport({ scale: 2 });
+      const c = document.createElement('canvas');
+      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const cx = c.getContext('2d');
+      await page.render({ canvasContext: cx, viewport: vp }).promise;
+      if (byPage[n]) {
+        await new Promise(res => {
+          const img = new Image();
+          img.onload = () => { cx.drawImage(img, 0, 0, c.width, c.height); res(); };
+          img.onerror = res;
+          img.src = byPage[n].dataUrl;
+        });
+      }
+      const jpeg = c.toDataURL('image/jpeg', 0.92);
+      const emb = await out.embedJpg(Uint8Array.from(atob(jpeg.split(',')[1]), ch => ch.charCodeAt(0)));
+      const p = out.addPage([emb.width, emb.height]);
+      p.drawImage(emb, { x: 0, y: 0, width: emb.width, height: emb.height });
+    }
+    try { src.destroy(); } catch(e){}
+    return await out.save();
   }
 };
 
-async function openPdf(pdfUrl){
-  if (!pdfUrl) return TOAST.show('No PDF was attached to this submission', 'warning');
+/* Answer PDFs live in the SubjectiveAnswers Drive folder, which
+   adminDownloadScreenshot deliberately refuses to read — it only serves
+   files from PaymentScreenshots. adminDownloadSubmissionPdf is the endpoint
+   for these, it is gated on subjective_view rather than screenshots, and it
+   takes the submission id instead of a Drive URL. */
+async function fetchSubmissionPdf(id){
+  const res = await ADMIN.post('adminDownloadSubmissionPdf', { id });
+  if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
+  return res;
+}
 
-  const fileId = driveFileId(pdfUrl);
-  if (!fileId) {
-    return TOAST.show(
-      /^data:/i.test(String(pdfUrl))
-        ? 'That submission stored a local data URL — it was never uploaded to Drive'
-        : 'That submission does not point to a readable Drive file',
-      'error', 6000
-    );
+async function openPdf(id, username){
+  if (!id) return TOAST.show('No PDF was attached to this submission', 'warning');
+
+  if (window.PDFVIEW) {
+    PDFVIEW.open({
+      title: username ? 'Answer paper — ' + username : 'Answer paper',
+      filename: (username || 'submission') + '.pdf',
+      load: async () => {
+        const res = await fetchSubmissionPdf(id);
+        return { base64: res.base64, filename: res.filename };
+      }
+    });
+    return;
   }
 
-  const tab = window.open('about:blank', '_blank');
-  if (!tab) return TOAST.show('Your browser blocked the pop-up — allow pop-ups for this site', 'error', 6000);
+  TOAST.show('Loading the answer PDF', 'info', 2000);
   try {
-    tab.document.write('<!doctype html><title>Loading</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading the answer PDF…</p></body>');
-    tab.document.close();
-  } catch(e){}
-
-  try {
-    const res = await ADMIN.post('adminDownloadScreenshot', { url: pdfUrl, fileId });
-    if (!res.success) throw new Error(res.error || 'Could not fetch that PDF.');
-
+    const res = await fetchSubmissionPdf(id);
     const chars = atob(res.base64);
     const bytes = new Uint8Array(chars.length);
     for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
-    const mime = res.mimeType || 'application/pdf';
-    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-    tab.location.href = url;
+    const url = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'application/pdf' }));
+    const tab = window.open(url, '_blank');
+    if (!tab) TOAST.show('Your browser blocked the pop-up — allow pop-ups for this site', 'error', 6000);
     setTimeout(() => URL.revokeObjectURL(url), 300000);
   } catch(e){
-    try {
-      tab.document.write('<!doctype html><body style="font-family:system-ui;padding:2rem;color:#b33"><h2>Could not load the PDF</h2><p>' + esc(e.message || 'Unknown error') + '</p></body>');
-      tab.document.close();
-    } catch(_){}
-    TOAST.show(e.message || 'Could not open that PDF', 'error');
+    TOAST.show(e.message || 'Could not open that PDF', 'error', 6000);
   }
 }
 
@@ -4144,6 +4139,7 @@ const USERS = {
         '<div><dt>Email</dt><dd>' + (esc(u.email) || '—') + '</dd></div>' +
         '<div><dt>Mobile</dt><dd>' + (esc(u.mobile) || '—') + '</dd></div>' +
         '<div><dt>Access</dt><dd>' + esc(this.accessLabel(u)) + '</dd></div>' +
+        '<div><dt>Email confirmed</dt><dd>' + (u.emailVerified ? 'Yes' : 'Not yet') + '</dd></div>' +
         '<div><dt>Joined</dt><dd>' + esc(fullTime(u.createdAt)) + '</dd></div>' +
         '<div><dt>Trial ends</dt><dd>' + esc(fullTime(u.trialExpiresAt)) + '</dd></div>' +
       '</dl>' +
@@ -4472,7 +4468,7 @@ MODAL.openReview = function(username){
     '</dl>' +
     (p.screenshotUrl && p.screenshotUrl.startsWith('http')
       ? '<h4 class="t-cap mb2">Screenshot</h4>' +
-        '<img src="' + esc(p.screenshotUrl) + '" alt="Payment screenshot submitted by ' + esc(p.username) + '" style="max-width:100%;max-height:300px;border-radius:var(--r-card);border:1px solid var(--sep);margin-bottom:var(--sp-2)" onerror="this.style.display=\'none\'">' +
+        '<div id="rev-shot" class="mb2"><span class="inline-loader">Loading the screenshot</span></div>' +
         '<button class="btn btn-quiet btn-sm mb4" onclick="ADMIN.downloadScreenshot(\'' + escAttrJs(p.screenshotUrl) + '\',\'' + un + '_payment.png\')"><i class="ph ph-download-simple"></i> Download</button>'
       : '<p class="t-foot mb4">No screenshot was attached.</p>') +
     (settled || !canReview
@@ -4486,6 +4482,9 @@ MODAL.openReview = function(username){
           '<button class="btn btn-primary" style="flex:1" id="rev-verify" onclick="MODAL.confirmReview(\'' + un + '\',\'verified\')"><i class="ph ph-check"></i> Verify</button>' +
         '</div>');
   MODAL.open('review');
+  if (p.screenshotUrl && p.screenshotUrl.startsWith('http')) {
+    ADMIN.renderScreenshot('rev-shot', p.screenshotUrl, p.username);
+  }
 };
 
 MODAL.confirmReview = async function(username, status){
@@ -4584,7 +4583,7 @@ const UI = {
   railClose(){
     $('rail').classList.remove('open');
     $('rail-scrim').classList.remove('show');
-    if (!document.querySelector('.overlay.show') && !$('ov-annotate').classList.contains('show')) document.body.style.overflow = '';
+    if (!document.querySelector('.overlay.show') && !(window.PDFVIEW && PDFVIEW.isOpen())) document.body.style.overflow = '';
   },
 
   toggleMenu(e){
@@ -4616,6 +4615,9 @@ document.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
 
+  /* The reader owns the keyboard while it is open — Ctrl K would otherwise
+     open the command palette behind it. */
+  if (window.PDFVIEW && PDFVIEW.isOpen()) return;
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
     e.preventDefault();
     if ($('app').classList.contains('on')) PALETTE.open();
@@ -4626,7 +4628,6 @@ document.addEventListener('keydown', e => {
   }
    if (e.key === 'Escape') {
     if ($('ov-confirm').classList.contains('show')) { CONFIRM._no(); return; }
-    if ($('ov-annotate').classList.contains('show')) { PDF_ANNOTATE.close(); return; }
     if ($('palette').classList.contains('show')) { PALETTE.close(); return; }
     UI.closeMenu();
     MODAL.closeAll();
@@ -4643,7 +4644,7 @@ document.addEventListener('keydown', e => {
 
 setInterval(() => {
   if (document.hidden || !ADMIN.creds) return;
-  if (document.querySelector('.overlay.show, #palette.show') || $('ov-annotate').classList.contains('show')) return;
+  if (document.querySelector('.overlay.show, #palette.show') || (window.PDFVIEW && PDFVIEW.isOpen())) return;
   const scope = ({
     today:['stats'], dashboard:['stats'], users:['users'], payments:['payments'],
     admins:['admins'], weeklysets:['weeklysets'], qreports:['qreports'],

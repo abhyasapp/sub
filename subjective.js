@@ -246,9 +246,23 @@ function _normalizeSubjRaw(raw, fileId, chapterId, chapterName){
 async function _fetchSubjFileFromNetwork(ref, cacheKey){
   const url = _backendUrl();
   if(!url) throw new Error('Backend URL not configured');
-  const r = await fetch(`${url}?action=getFile&fileId=${encodeURIComponent(ref.fileId)}`, { redirect:'follow' });
+  /* getFile needs a session in backend v1.11 (GETFILE_REQUIRES_AUTH) and is
+     rate-limited per account. Without the credentials the whole written-answer
+     bank came back "Session expired" and the app reported "no questions yet". */
+  const a = _authParams();
+  if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take();
+  const query = new URLSearchParams({
+    action: 'getFile', fileId: ref.fileId, username: a.username, token: a.token
+  }).toString();
+  const r = await fetch(`${url}?${query}`, { redirect:'follow' });
   if(!r.ok) throw new Error('HTTP ' + r.status);
   const data = await r.json();
+  if(data && data.rateLimited){
+    if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(12000);
+    throw new Error('The server asked us to slow down. Try again in a moment.');
+  }
+  if(data && data.sessionInvalid) throw new Error('Your session expired — sign in again.');
+  if(data && data.needsPayment) throw new Error('Your access has ended. Complete the payment to open the written bank.');
   if(data && data.success === false) throw new Error(data.error || 'Server error');
   const payload = (data && data.result !== undefined) ? data.result : data;
   if(typeof QDB !== 'undefined') QDB.set(cacheKey, payload).catch(() => {});
@@ -277,6 +291,7 @@ async function _fetchSubjFile(ref){
       return await _fetchSubjFileFromNetwork(ref, cacheKey);
     }catch(e){
       console.warn('[SUBJ] fetch failed for', ref.fileId, e.message);
+      BANK.lastError = e.message || 'Could not reach the server.';
       return [];
     }
   })();
@@ -297,6 +312,7 @@ async function loadBank(force){
   }
 
   const byChapter = {};
+  BANK.lastError = null;
   let i = 0;
   async function worker(){
     while(i < refs.length){
@@ -313,7 +329,18 @@ async function loadBank(force){
     byChapter[ch].sort((a, b) => String(a.topic).localeCompare(String(b.topic)));
   });
 
-  BANK = { byChapter, loaded: true, loading: false, error: null };
+  /* An empty bank is nearly always a failed fetch, not an empty syllabus —
+     say which, so the student knows whether to reconnect or wait for the
+     admin to upload something. */
+  const offline = (typeof S !== 'undefined' && (!S.online || S.forcedOffline));
+  const empty = !Object.keys(byChapter).length;
+  BANK = {
+    byChapter, loaded: true, loading: false,
+    lastError: BANK.lastError || null,
+    error: !empty ? null
+         : offline ? 'You are offline. Connect once and the written questions will be saved to this device.'
+         : (BANK.lastError || 'The question bank could not be loaded. Check your connection and try again.')
+  };
   return BANK;
 }
 
@@ -388,13 +415,15 @@ function _chapterNameOf(chapterId){
   const c = (window.SUBJECTIVE_CHAPTERS || []).find(x => x.id === chapterId);
   return c ? `${c.icon || ''} ${c.name}`.trim() : (chapterId || 'Subjective');
 }
-function _emptyCard(icon, title, subtitle){
-  return `<div class="card" style="text-align:center;padding:2rem 1rem">
+function _emptyCard(icon, title, subtitle, action){
+  return `<div class="card" style="text-align:center;padding:1.6rem 1rem">
     <div class="empty-i" style="opacity:.6"><i class="ph ${icon}" style="font-size:2rem"></i></div>
     <p style="font-weight:600;color:var(--t2);margin-top:.5rem">${esc(title)}</p>
-    ${subtitle ? `<p style="font-size:.72rem;color:var(--t3);margin-top:.2rem;line-height:1.55">${esc(subtitle)}</p>` : ''}
+    ${subtitle ? `<p style="font-size:.72rem;color:var(--t3);margin-top:.2rem;line-height:1.55;max-width:38ch;margin-left:auto;margin-right:auto">${esc(subtitle)}</p>` : ''}
+    ${action || ''}
   </div>`;
 }
+const _retryBtn = `<button class="btn btn-a" style="margin-top:.9rem" onclick="SUBJ.refreshBank()"><i class="ph ph-arrow-clockwise"></i> Try again</button>`;
 
 /* ═══════════════════════════════════════════════════════════════════════
    QOTD STATE MACHINE
@@ -453,8 +482,9 @@ function _renderQotd(){
     return;
   }
   if(!_allQuestions().length){
-    body.innerHTML = _emptyCard('ph-sun-horizon','No daily questions yet',
-      BANK.error || 'Your administrator hasn\'t uploaded any subjective questions yet.');
+    body.innerHTML = _emptyCard('ph-sun-horizon','No question today',
+      BANK.error || 'No written questions have been added yet. Check back soon.',
+      BANK.error ? _retryBtn : '');
     return;
   }
 
@@ -754,8 +784,9 @@ function _renderExam(){
     return;
   }
   if(!_allQuestions().length){
-    body.innerHTML = _emptyCard('ph-note-pencil','No exam questions yet',
-      BANK.error || 'Ask your administrator to add subjective questions first.');
+    body.innerHTML = _emptyCard('ph-note-pencil','No paper to build yet',
+      BANK.error || 'No written questions have been added yet.',
+      BANK.error ? _retryBtn : '');
     return;
   }
 
@@ -1023,19 +1054,37 @@ function _buildCustomExam(chapterIds, targetMarks, markFilter){
   toast('✅ Custom paper ready · ' + picked.length + ' Qs · ' + total + ' marks · next custom paper in 6h', 5000);
 }
 
+function _notifyBuilder(){
+  try {
+    if(window.SUBJ_BUILDER && typeof window.SUBJ_BUILDER._updateCooldownUI === 'function'){
+      window.SUBJ_BUILDER._updateCooldownUI();
+    }
+  } catch(e){}
+}
+
 function _markCustomExamUsed(){
   _setCustomExamLast(Date.now());
   setTimeout(() => {
     if(document.getElementById('view-subj-exam')?.classList.contains('on')) _renderExam();
-    if(typeof window.SUBJ_BUILDER !== 'undefined' && typeof window.SUBJ_BUILDER._updateCooldownUI === 'function'){
-      window.SUBJ_BUILDER._updateCooldownUI();
-    }
+    _notifyBuilder();
   }, 50);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    QUESTION LIST
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* This used to exist only as SUBJ._refreshBadge, but init() and
+   refreshBank() call it as a bare function — which threw a ReferenceError
+   part-way through init and left the daily-question timer unstarted. */
+function _refreshBadge(){
+  const b = $('subj-qotd-badge');
+  if(!b) return;
+  const fresh = _hasBank() &&
+    (!QOTD || QOTD.date !== _todayKey() || (!QOTD.submitted && _qotdPhase() === 'expired'));
+  b.hidden = !fresh;
+  b.style.display = fresh ? '' : 'none';
+}
 
 function _renderList(){
   const body = $('subj-list-body');
@@ -1047,7 +1096,8 @@ function _renderList(){
   }
   if(!_allQuestions().length){
     body.innerHTML = _emptyCard('ph-list-dashes','Nothing to browse yet',
-      BANK.error || 'Once questions are added, this becomes a topic-wise index.');
+      BANK.error || 'Once questions are added, this becomes a chapter-by-chapter index.',
+      BANK.error ? _retryBtn : '');
     return;
   }
 
@@ -1115,6 +1165,7 @@ const SUBJ = {
   ready(){ return BANK.loaded; },
 
   async refreshBank(){
+    toast('Reloading the question bank…');
     await loadBank(true);
     _renderQotd();
     _renderExam();
@@ -1171,13 +1222,7 @@ const SUBJ = {
     _renderList();
   },
 
-  _refreshBadge(){
-    const b = $('subj-qotd-badge');
-    if(!b) return;
-    const fresh = _hasBank() &&
-      (!QOTD || QOTD.date !== _todayKey() || (!QOTD.submitted && _qotdPhase() === 'expired'));
-    b.style.display = fresh ? '' : 'none';
-  }
+  _refreshBadge
 };
 
 window.SUBJ = SUBJ;

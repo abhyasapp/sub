@@ -93,6 +93,7 @@ function scopedStats(leaves){
 const CNT_AUTO_LIMIT = 20;
 
 const CNT = {
+  _lastError: null,
   async forFile(ref){
     if(!ref.fid) return null;
     if(S.fcount[ref.fid] != null) return S.fcount[ref.fid];
@@ -102,7 +103,7 @@ const CNT = {
       S.fcount[ref.fid] = n;
       _save(LS.FCOUNT, S.fcount);
       return n;
-    }catch{ return null; }
+    }catch(e){ CNT._lastError = e && e.message; return null; }
   },
   knownTotal(leaves){
     let sum = 0, unknown = 0;
@@ -243,7 +244,7 @@ const ONPROG = {
                      : 'var(--amb)';
       const pct = total ? Math.min(100, Math.round((metricVal/total)*100)) : 0;
       const unknownNote = info.unknown
-        ? `<div style="font-size:.66rem;color:var(--t3);margin-top:.45rem"><i class="ph ph-warning"></i> ${info.unknown} of ${info.files} file${info.files>1?'s':''} not counted yet (offline, or not cached)</div>`
+        ? `<div style="font-size:.66rem;color:var(--t3);margin-top:.45rem"><i class="ph ph-warning"></i> ${info.unknown} of ${info.files} file${info.files>1?'s':''} not counted yet${CNT._lastError ? ' — ' + esc(CNT._lastError) : ' (offline, or not downloaded)'}</div>`
         : '';
       const confirmBtn = info.needsConfirm
         ? `<button class="btn btn-sm btn-a" style="margin-top:.5rem" onclick="ONPROG.render(true)"><i class="ph ph-list-numbers"></i> Count questions (${info.files} files)</button>`
@@ -673,7 +674,7 @@ const REV = {
 
 /* ═══════════════ QUIZ — MCQ engine ═══════════════ */
 const QUIZ = {
-  async _fetch(fileId, cacheKey, attempt=1){
+  async _fetch(fileId, cacheKey, attempt=1, kind='fg'){
     function _validCache(v){
       if(!v) return false;
       if(v && typeof v === 'object' && !Array.isArray(v) && v.success === false) return false;
@@ -687,7 +688,14 @@ const QUIZ = {
     }
     try{
       const timeoutMs = attempt === 1 ? 25000 : 15000;
-      const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId})}`, {redirect:'follow'}, timeoutMs);
+      /* Backend v1.11 turned on GETFILE_REQUIRES_AUTH: getFile now needs a
+         username + session token, and also checks the account still has
+         trial or paid access. Without them every single question file came
+         back "Session expired", which looked like an empty question bank.
+         GETFILE_GATE paces the calls under the per-account rate limit. */
+      if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take(kind);
+      const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
+      const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId, ...auth})}`, {redirect:'follow'}, timeoutMs);
       const text = await r.text();
       if(text.trim().startsWith('<')){
         throw new Error('Server returned an HTML page instead of JSON — the Apps Script may be down or requires re-authorisation.');
@@ -695,6 +703,19 @@ const QUIZ = {
       let data;
       try{ data = JSON.parse(text); }
       catch(pe){ throw new Error('Could not parse server response. The file may be corrupted or the server returned an unexpected format.'); }
+      /* The server asked us to slow down — wait it out rather than caching
+         the error object as if it were a question file. */
+      if(data && data.rateLimited && attempt < 4){
+        if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(12000);
+        await new Promise(res => setTimeout(res, 6000));
+        return QUIZ._fetch(fileId, cacheKey, attempt + 1, kind);
+      }
+      if(data && data.sessionInvalid){
+        throw new Error('Your session expired. Sign out and sign in again to keep studying.');
+      }
+      if(data && data.needsPayment){
+        throw new Error('Your access has ended. Complete the payment to open new chapters — anything already downloaded still works offline.');
+      }
       if(data && typeof data === 'object' && !Array.isArray(data) && data.success === true){
         if(data.result !== undefined) data = data.result;
         else if(data.data !== undefined) data = data.data;
@@ -719,7 +740,7 @@ const QUIZ = {
       if(attempt < 2 && (err.message.includes('timed out') || err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))){
         toast('⚠️ Slow connection — retrying…');
         await new Promise(res => setTimeout(res, 1500));
-        return QUIZ._fetch(fileId, cacheKey, attempt + 1);
+        return QUIZ._fetch(fileId, cacheKey, attempt + 1, kind);
       }
       throw err;
     }
@@ -749,7 +770,7 @@ const QUIZ = {
       clearTimeout(msgTimer); clearTimeout(msgTimer2);
       QUIZ._hideLoader();
       const msg = err.message==='OFFLINE'
-        ? 'You are offline and this set is not cached. Download it first from the Offline Cache tab.'
+        ? 'You are offline and this set has not been downloaded yet. Open Downloads while you have a connection to save it.'
         : err.message;
       QUIZ._showError(msg, ()=>QUIZ.load(fileId, cacheKey, mode, chapterName, scope));
     }
@@ -1295,10 +1316,13 @@ const QUIZ = {
     closeMod();
     toast('Sending report…');
     try{
-      const r = await netFetch(`${APPS}?${qs({
-        action:'reportQuestion', username:S.user.username, token:S.user.token,
-        uid, reason, note, questionSnapshot: (q?.q||'').slice(0,1000)
-      })}`, {redirect:'follow'}, 15000);
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          action:'reportQuestion', username:S.user.username, token:S.user.token,
+          uid, reason, note, questionSnapshot: (q?.q||'').slice(0,1000)
+        })
+      }, 15000);
       const res = await r.json();
       if(res.success) toast('✅ ' + (res.message || 'Thanks — report sent.'));
       else toast('❌ ' + (res.error || 'Could not send report.'));

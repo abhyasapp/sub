@@ -90,6 +90,10 @@ const SHELL = [
   './subjective_chapters.js',
   './subjective-data.js',
 
+  /* Shared PDF reader — without this, opening a marked paper offline fails */
+  './pdf-viewer.js',
+  './icon-192.png',
+
   /* Styles + manifest */
   './design-system.css',
   './manifest.json',

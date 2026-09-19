@@ -333,6 +333,46 @@ function _anyModalOpen(){
 }
 
 function qs(params){return Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')}
+
+/* ── getFile pacing ──────────────────────────────────────────────────
+   The backend allows each account 60 getFile calls a minute (and 600
+   across everyone). "Download everything" walks every configured file —
+   roughly 200 of them — so without pacing the tail of the run comes back
+   rate-limited and writes broken entries into the offline cache. This
+   gate spaces the calls out instead, and backs right off if the server
+   still says slow down. Every question fetch in the app goes through it. */
+const GETFILE_GATE = {
+  MAX: 45,            // stay under the server's 60, leaving room for retries
+  BG_MAX: 15,         // background top-ups never eat the whole budget
+  WINDOW: 60000,
+  _hits: [],
+  _penaltyUntil: 0,
+  /* kind 'bg' is for the silent offline top-up. It is held to a third of the
+     budget so that a student tapping a chapter is never stuck behind a
+     download they never asked for. */
+  async take(kind){
+    const ceiling = kind === 'bg' ? this.BG_MAX : this.MAX;
+    for(;;){
+      const now = Date.now();
+      if(now < this._penaltyUntil){
+        await new Promise(r=>setTimeout(r, Math.min(this._penaltyUntil - now, 15000)));
+        continue;
+      }
+      this._hits = this._hits.filter(t => now - t < this.WINDOW);
+      if(this._hits.length < ceiling){ this._hits.push(now); return; }
+      const oldest = this._hits[0] || now;
+      const waitMs = Math.min(this.WINDOW, Math.max(250, this.WINDOW - (now - oldest) + 100));
+      await new Promise(r=>setTimeout(r, waitMs));
+    }
+  },
+  /* Called when the server itself reports a rate limit. */
+  backoff(ms = 10000){ this._penaltyUntil = Date.now() + ms; this._hits = []; },
+  /* Rough seconds until `n` more files could be fetched — used for ETAs. */
+  etaSeconds(n){
+    const perMin = this.MAX;
+    return n <= perMin ? 0 : Math.round(((n - perMin) / perMin) * 60);
+  }
+};
 async function netFetch(url, opts, timeoutMs=20000){
   if(S.forcedOffline) throw new Error('OFFLINE');
   if(!S.online) throw new Error('OFFLINE');
@@ -458,8 +498,13 @@ const AUTH = {
       else AUTH._bounce();
     }
   },
+  /* POST, not GET: a session token in a query string ends up in the Apps
+     Script execution log and in any proxy log on the way. */
   async _checkSessionOnce(u){
-    const r = await netFetch(`${APPS}?${qs({action:'checkSession', token:u.token, username:u.username})}`, {redirect:'follow'});
+    const r = await netFetch(APPS, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'checkSession', token:u.token, username:u.username})
+    }, 15000);
     const res = await r.json();
     return { res };
   },
@@ -707,7 +752,10 @@ const PSYNC = {
   },
   async _pull(force){
     try{
-      const r = await netFetch(`${APPS}?${qs({action:'getProgress', username:S.user.username, token:S.user.token})}`, {redirect:'follow'}, 15000);
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'getProgress', username:S.user.username, token:S.user.token})
+      }, 15000);
       const res = await r.json();
       if(!res.success || !res.data){
         if(force) toast('ℹ️ No cloud backup found for this account yet.');
@@ -897,11 +945,13 @@ const WEEKLY = {
   async init(){
     if(!S.online || S.forcedOffline){ this._renderHomeCard(); this._startTick(); return; }
     try{
+      const post = (action) => netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ action, username:S.user.username, token:S.user.token })
+      }, 15000).then(r=>r.json()).catch(()=>({success:false}));
       const [setsRes, attemptsRes] = await Promise.all([
-        netFetch(`${APPS}?${qs({action:'listWeeklySets', username:S.user.username, token:S.user.token})}`, {redirect:'follow'}, 15000)
-          .then(r=>r.json()).catch(()=>({success:false})),
-        netFetch(`${APPS}?${qs({action:'getMyWeeklyAttempts', username:S.user.username, token:S.user.token})}`, {redirect:'follow'}, 15000)
-          .then(r=>r.json()).catch(()=>({success:false}))
+        post('listWeeklySets'),
+        post('getMyWeeklyAttempts')
       ]);
       if(setsRes.success) this.sets = setsRes.sets || [];
       if(attemptsRes.success && Array.isArray(attemptsRes.attempts)){
@@ -1007,7 +1057,10 @@ const WEEKLY = {
     let attempt = this.attempts[id];
     if(!attempt && S.online && !S.forcedOffline){
       try{
-        const r = await netFetch(`${APPS}?${qs({action:'getWeeklyAttempt', username:S.user.username, token:S.user.token, weeklyId:id})}`, {redirect:'follow'}, 15000);
+        const r = await netFetch(APPS, {
+          method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({action:'getWeeklyAttempt', username:S.user.username, token:S.user.token, weeklyId:id})
+        }, 15000);
         const res = await r.json();
         if(res.success && res.attempt){
           attempt = res.attempt;
@@ -1785,14 +1838,22 @@ const CACHE = {
     const txt = document.getElementById('cptxt');
     if(pb) pb.style.display = '';
     let done = 0, failed = 0;
+    const startedAt = Date.now();
+    const etaText = () => {
+      if(done < 3) return '';
+      const perFile = (Date.now() - startedAt) / done;
+      const leftSec = Math.round((refs.length - done) * perFile / 1000);
+      if(leftSec < 45) return ' · under a minute left';
+      return ` · about ${Math.ceil(leftSec/60)} min left`;
+    };
     for(const ref of refs){
-      if(txt) txt.textContent = `Caching: ${ref.name} (${done+1}/${refs.length})…`;
+      if(txt) txt.textContent = `Downloading ${done+1} of ${refs.length}${etaText()}`;
       if(pf) pf.style.width = `${(done/refs.length)*100}%`;
       try{
         await QUIZ._fetch(ref.fid, ref.key);
       }catch(err){
         failed++;
-        if(txt) txt.textContent = `⚠️ Failed: ${ref.name} — retrying…`;
+        if(txt) txt.textContent = `Retrying ${ref.subtopic || ref.name}…`;
         try{
           await new Promise(r=>setTimeout(r,2000));
           await QUIZ._fetch(ref.fid, ref.key);
@@ -1803,8 +1864,10 @@ const CACHE = {
       if(pf) pf.style.width = `${(done/refs.length)*100}%`;
     }
     const ok = done - failed;
-    if(txt) txt.textContent = failed>0 ? `⚠️ Cached ${ok}/${refs.length} sets (${failed} failed — check connection)` : `✅ All ${done} sets cached successfully`;
-    toast(failed>0 ? `⚠️ ${ok}/${refs.length} cached — ${failed} failed` : '✅ Offline cache complete');
+    if(txt) txt.textContent = failed>0
+      ? `Downloaded ${ok} of ${refs.length}. ${failed} did not come through — try again on a steadier connection.`
+      : `All ${done} sets are on this device.`;
+    toast(failed>0 ? `${ok} of ${refs.length} downloaded — ${failed} failed` : 'Everything is downloaded for offline study');
     CACHE.render();
   },
 
@@ -1846,21 +1909,30 @@ const CACHE = {
     const missing = ChapterData.allFileRefs().filter(r=>!cachedKeys.has(r.key));
     if(!missing.length) return;
 
+    /* Mobile data is expensive here. Never spend it on a download nobody
+       asked for — offer it instead, every time, not just once. */
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const isCellular = conn && /cellular|2g|3g|slow-2g/i.test(conn.effectiveType || conn.type || '');
-    const seen = _load('abhyas_autosync_offered', false);
-    if (isCellular && !seen && missing.length > 5) {
-      _save('abhyas_autosync_offered', true);
-      toast('📦 New question sets available — tap Offline Cache to download when on WiFi.', 6000);
+    const saver = conn && conn.saveData;
+    if ((isCellular || saver) && missing.length > 5) {
+      const lastOffer = _load('abhyas_autosync_offered_at', 0);
+      if (Date.now() - lastOffer > 24*60*60*1000) {
+        _save('abhyas_autosync_offered_at', Date.now());
+        toast(`${missing.length} question sets aren't on this device yet. Open Downloads on Wi-Fi to save them for offline study.`, 7000);
+      }
       return;
     }
 
-    CACHE._badge(`📦 Downloading 0/${missing.length}…`);
+    /* A capped slice per session: the rest is picked up next time, or all at
+       once from Downloads. Keeps the boot quiet and the data bill small. */
+    const BATCH = 40;
+    const batch = missing.slice(0, BATCH);
+    CACHE._badge(`Saving for offline · 0/${batch.length}`);
     let done = 0;
-    for(const ref of missing){
-      try{ await QUIZ._fetch(ref.fid, ref.key); }catch{ /* skip failures quietly */ }
+    for(const ref of batch){
+      try{ await QUIZ._fetch(ref.fid, ref.key, 1, 'bg'); }catch{ /* quietly skip */ }
       done++;
-      CACHE._badge(`📦 Downloading ${done}/${missing.length}…`);
+      CACHE._badge(`Saving for offline · ${done}/${batch.length}`);
     }
     CACHE._badge(null);
     if(UI.cur==='offline') CACHE.render();
@@ -2288,6 +2360,7 @@ window.WEEKLY = WEEKLY;
 window.CHAPSTATS = CHAPSTATS;
 window.PSYNC = PSYNC;
 window.NETCHECK = NETCHECK;
+window.GETFILE_GATE = GETFILE_GATE;
 window.SRCH = SRCH;
 window.toggleForcedOffline = toggleForcedOffline;
 window.pluralize = pluralize;

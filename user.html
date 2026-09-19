@@ -3,8 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F2F4F3">
+<meta name="theme-color" content="#F2F4F3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-title" content="Abhyas">
+<meta name="format-detection" content="telephone=no">
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <script>(function(){
   try{
@@ -155,7 +158,9 @@
 html{height:100%;-webkit-text-size-adjust:100%}
 body{
   font-family:var(--font);font-size:var(--fs-body);line-height:1.5;
-  background:var(--bg);color:var(--ink);min-height:100vh;overflow-x:hidden;
+  background:var(--bg);color:var(--ink);overflow-x:hidden;
+  min-height:100vh;min-height:100dvh;
+  overscroll-behavior-y:none;
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 }
 :focus{outline:none}
@@ -212,6 +217,16 @@ b,strong{font-weight:650}
 .stack2{display:flex;flex-direction:column;gap:var(--sp-2)}
 .stack3{display:flex;flex-direction:column;gap:var(--sp-3)}
 .hidden,[hidden]{display:none!important}
+
+/* iOS Safari zooms the page whenever a focused field is under 16px, which
+   throws a student out of a timed test mid-answer. Only real inputs move. */
+@media (pointer:coarse){
+  .sf input,.sf textarea,.sf select,.input,.select,.textarea,.sel-c,
+  .toolbar input,.toolbar select,.tt-form input,.tt-form select{font-size:16px}
+}
+button,a,label,summary,.eo,input[type=checkbox],input[type=radio]{touch-action:manipulation}
+/* Inner scrollers shouldn't drag the page (or Safari's address bar) with them. */
+.ch-list,#on-fw-list,.mbody,#bn-sheet,#sb,.subm-q,.tt-week-scroll{overscroll-behavior:contain}
 
 .g2-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-3)}
 .g4-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--sp-2)}
@@ -297,6 +312,7 @@ b,strong{font-weight:650}
   border-radius:var(--r-panel);padding:var(--sp-4);
   margin-bottom:var(--sp-3);box-shadow:var(--sh-1)
 }
+@media (max-width:520px){.card{padding:var(--sp-3);border-radius:var(--r-card)}}
 .card-hd{
   display:flex;align-items:center;justify-content:space-between;
   gap:var(--sp-2);flex-wrap:wrap;margin-bottom:var(--sp-3)
@@ -455,7 +471,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 #toasts{
   position:fixed;left:50%;transform:translateX(-50%);
   bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--sp-3));
-  z-index:var(--z-toast);display:flex;flex-direction:column;align-items:center;
+  z-index:10030;display:flex;flex-direction:column;align-items:center;
   gap:var(--sp-2);pointer-events:none;width:calc(100vw - 2rem);max-width:380px
 }
 @media (min-width:961px){#toasts{bottom:var(--sp-6)}}
@@ -660,9 +676,9 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .sb-foot{margin-top:auto;padding-top:var(--sp-3)}
 #sb-version{text-align:center;font-size:var(--fs-cap);color:var(--ink-4);padding-top:var(--sp-2)}
 
-#main{flex:1;min-width:0;padding:var(--sp-5) var(--sp-5) var(--sp-16)}
+#main{flex:1;min-width:0;padding:var(--sp-4) var(--sp-5) var(--sp-12)}
 @media (max-width:960px){
-  #main{padding:var(--sp-4) var(--sp-4) calc(var(--tabbar-h) + var(--safe-b) + var(--sp-8))}
+  #main{padding:var(--sp-3) var(--sp-3) calc(var(--tabbar-h) + var(--safe-b) + var(--sp-6))}
 }
 .inner{max-width:var(--content-max);margin:0 auto}
 
@@ -771,12 +787,16 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 
 .start-block{
   background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);
-  padding:var(--sp-5);margin-bottom:var(--sp-3);box-shadow:var(--sh-1)
+  padding:var(--sp-4);margin-bottom:var(--sp-3);box-shadow:var(--sh-1)
+}
+@media (max-width:520px){
+  .start-block{padding:var(--sp-4) var(--sp-3)}
+  #greeting{margin-bottom:var(--sp-3)}
 }
 .greet-line{display:flex;align-items:baseline;gap:var(--sp-2);margin-bottom:var(--sp-1)}
 #greeting-title{font-size:var(--fs-hero);font-weight:700;letter-spacing:-.022em;color:var(--ink)}
 #greeting-icon{font-size:1.25rem;line-height:1}
-#greeting{font-size:var(--fs-callout);color:var(--ink-2);margin-bottom:var(--sp-4);line-height:1.5}
+#greeting{font-size:var(--fs-callout);color:var(--ink-2);margin-bottom:var(--sp-3);line-height:1.5}
 .start-alt{
   display:flex;gap:var(--sp-2);margin-top:var(--sp-2)
 }
@@ -847,6 +867,80 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .marquee-bar.urgent .marquee-item strong{color:var(--danger)}
 
 #quiz-wrap{max-width:720px;margin:0 auto}
+
+/* The answer bar sits between the question and the app's tab bar, and never
+   on top of it: its own height plus the tab bar plus the device inset. */
+:root{--quiznav-h:54px}
+.ex-bottom{
+  display:flex;align-items:center;justify-content:center;gap:var(--sp-3);
+  margin:var(--sp-5) 0 var(--sp-8)
+}
+.ex-bottom-count{font-size:var(--fs-foot);font-weight:700;color:var(--ink-2)}
+.fc-nav-ctr{display:none}
+
+@media (max-width:960px){
+  #quiz-wrap{padding-bottom:calc(var(--quiznav-h) + var(--sp-2))}
+  .fc-nav,.ex-bottom{
+    position:fixed;left:0;right:0;
+    bottom:calc(var(--tabbar-h) + var(--safe-b));
+    z-index:calc(var(--z-tabbar) - 1);
+    height:var(--quiznav-h);
+    display:flex;align-items:center;justify-content:space-between;
+    gap:var(--sp-2);margin:0;padding:0 var(--sp-3);
+    background:color-mix(in srgb,var(--surface) 94%,transparent);
+    backdrop-filter:blur(18px) saturate(1.5);
+    border-top:1px solid var(--sep)
+  }
+  .fc-nav .btn,.ex-bottom .btn{min-width:0;flex:0 0 auto;min-height:40px;padding:0 var(--sp-4)}
+  .fc-hint{display:none}
+  .fc-nav-ctr{
+    display:block;flex:1;text-align:center;min-width:0;
+    font-size:var(--fs-foot);font-weight:700;color:var(--ink-2);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+  }
+  .ex-bottom-count{flex:1;text-align:center}
+  #ex-bottom-skip{flex:0 0 auto}
+}
+/* Anything else pinned to the bottom has to clear the answer bar. */
+@media (max-width:960px){
+  body.quiz-on #toasts{bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--quiznav-h) + var(--sp-2))}
+  body.quiz-on #cache-autobadge{bottom:calc(var(--tabbar-h) + var(--safe-b) + var(--quiznav-h) + var(--sp-2))}
+  body.quiz-on #pwa-install-banner{display:none!important}
+}
+@media (max-width:380px){
+  .fc-nav-word{display:none}
+  .fc-nav-lbl{display:none}
+  .fc-nav .btn,.ex-bottom .btn{padding:0 var(--sp-3)}
+}
+
+/* Quiz density on a phone: the aim is question + every option + the answer
+   bar inside one screen, so answering is read → tap → Next with no scroll.
+   The app's own top bar is hidden while a quiz runs — the quiz bar already
+   carries Quit, Finish, the timer and the score. */
+@media (max-width:640px){
+  body.quiz-on #tb{display:none}
+  body.quiz-on .qbar{top:0}
+  body.quiz-on #main{padding-top:var(--sp-2)}
+  .qbar{margin-bottom:var(--sp-2)}
+  .qb-l1{padding:var(--sp-1) var(--sp-2)}
+  .qb-l2{min-height:42px}
+  .qbz{padding:var(--sp-1) var(--sp-2);gap:2px}
+  .qb-ctr,.qb-timer{font-size:var(--fs-t3)}
+  .qb-btn{min-height:24px}
+  .qtile{width:34px;padding:1px 0}
+  .qt-num{font-size:var(--fs-foot)}
+  .qt-lbl{font-size:.5rem}
+  .qt-ans{width:44px}
+  .qcard{padding:var(--sp-3);border-radius:var(--r-card);margin-bottom:var(--sp-2)}
+  .qm{margin-bottom:var(--sp-2)}
+  .qt{font-size:.9375rem;line-height:1.45}
+  .eo{min-height:42px;margin:var(--sp-1) 0;padding:var(--sp-2);gap:var(--sp-2);
+      line-height:1.35;border-radius:var(--r-input)}
+  .eo .ok{width:22px;height:22px;font-size:.6875rem;border-radius:6px}
+  .expl{margin-top:var(--sp-2);padding:var(--sp-2) var(--sp-3);font-size:var(--fs-foot);line-height:1.5}
+  .eqc{padding:var(--sp-3);margin-bottom:var(--sp-2)}
+  #fc-img-wrap{margin:var(--sp-2) 0 !important}
+}
 
 .qbar{
   position:sticky;top:var(--topbar-h);z-index:var(--z-quizbar);margin-bottom:var(--sp-4);
@@ -1432,6 +1526,15 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div class="marquee-viewport"><div class="marquee-track" id="marquee-track"></div></div>
         </div>
 
+        <div class="banner banner-warning" id="verify-banner" hidden>
+          <i class="ph ph-envelope-simple" aria-hidden="true"></i>
+          <div style="flex:1">
+            <div>Your email address isn't confirmed yet. Confirm it so you can reset your password if you ever lose it.</div>
+            <button class="btn btn-sm btn-quiet" style="margin-top:var(--sp-2)" id="verify-resend" onclick="VERIFY.resend()">Send the link again</button>
+          </div>
+          <button class="ib" onclick="VERIFY.dismiss()" aria-label="Hide this for now"><i class="ph ph-x"></i></button>
+        </div>
+
         <div class="due-strip" id="due-strip" hidden></div>
 
         <section class="start-block">
@@ -1533,6 +1636,10 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <h2><i class="ph ph-note-pencil"></i> Full paper</h2>
           <p>A complete 100-mark paper, three hours, uploaded as a single PDF when you're done.</p>
         </div>
+        
+        <div id="subj-exam-body">
+          <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading…</p></div></div>
+        </div>
 
         <div class="card" id="exam-builder">
           <div class="card-hd"><h3><i class="ph ph-sliders-horizontal"></i> Build your own paper</h3><span class="ctag tp">Custom</span></div>
@@ -1560,13 +1667,10 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             </div>
           </div>
 
-          <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ_BUILDER.generate()">
+          <button class="btn btn-solid btn-lg btn-blk" id="exam-builder-go" onclick="SUBJ_BUILDER.generate()">
             <i class="ph ph-shuffle"></i> Build the paper
           </button>
-        </div>
-
-        <div id="subj-exam-body">
-          <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading…</p></div></div>
+          <p class="t-cap text-center" id="exam-builder-note" style="margin-top:var(--sp-2)"></p>
         </div>
       </div>
 
@@ -1948,9 +2052,12 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             </div>
           </div>
 
-          <div class="fc-nav">
-            <button class="btn btn-quiet" id="fc-prev" onclick="QUIZ.fcNav(-1)"><i class="ph ph-arrow-left"></i> Back</button>
+          <div class="fc-nav" id="fc-nav">
+            <button class="btn btn-quiet" id="fc-prev" onclick="QUIZ.fcNav(-1)" aria-label="Previous question"><i class="ph ph-arrow-left"></i> <span class="fc-nav-lbl">Back</span></button>
             <span class="fc-hint" id="fc-hint">Tap an option to answer</span>
+            <span class="fc-nav-ctr" id="fc-nav-ctr" role="status" aria-live="polite">
+              <span class="fc-nav-word">Question </span><span id="fc-nav-n">1 / 1</span>
+            </span>
             <button class="btn btn-solid" id="fc-next" onclick="QUIZ.fcNav(1)">Next <i class="ph ph-arrow-right"></i></button>
           </div>
         </div>
@@ -1982,8 +2089,12 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <div class="qb-l3"><div class="qprog"><div class="qpf" id="ex-pf"></div></div></div>
           </div>
           <div id="ex-qs"></div>
-          <div class="text-center" style="margin:var(--sp-5) 0 var(--sp-8)">
-            <button class="btn btn-solid btn-lg" onclick="QUIZ.submitExam()"><i class="ph ph-check-circle"></i> Submit all answers</button>
+          <div class="ex-bottom" id="ex-bottom">
+            <button class="btn btn-quiet" id="ex-bottom-skip" onclick="QUIZ.jumpToUnanswered()" hidden>
+              <i class="ph ph-arrow-down"></i> <span id="ex-bottom-left">0</span> left
+            </button>
+            <span class="ex-bottom-count mono" id="ex-bottom-count" role="status" aria-live="polite">0 / 0</span>
+            <button class="btn btn-solid btn-lg" onclick="QUIZ.submitExam()"><i class="ph ph-check-circle"></i> Submit</button>
           </div>
         </div>
 
@@ -2063,6 +2174,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 <script src="subjective.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="cloud-sync.js"></script>
+<script src="pdf-viewer.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas — page layer.
@@ -2099,18 +2211,67 @@ function _cleanChip(id){
 }
 function _ctr(id, cur, tot){ const e = $(id); if (e) e.innerHTML = cur + '<em>/' + tot + '</em>'; }
 function _syncSkip(){
-  const btn = $('ex-skip-nav');
-  if (!btn || !S.quiz || !S.quiz.ans) return;
+  if (!S.quiz || !S.quiz.ans) return;
   const n = S.quiz.ans.filter(a => a === null).length;
-  btn.style.display = n ? '' : 'none';
-  set('ex-skip-count', n);
+  const btn = $('ex-skip-nav');
+  if (btn) { btn.style.display = n ? '' : 'none'; set('ex-skip-count', n); }
+  const tot = S.quiz.qs ? S.quiz.qs.length : 0;
+  set('ex-bottom-count', (tot - n) + ' / ' + tot);
+  const bskip = $('ex-bottom-skip');
+  if (bskip) { bskip.hidden = !n; set('ex-bottom-left', n); }
 }
+
+/* The answer bar is fixed on a phone, so it must only exist while a quiz is
+   actually on screen — and the app's top bar steps aside for the same reason. */
+(function(){
+  const qw = $('quiz-wrap'), res = $('res-wrap');
+  if (!qw || !window.MutationObserver) return;
+  const paint = () => document.body.classList.toggle('quiz-on',
+    qw.style.display !== 'none' && (!res || res.style.display === 'none'));
+  const mo = new MutationObserver(paint);
+  mo.observe(qw, { attributes:true, attributeFilter:['style'] });
+  if (res) mo.observe(res, { attributes:true, attributeFilter:['style'] });
+  paint();
+})();
 
 if (typeof QUIZ !== 'undefined') {
   const _rf = QUIZ._renderFlashcard.bind(QUIZ);
   QUIZ._renderFlashcard = function(){
     _rf(); _cleanChip('fc-chip');
-    if (S.quiz.qs) _ctr('fc-ctr', S.quiz.idx + 1, S.quiz.qs.length);
+    if (!S.quiz.qs) return;
+    const i = S.quiz.idx, n = S.quiz.qs.length, last = i === n - 1;
+    _ctr('fc-ctr', i + 1, n);
+    set('fc-nav-n', (i + 1) + ' / ' + n);
+    /* objective.js writes plain text into these, which drops the icons. */
+    const prev = $('fc-prev');
+    if (prev) prev.innerHTML = '<i class="ph ph-arrow-left"></i> <span class="fc-nav-lbl">Back</span>';
+    const next = $('fc-next');
+    if (next) {
+      next.innerHTML = S.quiz.reviewOnly
+        ? (last ? '<i class="ph ph-check"></i> Done' : 'Next <i class="ph ph-arrow-right"></i>')
+        : (last ? '<i class="ph ph-check-circle"></i> Finish' : 'Next <i class="ph ph-arrow-right"></i>');
+      next.setAttribute('aria-label', last ? 'Finish and see results' : 'Next question');
+    }
+  };
+
+  /* A double tap on Next must not jump two questions. */
+  const _fcNav = QUIZ.fcNav.bind(QUIZ);
+  let _navAt = 0;
+  QUIZ.fcNav = function(dir){
+    const now = Date.now();
+    if (now - _navAt < 200) return;
+    _navAt = now;
+    _fcNav(dir);
+  };
+
+  /* Nor may a double tap submit a paper twice. */
+  const _submitExam = QUIZ.submitExam.bind(QUIZ);
+  let _submitting = false;
+  QUIZ.submitExam = function(){
+    if (_submitting) return;
+    _submitting = true;
+    try { _submitExam(); }
+    finally { setTimeout(() => { _submitting = false; }, 1200); }
   };
 
   const _uc = QUIZ._updateFcCounts.bind(QUIZ);
@@ -2386,7 +2547,7 @@ window.APP_SWITCH = {
    MY SUBMISSIONS — list your written submissions, open the uploaded
    PDF, and see the score once it's marked. Data comes from
    getMySubjectiveSubmissions; the PDF itself comes from
-   getMySubjectivePdf, a small endpoint that returns the bytes of a
+   getMySubmissionPdf, a small endpoint that returns the bytes of a
    submission you own.
    ═══════════════════════════════════════════════════════════════════ */
 window.MY_SUBJ = {
@@ -2512,9 +2673,11 @@ window.MY_SUBJ = {
     const marks = s.questionMarks || (s.kind === 'exam' ? 100 : 10);
     const when = s.submittedAt ? new Date(s.submittedAt).toLocaleString() : '—';
 
+    const marked = !!s.pdfReplacedAt;
     const pdfBtn = s.pdfUrl
-      ? '<button class="subm-pdf-btn" onclick="MY_SUBJ.openPdf(\'' + escAttrJs(s.id) + '\')">' +
-          '<i class="ph ph-file-pdf"></i> Open my PDF</button>'
+      ? '<button class="subm-pdf-btn" onclick="MY_SUBJ.openPdf(\'' + escAttrJs(s.id) + '\',\'' + escAttrJs(kind) + '\')">' +
+          '<i class="ph ph-file-pdf"></i> ' + (marked ? 'Open the marked paper' : 'Open my answer') + '</button>' +
+        (marked ? '<span class="ctag tc"><i class="ph ph-highlighter-circle"></i> Marked by hand</span>' : '')
       : '<span class="t-cap">No PDF attached</span>';
 
     const statusChip = graded
@@ -2558,46 +2721,112 @@ window.MY_SUBJ = {
     '</div>';
   },
 
-  async openPdf(id){
+  /* The backend endpoint is getMySubmissionPdf — it streams the bytes of a
+     submission you own, so the Drive files themselves stay private. */
+  async openPdf(id, label){
     const user = this._user();
     const url = this._url();
     if (!user || !user.token) { toast('Please log in again.'); return; }
-    if (!url) { toast('Backend not configured.'); return; }
+    if (!url) { toast('The backend address is not set up.'); return; }
 
-    const tab = window.open('about:blank', '_blank');
-    if (tab) {
-      try {
-        tab.document.write('<!doctype html><title>Loading</title><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui;color:#666;background:#f5f5f5"><p>Loading your PDF…</p></body>');
-        tab.document.close();
-      } catch(e){}
-    }
-    toast('Loading your PDF…');
-
-    try {
+    const fetchPdf = async () => {
       const r = await fetch(url, {
         method:'POST', headers:{ 'Content-Type':'text/plain' },
-        body: JSON.stringify({ action:'getMySubjectivePdf', username:user.username, token:user.token, id })
+        body: JSON.stringify({ action:'getMySubmissionPdf', username:user.username, token:user.token, id })
       });
+      if (!r.ok) throw new Error('The server replied with an error (' + r.status + ').');
       const res = await r.json();
       if (!res || !res.success) throw new Error((res && res.error) || 'Could not load that PDF.');
+      return res;
+    };
 
+    /* The in-app viewer keeps the student inside the app, is not affected by
+       pop-up blockers, and reads properly on a phone. */
+    if (window.PDFVIEW) {
+      PDFVIEW.open({
+        title: label || 'My answer paper',
+        load: async () => {
+          const res = await fetchPdf();
+          return { base64: res.base64, filename: res.filename || 'answer.pdf' };
+        }
+      });
+      return;
+    }
+
+    toast('Loading your PDF…');
+    try {
+      const res = await fetchPdf();
       const chars = atob(res.base64);
       const bytes = new Uint8Array(chars.length);
       for (let i = 0; i < chars.length; i++) bytes[i] = chars.charCodeAt(i);
       const blobUrl = URL.createObjectURL(new Blob([bytes], { type: res.mimeType || 'application/pdf' }));
-
-      if (tab) tab.location.href = blobUrl;
-      else window.open(blobUrl, '_blank');
+      const tab = window.open(blobUrl, '_blank');
+      if (!tab) {
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = res.filename || 'answer.pdf';
+        document.body.appendChild(a); a.click(); a.remove();
+      }
       setTimeout(() => URL.revokeObjectURL(blobUrl), 300000);
     } catch(e){
-      if (tab) {
-        try {
-          tab.document.write('<!doctype html><body style="font-family:system-ui;padding:2rem;color:#b33"><h2>Could not load the PDF</h2><p>' + esc(e.message || '') + '</p></body>');
-          tab.document.close();
-        } catch(_){}
-      }
       toast(e.message || 'Could not open that PDF.', 5000);
     }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   EMAIL CONFIRMATION — an unconfirmed address means the student can
+   never reset their own password, so it is worth one quiet nudge.
+   ═══════════════════════════════════════════════════════════════════ */
+window.VERIFY = {
+  KEY: 'abhyas_verify_hidden',
+
+  _unverified(){
+    try {
+      if (typeof S !== 'undefined' && S.user && S.user.emailVerified === false) return true;
+      const raw = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
+      return !!(raw && raw.emailVerified === false);
+    } catch(e){ return false; }
+  },
+  _hidden(){
+    try { return Number(localStorage.getItem(this.KEY) || 0) > Date.now(); } catch(e){ return false; }
+  },
+  render(){
+    const el = $('verify-banner');
+    if (!el) return;
+    el.hidden = !(this._unverified() && !this._hidden());
+  },
+  dismiss(){
+    try { localStorage.setItem(this.KEY, String(Date.now() + 7 * 24 * 3600 * 1000)); } catch(e){}
+    this.render();
+  },
+  _mark(){
+    try {
+      if (typeof S !== 'undefined' && S.user) S.user.emailVerified = true;
+      const raw = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
+      if (raw) { raw.emailVerified = true; localStorage.setItem('abhyas_session', JSON.stringify(raw)); }
+    } catch(e){}
+  },
+  async resend(){
+    let user = null, url = '';
+    try { user = (typeof S !== 'undefined' && S.user) ? S.user : null; } catch(e){}
+    try { url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || ''; } catch(e){}
+    if (!user || !user.token || !url) return toast('Please sign in again.');
+    const btn = $('verify-resend');
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    try {
+      const r = await fetch(url, {
+        method:'POST', headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify({ action:'resendVerification', username:user.username, token:user.token })
+      });
+      const res = await r.json();
+      if (!res || !res.success) throw new Error((res && res.error) || 'Could not send that email.');
+      if (res.alreadyVerified) { this._mark(); this.render(); toast('Your email is already confirmed.'); }
+      else toast('Sent — open the link in your inbox.', 5000);
+    } catch(e){
+      toast(e.message || 'Could not send that email right now.', 5000);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = 'Send the link again'; }
   }
 };
 
@@ -2637,7 +2866,7 @@ UI._goRaw = function(v){
     const active = $('nav-' + real);
     if (active) active.classList.add('active');
 
-    if (real === 'subj-exam') setTimeout(() => { if (typeof SUBJ_BUILDER !== 'undefined') SUBJ_BUILDER._populate(); }, 80);
+    if (real === 'subj-exam') setTimeout(() => { if (typeof SUBJ_BUILDER !== 'undefined') { SUBJ_BUILDER._populate(); SUBJ_BUILDER._updateCooldownUI(); } }, 80);
     if (real === 'subj-list') setTimeout(_populateChapterFilter, 80);
     setTimeout(_refreshHints, 50);
     return;
@@ -2686,6 +2915,19 @@ window.SUBJ_BUILDER = {
       ).join('')
     ).join('');
     this._populated = true;
+  },
+  /* subjective.js rate-limits a custom paper to one every six hours. Showing
+     the remaining time beats letting someone press Build and get refused. */
+  _updateCooldownUI(){
+    const btn = $('exam-builder-go');
+    const note = $('exam-builder-note');
+    if (!btn || typeof SUBJ === 'undefined' || typeof SUBJ.customExamIsLocked !== 'function') return;
+    const locked = SUBJ.customExamIsLocked();
+    btn.disabled = locked;
+    btn.innerHTML = locked
+      ? '<i class="ph ph-clock"></i> Available again in ' + SUBJ.customExamCooldownLabel()
+      : '<i class="ph ph-shuffle"></i> Build the paper';
+    if (note) note.textContent = locked ? 'You can build one custom paper every six hours.' : '';
   },
   selectAll(){ document.querySelectorAll('#exam-builder-chapters input.eb-ch').forEach(c => c.checked = true); },
   clear(){ document.querySelectorAll('#exam-builder-chapters input.eb-ch').forEach(c => c.checked = false); },
@@ -2832,6 +3074,8 @@ window.SB_HINTS = {
     }
 
     if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.refreshHint();
+    if (typeof VERIFY !== 'undefined') VERIFY.render();
+    if (typeof SUBJ_BUILDER !== 'undefined') SUBJ_BUILDER._updateCooldownUI();
 
     _renderDueStrip();
     _renderMarquee();
@@ -2874,8 +3118,38 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
       _refreshHints();
       if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load(true);
     }, 300);
+    /* Warm the written-answer bank in the background so the sidebar can say
+       whether today's question is waiting without the student opening the tab. */
+    setTimeout(() => {
+      try {
+        if (typeof SUBJ !== 'undefined' && typeof SUBJ.init === 'function' && !SUBJ.ready()) SUBJ.init();
+      } catch(e){}
+    }, 1800);
   };
 }
+
+/* manifest.json ships home-screen shortcuts that land on user.html#offline
+   and user.html#subjective — without this they all just opened Home. */
+(function(){
+  const MAP = {
+    home:'home', offline:'offline', downloads:'offline', progress:'progress',
+    subjective:'subj-qotd', written:'subj-qotd', weekly:'weekly',
+    chapters:'online', wrong:'wrong', bookmarks:'bookmarks'
+  };
+  function applyHash(){
+    const key = String(location.hash || '').replace(/^#/, '').toLowerCase();
+    const view = MAP[key];
+    if (view && typeof UI !== 'undefined' && UI.go) UI.go(view);
+  }
+  window.addEventListener('hashchange', applyHash);
+  if (!location.hash) return;
+  let tries = 0;
+  (function wait(){
+    const app = $('app');
+    if (app && app.classList.contains('on')) { applyHash(); return; }
+    if (++tries < 80) setTimeout(wait, 250);
+  })();
+})();
 
 (function bootstrapAdmin(){
   let tries = 0;
@@ -2936,6 +3210,18 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   new MutationObserver(() => {
     if (mbg.classList.contains('show')) activate(); else deactivate();
   }).observe(mbg, { attributes:true, attributeFilter:['class'] });
+})();
+
+/* The drawer is opened from app.js, so watch the class instead of patching
+   it: without this the page behind the drawer scrolls under your finger. */
+(function(){
+  const sb = $('sb');
+  if (!sb || !window.MutationObserver) return;
+  new MutationObserver(() => {
+    const open = sb.classList.contains('open');
+    document.body.style.overflow = open ? 'hidden' : '';
+    sb.setAttribute('aria-hidden', open || window.innerWidth > 960 ? 'false' : 'true');
+  }).observe(sb, { attributes:true, attributeFilter:['class'] });
 })();
 
 (function(){
