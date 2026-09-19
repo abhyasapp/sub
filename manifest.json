@@ -67,22 +67,5 @@
       "url": "./user.html#subjective",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }]
     }
-  ],
-
-  "screenshots": [
-    {
-      "src": "screenshot-mobile.png",
-      "sizes": "1080x1920",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Abhyas study dashboard on mobile"
-    },
-    {
-      "src": "screenshot-desktop.png",
-      "sizes": "1920x1080",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Abhyas study dashboard on desktop"
-    }
   ]
 }

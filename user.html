@@ -1954,6 +1954,24 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <button class="btn btn-r" onclick="DATA.reset()"><i class="ph ph-warning"></i> Reset this device</button>
           </div>
         </div>
+
+        <!-- ABHYAS_PATCH_1_13 -->
+        <div class="card">
+          <div class="card-hd"><h3>Your data on the server</h3><span class="ctag tr">Permanent</span></div>
+          <p class="t-callout mb4">"Reset this device" only clears this browser &mdash; while you are logged in, your cloud backup is restored on the next visit. To really start over, reset it here.</p>
+          <div class="bg">
+            <button class="btn btn-r" onclick="DATA.resetCloud()"><i class="ph ph-arrow-counter-clockwise"></i> Reset my progress everywhere</button>
+          </div>
+          <p class="t-callout mb3" style="margin-top:var(--sp-5)"><b>Delete my account.</b> Removes your login, progress, payment record, weekly-set attempts and written answers, including uploaded files. It cannot be undone. Signed up with Google and never set a password? Use &ldquo;Forgot password&rdquo; on the login page first. A backup in your own Google Drive is not touched. <a href="privacy.html" target="_blank" rel="noopener">What we store</a>.</p>
+          <label class="t-foot" for="del-pw">Password</label>
+          <input class="input" type="password" id="del-pw" autocomplete="current-password" style="margin:var(--sp-1) 0 var(--sp-3)">
+          <label class="t-foot" for="del-typed">Type DELETE to confirm</label>
+          <input class="input" type="text" id="del-typed" autocomplete="off" style="margin:var(--sp-1) 0 var(--sp-3)">
+          <div class="bg">
+            <button class="btn btn-r" onclick="DATA.deleteAccount()"><i class="ph ph-trash"></i> Delete my account</button>
+          </div>
+        </div>
+
       </div>
 
       <!-- ─────────────── STUDY PLAN ─────────────── -->
@@ -2160,9 +2178,14 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script>
+/* Firebase SDK is only needed once push is configured in firebase-config.js. */
+if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
+  document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"><\/script>');
+  document.write('<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js"><\/script>');
+}
+</script>
 <script src="config.js"></script>
 <script src="version.js"></script>
 <script src="shared.js"></script>

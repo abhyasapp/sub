@@ -37,5 +37,11 @@
           Back / Next / Finish bar above the tab bar, a density pass so a
           question and its options fit one screen, and guards against a
           double tap skipping a question or submitting twice.
+   1.13 - self-service data control: resetMyProgress + deleteMyAccount
+          (Backup page -> "Your data on the server"); account deletion now
+          also trashes Drive files and anonymises log/report references;
+          per-file reset button fixed; Firebase SDK only loads when push is
+          configured; sw precaches icon-512/favicon; manifest tidy-up;
+          privacy page.
    ═══════════════════════════════════════════════════════════════════════ */
-const APP_VERSION = '1.09';
+const APP_VERSION = '1.13';

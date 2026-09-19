@@ -2068,6 +2068,56 @@ const DATA = {
     await QDB.clear();
     toast('🗑 Local data wiped — reloading…');
     setTimeout(()=>location.reload(), 1200);
+  },
+
+  /* ---- v1.13: cloud reset + account deletion ----------- ABHYAS_PATCH_1_13 ---- */
+  async resetCloud(){
+    if(!S.user || !S.user.token){ toast('❌ Log in first'); return; }
+    if(!S.online || S.forcedOffline){ toast('❌ Go online first — this also clears your cloud copy'); return; }
+    if(!confirm('Reset your progress EVERYWHERE?\n\nThis deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.')) return;
+    const typed = prompt('Type RESET to confirm.');
+    if(typed === null || typed.trim().toUpperCase() !== 'RESET'){ toast('Cancelled — nothing was changed'); return; }
+    let res;
+    try{
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'resetMyProgress', username:S.user.username, token:S.user.token, confirm:'RESET'})
+      }, 30000);
+      res = await r.json();
+    }catch(e){ toast('❌ Could not reach the server — nothing was changed'); return; }
+    if(!res || !res.success){ toast('❌ ' + ((res && res.error) || 'Reset failed')); return; }
+    clearTimeout(PSYNC._timer); PSYNC._timer = null;
+    S.prog = {total:0,correct:0,sessions:[]}; S.bk = []; S.fl = []; S.wr = [];
+    S.stk = {days:[],last:''}; S.chapStats = {}; S.fcount = {};
+    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.FCOUNT, LS.EXAM_SNAP].forEach(k=>localStorage.removeItem(k));
+    toast('✅ Progress reset everywhere — reloading…');
+    setTimeout(()=>location.reload(), 900);
+  },
+
+  async deleteAccount(){
+    if(!S.user || !S.user.token){ toast('❌ Log in first'); return; }
+    if(!S.online || S.forcedOffline){ toast('❌ Go online first — your account lives on the server'); return; }
+    const pwEl = document.getElementById('del-pw');
+    const cfEl = document.getElementById('del-typed');
+    const password = pwEl ? pwEl.value : '';
+    const typed = cfEl ? cfEl.value.trim().toUpperCase() : '';
+    if(!password){ toast('Enter your password first'); return; }
+    if(typed !== 'DELETE'){ toast('Type DELETE in the box to confirm'); return; }
+    if(!confirm('Permanently delete your account?\n\nYour login, progress, payment record, weekly-set attempts and written answers (including uploaded files) are removed from the server. This cannot be undone.')) return;
+    let res;
+    try{
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'deleteMyAccount', username:S.user.username, token:S.user.token, password, confirm:'DELETE'})
+      }, 45000);
+      res = await r.json();
+    }catch(e){ toast('❌ Could not reach the server — nothing was deleted'); return; }
+    if(!res || !res.success){ toast('❌ ' + ((res && res.error) || 'Could not delete the account')); return; }
+    clearTimeout(PSYNC._timer); PSYNC._timer = null;
+    try{ Object.keys(localStorage).filter(k=>k.indexOf('abhyas')===0).forEach(k=>localStorage.removeItem(k)); }catch(e){}
+    try{ await QDB.clear(); }catch(e){}
+    toast('✅ Account deleted');
+    setTimeout(()=>{ window.location.href = 'index.html'; }, 1200);
   }
 };
 

@@ -2,7 +2,7 @@
    debug.gs — Diagnostics + destructive helpers  (v1.11)
 
    ⚠️  DELETE THIS FILE BEFORE SHARING THE APPS SCRIPT PROJECT.
-   ⚠️  resetAll() wipes every sheet except Users/Payments/Settings/Admins.
+   ⚠️  resetAll() wipes activity data, keeps accounts. resetEverything() = full wipe.
    ⚠️  resetAdminPasswordToSeed() sets a NEW RANDOM owner password.
    ⚠️  testAll() resets the owner password and creates/deletes "testuser".
 
@@ -48,22 +48,68 @@ function testFileAccess(fileId) {
 
 const ALLOW_RESET_ALL = false;
 
+/* ABHYAS_PATCH_1_13
+   resetAll(): clears ALL activity data (progress, attempts, submissions, logs,
+   question reports, push tokens, weekly sets ...) but KEEPS accounts: Users,
+   Payments, Settings, Admins and AdminPermissions are left exactly as they are.
+   (Before v1.13 this also emptied Users/Payments/Admins, although the comment
+   said otherwise.) Drive files are not touched. */
 function resetAll() {
   if (!ALLOW_RESET_ALL) {
-    const msg = "🚫 resetAll() refused: ALLOW_RESET_ALL is false. Flip it to true (temporarily) if you really mean to wipe production data.";
+    const msg = "resetAll() refused: ALLOW_RESET_ALL is false. Flip it to true (temporarily) if you really mean to wipe production data.";
     console.error(msg);
     return msg;
   }
   const ss = getSpreadsheet_();
-  const keep = [USERS_SHEET, PAYMENTS_SHEET, SETTINGS_SHEET, ADMINS_SHEET];
+  const keep = [USERS_SHEET, PAYMENTS_SHEET, SETTINGS_SHEET, ADMINS_SHEET, ADMIN_PERMS_SHEET];
   ss.getSheets().forEach(sheet => { if (!keep.includes(sheet.getName())) ss.deleteSheet(sheet); });
-  keep.forEach(name => {
+  console.log("Activity data reset. Accounts kept.");
+  return "Activity data has been reset. Accounts, payments and settings were kept.";
+}
+
+/* Full wipe: every student, payment, log and student upload.  Keeps ONLY the
+   main-admin (owner) account(s) so you can still log in.  Student Drive
+   folders go to the Drive trash (recoverable ~30 days).  Same safety flag. */
+function resetEverything() {
+  if (!ALLOW_RESET_ALL) {
+    const msg = "resetEverything() refused: ALLOW_RESET_ALL is false. Flip it to true (temporarily) if you really mean to wipe production data.";
+    console.error(msg);
+    return msg;
+  }
+  STUDENT_UPLOAD_FOLDERS.forEach(name => {
+    const it = DriveApp.getFoldersByName(name);
+    while (it.hasNext()) {
+      try { it.next().setTrashed(true); } catch (e) { console.error("resetEverything: folder " + name + ": " + e); }
+    }
+  });
+
+  const ss = getSpreadsheet_();
+  const keep = [USERS_SHEET, PAYMENTS_SHEET, SETTINGS_SHEET, ADMINS_SHEET, ADMIN_PERMS_SHEET];
+  ss.getSheets().forEach(sheet => { if (!keep.includes(sheet.getName())) ss.deleteSheet(sheet); });
+
+  [USERS_SHEET, PAYMENTS_SHEET].forEach(name => {
     const sheet = ss.getSheetByName(name);
     if (sheet && sheet.getLastRow() > 1) sheet.deleteRows(2, sheet.getLastRow() - 1);
   });
-  initDefaultSettings_();
-  console.log("All data reset.");
-  return "All data has been reset.";
+
+  const owners = {};
+  const admins = ss.getSheetByName(ADMINS_SHEET);
+  if (admins && admins.getLastRow() > 1) {
+    const data = admins.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][6]) === ADMIN_ROLE_OWNER) owners[String(data[i][0]).toLowerCase()] = true;
+      else admins.deleteRow(i + 1);
+    }
+  }
+  const perms = ss.getSheetByName(ADMIN_PERMS_SHEET);
+  if (perms && perms.getLastRow() > 1) {
+    const data = perms.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (!owners[String(data[i][0]).toLowerCase()]) perms.deleteRow(i + 1);
+    }
+  }
+  console.log("Everything reset. Remaining admin accounts: " + Object.keys(owners).join(", "));
+  return "Everything has been reset. Only the main admin account(s) remain.";
 }
 
 /* Sets a fresh RANDOM password on the main admin (creating the account if it

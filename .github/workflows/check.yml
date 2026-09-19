@@ -1,0 +1,41 @@
+name: Static checks
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: One README only (case-insensitive)
+        run: test "$(ls | grep -ci '^readme\.md$')" = "1"
+      - name: Client and backend versions must match
+        run: |
+          client=$(grep -oP "APP_VERSION = '\K[^']+" version.js)
+          server=$(grep -oP 'APP_VERSION = "\K[^"]+' script/code.gs)
+          echo "client=$client server=$server"
+          test "$client" = "$server"
+      - name: Syntax check - .js and .gs files
+        run: |
+          set -e
+          for f in *.js; do node --check "$f"; done
+          mkdir -p /tmp/gs
+          for f in script/*.gs; do cp "$f" "/tmp/gs/$(basename "$f").js"; node --check "/tmp/gs/$(basename "$f").js"; done
+      - name: Syntax check - inline scripts in HTML
+        run: |
+          python3 - <<'PY'
+          import re, subprocess, sys, glob, os, tempfile
+          bad = 0
+          for html in glob.glob('*.html'):
+              src = open(html, encoding='utf-8').read()
+              for i, m in enumerate(re.finditer(r'<script>(.*?)</script>', src, re.S)):
+                  with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as t:
+                      t.write(m.group(1))
+                  r = subprocess.run(['node', '--check', t.name], capture_output=True, text=True)
+                  os.unlink(t.name)
+                  if r.returncode:
+                      bad += 1
+                      print('::error file=%s::inline script #%d: %s' % (html, i + 1, r.stderr.strip()[:300]))
+          sys.exit(1 if bad else 0)
+          PY

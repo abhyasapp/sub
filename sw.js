@@ -33,12 +33,12 @@ const CACHE_NAME = 'abhyas-v' + APP_VERSION;
    notifications couldn't initialize. */
 let _fcmMessaging = null;
 try {
-  importScripts(
-    './firebase-config.js',
-    'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
-    'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js'
-  );
+  importScripts('./firebase-config.js');
   if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
+    importScripts(
+      'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
+      'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js'
+    );
     firebase.initializeApp(FIREBASE_CONFIG);
     _fcmMessaging = firebase.messaging();
   }
@@ -93,6 +93,8 @@ const SHELL = [
   /* Shared PDF reader — without this, opening a marked paper offline fails */
   './pdf-viewer.js',
   './icon-192.png',
+  './icon-512.png',
+  './favicon.png',
 
   /* Styles + manifest */
   './design-system.css',

@@ -264,7 +264,7 @@ const ONPROG = {
             <div class="pb-l">
               <span>${esc(rowLabel)}</span>
               <span class="fw-row-right">${fVal} / ${fTotal!=null?fTotal:'?'}${fTotal!=null?` (${fPct}%)`:''}
-                <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" onclick="event.stopPropagation();ONPROG.resetFile(${JSON.stringify(ref.fid)})"><i class="ph ph-trash"></i></button>
+                <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" data-fid="${esc(ref.fid)}" onclick="event.stopPropagation();ONPROG.resetFile(this.dataset.fid)"><i class="ph ph-trash"></i></button>
               </span>
             </div>
             <div class="pb"><div class="pb-f" style="width:${fTotal!=null?fPct:0}%;background:${barColor}"></div></div>
@@ -278,7 +278,7 @@ const ONPROG = {
       }
 
       const scopeResetBtn = fid
-        ? ` <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" onclick="ONPROG.resetFile(${JSON.stringify(fid)})"><i class="ph ph-trash"></i></button>`
+        ? ` <button class="fw-reset" title="Reset progress for this file" aria-label="Reset progress for this file" data-fid="${esc(fid)}" onclick="ONPROG.resetFile(this.dataset.fid)"><i class="ph ph-trash"></i></button>`
         : '';
 
       bodyEl.innerHTML = `

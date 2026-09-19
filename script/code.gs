@@ -1,8 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas V1 — Apps Script backend (runtime only)
 
-   VERSION: 1.11
+   VERSION: 1.13
    ─────────────────────────────────────────────────────────────────────
+   v1.13 - Self-service data control.
+     * deleteMyAccount / resetMyProgress actions (session + typed confirm;
+       deleteMyAccount also needs the password).
+     * Deleting an account (self or admin) now also trashes the student's Drive
+       files (payment screenshots, answer PDFs) and anonymises their name in
+       QuestionReports and the activity log.
+     * debug.gs: resetAll() keeps accounts; resetEverything() is the full wipe.
    v1.11 — Security + robustness hardening (from the v1.10 review).
      CRITICAL
      • Admin takeover closed: signup / Google signup can no longer claim a
@@ -65,7 +72,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.12";
+const APP_VERSION = "1.13";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -223,7 +230,8 @@ let _REQUEST_VIA_POST = false;
 /* Actions that carry secrets and therefore must be POST. */
 const POST_ONLY_ACTIONS = {
   login: 1, googlelogin: 1, signup: 1, resetpassword: 1,
-  adminlogin: 1, adminchangepassword: 1, admincreateadmin: 1
+  adminlogin: 1, adminchangepassword: 1, admincreateadmin: 1,
+  deletemyaccount: 1, resetmyprogress: 1
 };
 
 /* ── Request-scoped caches ── */
@@ -278,6 +286,8 @@ function doGet(e) {
       case "resetpassword":        result = resetPassword(e.parameter); break;
       case "resendverification":   result = resendVerificationEmail(e.parameter); break;
       case "updateownmobile":      result = updateOwnMobile(e.parameter); break;
+      case "deletemyaccount":      result = deleteMyAccount(e.parameter); break;
+      case "resetmyprogress":      result = resetMyProgress(e.parameter); break;
       case "checkadmincapable":    result = checkAdminCapable(e.parameter); break;
       case "adminswitchfromuser":  result = adminSwitchFromUser(e.parameter); break;
 
@@ -3606,7 +3616,7 @@ function adminDeleteUsersBatch(p) {
     toDelete.sort((a, b) => b.rowIndex - a.rowIndex);
     toDelete.forEach(({ username, rowIndex }) => {
       sheet.deleteRow(rowIndex);
-      purgeUserAuxiliaryRows_(username);
+      purgeUserAuxiliaryRows_(username, { skipLogScrub: true });
       results.push({ username, success: true });
     });
     _invalidateSheet_(USERS_SHEET);
@@ -3616,7 +3626,178 @@ function adminDeleteUsersBatch(p) {
   });
 }
 
-function purgeUserAuxiliaryRows_(username) {
+/* -----------------------------------------------------------------------
+   SELF-SERVICE DATA CONTROL (v1.13)                        ABHYAS_PATCH_1_13
+   ----------------------------------------------------------------------- */
+
+const DELETED_USER_LABEL = "[deleted user]";
+
+/* Extracts a Drive file id from a stored URL (".../uc?id=XYZ" or "/d/XYZ/"). */
+function driveIdFromUrl_(url) {
+  const s = String(url || "");
+  const m = s.match(/[?&]id=([A-Za-z0-9_-]{15,})/) || s.match(/\/d\/([A-Za-z0-9_-]{15,})/);
+  return m ? m[1] : "";
+}
+
+/* Drive file ids that belong to one student: payment screenshots, submitted
+   answer PDFs, and the pre-edit backup copy of a marked PDF.
+   opts.payments === false -> leave payment screenshots out. */
+function collectUserDriveFileIds_(target, opts) {
+  const withPayments = !(opts && opts.payments === false);
+  const ids = {};
+  const scan = (getter, userCol, idCols, urlCols) => {
+    try {
+      const data = getter().getDataRange().getValues();
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][userCol]).toLowerCase().trim() !== target) continue;
+        idCols.forEach(c => { const v = String(data[i][c] || "").trim(); if (v) ids[v] = 1; });
+        urlCols.forEach(c => { const v = driveIdFromUrl_(data[i][c]); if (v) ids[v] = 1; });
+      }
+    } catch (e) { console.error("collectUserDriveFileIds_:", e); }
+  };
+  if (withPayments) scan(getPaymentsSheet_, 0, [], [8]);
+  scan(getSubjSubmissionsSheet_, 1, [10, 19], [11]);
+  return Object.keys(ids);
+}
+
+/* Folders the app itself creates for student uploads. A payment "screenshot URL"
+   can also be a Drive link the student pasted, so we ONLY ever trash files that
+   sit inside one of these folders - never an arbitrary file a student pointed at. */
+const STUDENT_UPLOAD_FOLDERS = ["PaymentScreenshots", "SubjectiveAnswers", "SubjectivePdfBackups"];
+
+function isStudentUploadFile_(file) {
+  const parents = file.getParents();
+  while (parents.hasNext()) {
+    if (STUDENT_UPLOAD_FOLDERS.indexOf(parents.next().getName()) !== -1) return true;
+  }
+  return false;
+}
+
+/* Moves files to the Drive trash (recoverable by the owner for ~30 days). */
+function trashDriveFiles_(ids) {
+  let trashed = 0;
+  (ids || []).forEach(id => {
+    try {
+      const file = DriveApp.getFileById(id);
+      if (!isStudentUploadFile_(file)) { console.log("trashDriveFiles_: skipped " + id + " (not in an Abhyas upload folder)"); return; }
+      file.setTrashed(true);
+      trashed++;
+    } catch (e) { console.error("trashDriveFiles_: " + id + " - " + (e && e.message ? e.message : e)); }
+  });
+  return trashed;
+}
+
+/* Replaces every cell in one column that equals `target` (case-insensitive). */
+function anonymizeColumn_(sheet, colIdx, target, replacement) {
+  const last = sheet.getLastRow();
+  if (last < 2) return 0;
+  const rng = sheet.getRange(2, colIdx + 1, last - 1, 1);
+  const vals = rng.getValues();
+  let n = 0;
+  for (let i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]).toLowerCase().trim() === target) { vals[i][0] = replacement; n++; }
+  }
+  if (n) rng.setValues(vals);
+  return n;
+}
+
+/* Deletes every row whose column `colIdx` equals `target`. Returns the count. */
+function deleteRowsForUser_(sheetName, getter, colIdx, target) {
+  let n = 0;
+  try {
+    const sheet = getter();
+    const data = sheet.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][colIdx]).toLowerCase().trim() === target) { sheet.deleteRow(i + 1); n++; }
+    }
+    _invalidateSheet_(sheetName);
+  } catch (e) { console.error("deleteRowsForUser_: " + sheetName + " failed:", e); }
+  return n;
+}
+
+/* Full clean-up for one student, used by adminDeleteUser, adminDeleteUsersBatch
+   and deleteMyAccount. Call it AFTER the Users row is gone.
+   opts.skipLogScrub === true -> don't rewrite the log (used by the batch delete
+   so a 1000-user batch stays inside the Apps Script time limit). */
+function purgeUserAuxiliaryRows_(username, opts) {
+  if (!username) return { driveFilesTrashed: 0, referencesAnonymized: 0 };
+  const target = String(username).toLowerCase().trim();
+  const driveIds = collectUserDriveFileIds_(target);   // must run BEFORE the rows are deleted
+  purgeUserSheetRows_(username);
+  const trashed = trashDriveFiles_(driveIds);
+  let scrubbed = 0;
+  try {
+    scrubbed += anonymizeColumn_(getQReportsSheet_(), 6, target, DELETED_USER_LABEL);
+    _invalidateSheet_(QREPORTS_SHEET);
+  } catch (e) { console.error("purgeUserAuxiliaryRows_: QuestionReports scrub failed:", e); }
+  if (!(opts && opts.skipLogScrub)) {
+    try { scrubbed += anonymizeColumn_(getLogsSheet_(), 3, target, DELETED_USER_LABEL); }
+    catch (e) { console.error("purgeUserAuxiliaryRows_: log scrub failed:", e); }
+  }
+  return { driveFilesTrashed: trashed, referencesAnonymized: scrubbed };
+}
+
+/* Student deletes their OWN account. Needs: valid session, the password, and
+   confirm = "DELETE". Accounts that also carry admin access are refused (the
+   main admin has to remove the admin role first). */
+function deleteMyAccount(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const username = auth.username;
+
+  if (String(p.confirm || "").trim().toUpperCase() !== "DELETE") {
+    return { success: false, error: "Type DELETE to confirm." };
+  }
+  if (!checkRateLimit_("delacct_" + username.toLowerCase(), 5, 10 * 60 * 1000, "Delete Account Rate Limited")) {
+    return { success: false, error: "Too many attempts. Please wait a few minutes and try again." };
+  }
+  const password = String(p.password == null ? "" : p.password);
+  if (!password) return { success: false, needsPassword: true, error: "Enter your password to delete your account." };
+  if (!verifyPassword_(password, auth.found.row[1]).ok) return { success: false, error: "Password is incorrect." };
+  if (userIsAlsoAdmin_(username, auth.found.row[1])) {
+    return { success: false, error: "This account also has admin access. Ask the main admin to remove the admin role first." };
+  }
+
+  return withLock_(() => {
+    const sheet = getUsersSheet_();
+    const found = findUserRow_(sheet, username);
+    if (!found) return { success: false, error: "Account not found." };
+    if (!verifyUserToken_(found, p.token)) return { success: false, error: "Session expired. Please log in again.", sessionInvalid: true };
+
+    sheet.deleteRow(found.rowIndex);
+    _invalidateSheet_(USERS_SHEET);
+    const cleanup = purgeUserAuxiliaryRows_(username);
+    logAction_("system", "Self-Delete Account", DELETED_USER_LABEL,
+      "Student deleted their own account. Drive files trashed: " + cleanup.driveFilesTrashed);
+    return { success: true, deleted: true, message: "Your account and its data have been deleted." };
+  });
+}
+
+/* Student clears THEIR OWN cloud progress (Progress row + admin-made progress
+   snapshots). The account, payment record and weekly-set / written-answer
+   history stay. */
+function resetMyProgress(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const username = auth.username;
+
+  if (String(p.confirm || "").trim().toUpperCase() !== "RESET") {
+    return { success: false, error: "Type RESET to confirm." };
+  }
+  if (!checkRateLimit_("resetprog_" + username.toLowerCase(), 5, 10 * 60 * 1000, "Reset Progress Rate Limited")) {
+    return { success: false, error: "Too many attempts. Please wait a few minutes and try again." };
+  }
+
+  return withLock_(() => {
+    const target = String(username).toLowerCase().trim();
+    const progress = deleteRowsForUser_(PROGRESS_SHEET, getProgressSheet_, 0, target);
+    const backups = deleteRowsForUser_(PROGRESS_BACKUPS_SHEET, getProgressBackupsSheet_, 2, target);
+    logAction_("system", "Self-Reset Progress", username, "Cleared cloud progress rows: " + progress + ", snapshots: " + backups);
+    return { success: true, cleared: { progress, snapshots: backups } };
+  });
+}
+
+function purgeUserSheetRows_(username) {
   if (!username) return;
   const target = String(username).toLowerCase().trim();
 
