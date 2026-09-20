@@ -550,7 +550,7 @@ function _onTokenResponse(resp) {
 async function _fetchUserEmail() {
   if (!_accessToken) return null;
   try {
-    const res = await fetch(`${DRIVE_LIST_URL}/about?fields=user(emailAddress)`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)`, {
       headers: { Authorization: `Bearer ${_accessToken}` }
     });
     if (!res.ok) return null;

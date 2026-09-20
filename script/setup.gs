@@ -30,6 +30,7 @@ function setup() {
     getPushTokensSheet_();
     getWeeklySetsSheet_();
     getWeeklyAttemptsSheet_();
+    getWeeklyStartsSheet_();
     getQReportsSheet_();
     getSubjSubmissionsSheet_();
     getAdminPermsSheet_();
@@ -160,6 +161,10 @@ function ensurePushTriggers_() {
   }
   if (!triggers.some(t => t.getHandlerFunction() === "checkWeeklySetUnlocks_")) {
     ScriptApp.newTrigger("checkWeeklySetUnlocks_").timeBased().everyMinutes(15).create();
+  }
+  /* v1.15: nightly copy of the spreadsheet. */
+  if (!triggers.some(t => t.getHandlerFunction() === "backupSpreadsheet")) {
+    ScriptApp.newTrigger("backupSpreadsheet").timeBased().everyDays(1).atHour(2).create();
   }
   /* v1.11: daily housekeeping for Script Properties. */
   if (!triggers.some(t => t.getHandlerFunction() === "cleanupExpiredProperties")) {

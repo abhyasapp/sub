@@ -72,7 +72,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.13";
+const APP_VERSION = "1.15";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -108,6 +108,7 @@ const WEEKLYATTEMPTS_SHEET   = "WeeklyAttempts";
 const QREPORTS_SHEET         = "QuestionReports";
 const SUBJ_SUBMISSIONS_SHEET = "SubjectiveSubmissions";
 const ADMIN_PERMS_SHEET      = "AdminPermissions";
+const WEEKLYSTARTS_SHEET     = "WeeklyStarts";
 
 const USER_HEADERS = [
   "username","passHash","name","email","mobile",
@@ -144,6 +145,9 @@ const SUBJ_SUBMISSION_HEADERS = [
   "pdfReplacedAt","pdfReplacedBy","pdfOriginalBackupId"
 ];
 const ADMIN_PERM_HEADERS = ["username","featureKey","enabled","updatedAt","updatedBy"];
+const WEEKLYSTART_HEADERS = ["username","weeklyId","startedAt"];
+/* Keep equal to WEEKLY_EXAM_WINDOW_HOURS (12) in app.js. */
+const WEEKLY_EXAM_WINDOW_MS = 12 * 60 * 60 * 1000;
 const PROGRESS_IMPORT_HEADERS = [
   "importId","admin","mode","status","recordsReceived",
   "recordsAccepted","recordsSkipped","errorCount","createdAt",
@@ -281,6 +285,7 @@ function doGet(e) {
       case "login":                result = handleLogin(e.parameter); break;
       case "googlelogin":          result = handleGoogleLogin(e.parameter); break;
       case "signup":               result = handleSignup(e.parameter); break;
+      case "logclienterror":       result = logClientError(e.parameter); break;
       case "checksession":         result = checkSession(e.parameter); break;
       case "requestpasswordreset": result = requestPasswordReset(e.parameter); break;
       case "resetpassword":        result = resetPassword(e.parameter); break;
@@ -297,6 +302,8 @@ function doGet(e) {
       case "listweeklysets":       result = listWeeklySets(e.parameter); break;
       case "getweeklyattempt":     result = getWeeklyAttempt(e.parameter); break;
       case "getmyweeklyattempts":  result = getMyWeeklyAttempts(e.parameter); break;
+      case "startweeklyattempt":   result = startWeeklyAttempt(e.parameter); break;
+      case "getweeklystanding":    result = getWeeklyStanding(e.parameter); break;
       case "submitweeklyattempt":  result = submitWeeklyAttempt(e.parameter); break;
       case "reportquestion":       result = reportQuestion(e.parameter); break;
 
@@ -644,6 +651,8 @@ function getQReportsSheet_()        { return _getOrCreateSheet_(QREPORTS_SHEET, 
 function getAdminPermsSheet_()      { return _getOrCreateSheet_(ADMIN_PERMS_SHEET, ADMIN_PERM_HEADERS, [1,2], "#7c3aed", SpreadsheetApp.BandingTheme.PURPLE, 320); }
 function getProgressImportsSheet_() { return _getOrCreateSheet_(PROGRESS_IMPORTS_SHEET, PROGRESS_IMPORT_HEADERS, [], "#5e35b1", SpreadsheetApp.BandingTheme.PURPLE, 320); }
 function getProgressBackupsSheet_() { return _getOrCreateSheet_(PROGRESS_BACKUPS_SHEET, PROGRESS_BACKUP_HEADERS, [], "#455a64", SpreadsheetApp.BandingTheme.GREY, 320); }
+
+function getWeeklyStartsSheet_() { return _getOrCreateSheet_(WEEKLYSTARTS_SHEET, WEEKLYSTART_HEADERS, [1,2], "#00897b", SpreadsheetApp.BandingTheme.TEAL, 300); }
 
 function getSubjSubmissionsSheet_() {
   const sheet = _getOrCreateSheet_(SUBJ_SUBMISSIONS_SHEET, SUBJ_SUBMISSION_HEADERS, [1,2,4,11], "#0891b2", SpreadsheetApp.BandingTheme.CYAN, 400);
@@ -1510,7 +1519,7 @@ function requestPasswordReset(p) {
     MailApp.sendEmail({
       to: email,
       subject: "Reset your Abhyas password",
-      body: `Hi ${found.row[2] || username},\n\nSomeone (hopefully you) requested a password reset for your Abhyas account (${username}).\n\nOpen the Abhyas app and paste this reset code when prompted:\n\n${token}\n\nThis code expires in 1 hour. If you didn't request this, you can safely ignore this email.\n`
+      body: `Hi ${found.row[2] || username},\n\nSomeone (hopefully you) requested a password reset for your Abhyas account (${username}).\n\nOpen this link on your phone to choose a new password:\n\n${getSettingValue_("appUrl", "https://app.mku.name.np/")}?resetToken=${token}\n\nOr paste this code into the app: ${token}\n\nThis code expires in 1 hour. If you didn't request this, you can safely ignore this email.\n`
     });
   } catch (err) { console.error("requestPasswordReset: MailApp send failed:", err); }
   return generic;
@@ -2396,7 +2405,19 @@ function _isPrivateSettingKey_(key) {
 
 /* PUBLIC endpoint (no auth): hides keys prefixed "private_" / "secret_".
    Admins read everything through adminGetSettings. */
+/* v1.15: the payment screen polls this every 20 s and it carries the QR image,
+   so it is cached for two minutes (cleared whenever an admin saves settings). */
 function getSettings() {
+  const cache = CacheService.getScriptCache();
+  try {
+    const hit = cache.get("pub_settings");
+    if (hit) return { success: true, settings: JSON.parse(hit) };
+  } catch (e) {}
+  const res = getSettingsUncached_();
+  try { if (res && res.success) cache.put("pub_settings", JSON.stringify(res.settings), 120); } catch (e) {}
+  return res;
+}
+function getSettingsUncached_() {
   const all = getSettingsAll_();
   const settings = {};
   Object.keys(all).forEach(k => { if (!_isPrivateSettingKey_(k)) settings[k] = all[k]; });
@@ -2511,7 +2532,7 @@ function adminUploadWeeklySetFile(p) {
     const blob = Utilities.newBlob(jsonText, "application/json", filename);
     const folder = getOrCreateFolder_("WeeklySets");
     const file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    /* v1.14: files stay PRIVATE. The script reads them as owner, so no public link is needed. */
     logAction_(chk.actor, "Upload Weekly Set File", filename, "fileId: " + file.getId());
     return { success: true, fileId: file.getId(), filename: file.getName() };
   } catch (e) { return { success: false, error: "Drive upload failed: " + (e.message || e) }; }
@@ -2637,6 +2658,86 @@ function listWeeklySets(p) {
   return { success: true, sets };
 }
 
+/* v1.15: the moment a student opens the graded weekly test, the start is
+   recorded here. Restarting later cannot be used to look at the questions and
+   try again: a second start is a "resume", and the client only allows that on
+   the device that still holds the saved test. */
+function startWeeklyAttempt(p) {
+  const weeklyId = String(p.weeklyId || "").trim();
+  if (!weeklyId) return { success: false, error: "Missing parameters." };
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const gate = requireAccess_(auth);
+  if (gate) return gate;
+  const username = auth.username;
+
+  const wsFound = findWeeklySetRow_(getWeeklySetsSheet_(), weeklyId);
+  if (!wsFound) return { success: false, error: "Weekly set not found." };
+  const ws = rowToWeeklySet_(wsFound.row);
+  const release = new Date(ws.releaseAt).getTime();
+  if (isNaN(release) || Date.now() < release) return { success: false, error: "This weekly set is not open yet." };
+
+  return withLock_(() => {
+    const done = findWeeklyAttemptRow_(getWeeklyAttemptsSheet_(), username, weeklyId);
+    if (done) return { success: true, alreadyAttempted: true, attempt: rowToWeeklyAttempt_(done.row) };
+    if (Date.now() > release + WEEKLY_EXAM_WINDOW_MS) return { success: true, windowClosed: true };
+
+    const sheet = getWeeklyStartsSheet_();
+    const data = sheet.getDataRange().getValues();
+    const target = username.toLowerCase();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).toLowerCase() === target && String(data[i][1]) === weeklyId) {
+        return { success: true, resumed: true, startedAt: Number(data[i][2]) || 0, serverNow: Date.now() };
+      }
+    }
+    const now = Date.now();
+    sheet.appendRow([username, weeklyId, now]);
+    _invalidateSheet_(WEEKLYSTARTS_SHEET);
+    return { success: true, resumed: false, startedAt: now, serverNow: now };
+  });
+}
+
+/* Rank and percentile, shown only after the exam window closes. */
+function getWeeklyStanding(p) {
+  const weeklyId = String(p.weeklyId || "").trim();
+  if (!weeklyId) return { success: false, error: "Missing parameters." };
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const gate = requireAccess_(auth);
+  if (gate) return gate;
+
+  const wsFound = findWeeklySetRow_(getWeeklySetsSheet_(), weeklyId);
+  if (!wsFound) return { success: false, error: "Weekly set not found." };
+  const ws = rowToWeeklySet_(wsFound.row);
+  const release = new Date(ws.releaseAt).getTime();
+  if (isNaN(release) || Date.now() <= release + WEEKLY_EXAM_WINDOW_MS) {
+    return { success: true, ready: false, message: "Rankings appear when the exam window closes." };
+  }
+
+  const data = _cachedSheetData_(WEEKLYATTEMPTS_SHEET, getWeeklyAttemptsSheet_).data;
+  const me = auth.username.toLowerCase();
+  const scores = [];
+  let mine = null;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]).trim() !== weeklyId) continue;
+    const total = Number(data[i][3] || 0);
+    const correct = Number(data[i][4] || 0);
+    const pct = total ? (correct / total) * 100 : 0;
+    scores.push(pct);
+    if (String(data[i][0]).toLowerCase().trim() === me) mine = pct;
+  }
+  if (mine === null) return { success: true, ready: true, attempted: false };
+  const better = scores.filter(s => s > mine).length;
+  const rank = better + 1;
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return {
+    success: true, ready: true, attempted: true,
+    rank, total: scores.length,
+    percentile: scores.length > 1 ? Math.round(((scores.length - rank) / (scores.length - 1)) * 100) : 100,
+    avgPct: Math.round(avg)
+  };
+}
+
 function getWeeklyAttempt(p) {
   const weeklyId = String(p.weeklyId || "").trim();
   if (!weeklyId) return { success: false, error: "Missing parameters." };
@@ -2720,6 +2821,7 @@ function submitWeeklyAttempt(p) {
   const ws = rowToWeeklySet_(wsFound.row);
   const releaseTime = new Date(ws.releaseAt).getTime();
   if (isNaN(releaseTime) || Date.now() < releaseTime) return { success: false, error: "This weekly set hasn't been released yet." };
+  if (Date.now() > releaseTime + WEEKLY_EXAM_WINDOW_MS + 3 * 60 * 60 * 1000) return { success: false, error: "The exam window for this set has closed." };
 
   let answers;
   try { answers = JSON.parse(p.answers || "[]"); } catch (e) { return { success: false, error: "Malformed answers array." }; }
@@ -2868,6 +2970,18 @@ function submitSubjectiveAnswer(p) {
   const parsed = parsePdfDataUrl_(pdfData, 12 * 1024 * 1024);
   if (parsed.error) return { success: false, error: parsed.error };
 
+  /* v1.15: the slow Drive upload happens BEFORE the script-wide lock is taken,
+     so several students uploading at once no longer cause "server busy". */
+  let pdfFileId = "", pdfUrl = "";
+  try {
+    const safeName = `${username}_${kind}_${Date.now()}.pdf`;
+    const folder = getOrCreateFolder_("SubjectiveAnswers");
+    const blob = Utilities.newBlob(parsed.bytes, "application/pdf", safeName);
+    const file = folder.createFile(blob);
+    pdfFileId = file.getId();
+    pdfUrl = file.getUrl();
+  } catch (e) { return { success: false, error: "Drive upload failed: " + (e.message || e) }; }
+
   return withLock_(() => {
     const sheet = getSubjSubmissionsSheet_();
 
@@ -2876,20 +2990,13 @@ function submitSubjectiveAnswer(p) {
       for (let i = 1; i < data.length; i++) {
         if (String(data[i][1]).toLowerCase().trim() === username.toLowerCase() &&
             String(data[i][3]) === questionId) {
+          try { DriveApp.getFileById(pdfFileId).setTrashed(true); } catch (e2) {}
           return { success: false, alreadySubmitted: true, error: "You've already submitted this question." };
         }
       }
     }
 
-    let pdfFileId = "", pdfUrl = "";
-    try {
-      const safeName = `${username}_${kind}_${Date.now()}.pdf`;
-      const folder = getOrCreateFolder_("SubjectiveAnswers");
-      const blob = Utilities.newBlob(parsed.bytes, "application/pdf", safeName);
-      const file = folder.createFile(blob);
-      pdfFileId = file.getId();
-      pdfUrl = file.getUrl();
-    } catch (e) { return { success: false, error: "Drive upload failed: " + (e.message || e) }; }
+    /* (file was uploaded before the lock was taken; see above) */
 
     const id = Utilities.getUuid();
     const now = Date.now();
@@ -3079,7 +3186,7 @@ function adminUploadSubjectiveFile(p) {
     const blob = Utilities.newBlob(jsonText, "application/json", filename);
     const folder = getOrCreateFolder_("SubjectiveQuestions");
     const file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    /* v1.14: files stay PRIVATE. The script reads them as owner, so no public link is needed. */
     logAction_(actor, "Upload Subjective File", filename, "fileId: " + file.getId());
     return {
       success: true, fileId: file.getId(), filename: file.getName(),
@@ -3807,6 +3914,7 @@ function purgeUserSheetRows_(username) {
     [PAYMENTS_SHEET, getPaymentsSheet_, 0],
     [PROGRESS_BACKUPS_SHEET, getProgressBackupsSheet_, 2],
     [WEEKLYATTEMPTS_SHEET, getWeeklyAttemptsSheet_, 0],
+    [WEEKLYSTARTS_SHEET, getWeeklyStartsSheet_, 0],
     [SUBJ_SUBMISSIONS_SHEET, getSubjSubmissionsSheet_, 1]
   ];
 
@@ -4144,13 +4252,13 @@ function adminUpdateSettings(p) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]) === key) {
         sheet.getRange(i + 1, 2).setValue(value);
-        _invalidateSheet_(SETTINGS_SHEET);
+        _invalidateSheet_(SETTINGS_SHEET); CacheService.getScriptCache().remove("pub_settings");
         logAction_(actor, "Update Setting", key, _isPrivateSettingKey_(key) ? "(private value updated)" : "New value: " + value);
         return { success: true, key, value };
       }
     }
     sheet.appendRow([key, value]);
-    _invalidateSheet_(SETTINGS_SHEET);
+    _invalidateSheet_(SETTINGS_SHEET); CacheService.getScriptCache().remove("pub_settings");
     logAction_(actor, "Update Setting", key, _isPrivateSettingKey_(key) ? "(private value set)" : "New value: " + value);
     return { success: true, key, value };
   });
@@ -4182,7 +4290,7 @@ function adminUpdateSettingsBatch(p) {
       applied.push(key);
     });
     if (appendRows.length) sheet.getRange(sheet.getLastRow() + 1, 1, appendRows.length, 2).setValues(appendRows);
-    _invalidateSheet_(SETTINGS_SHEET);
+    _invalidateSheet_(SETTINGS_SHEET); CacheService.getScriptCache().remove("pub_settings");
     logAction_(actor, "Update Settings (batch)", applied.join(", "), "");
     return { success: true, updated: applied };
   });
@@ -4722,6 +4830,33 @@ function cleanupExpiredProperties() {
 /* ═══════════════════════════════════════════════════════════════════════
    UTILITIES
    ═══════════════════════════════════════════════════════════════════════ */
+
+/* Short crash reports from the app (page, message, browser). Public, rate
+   limited, and never contains answers or personal details. Shows up in the
+   admin Activity log as "Client Error". */
+function logClientError(p) {
+  if (!checkRateLimit_("clienterr", 20, 60000)) return { success: true };
+  const clip = (v, n) => sanitizeSheetField_(String(v == null ? "" : v).replace(/[\r\n]+/g, " ").slice(0, n));
+  logAction_("client", "Client Error", clip(p.page, 60),
+    clip(p.msg, 200) + " @ " + clip(p.src, 80) + ":" + clip(p.line, 8) + " v" + clip(p.v, 10) + " " + clip(p.ua, 80));
+  return { success: true };
+}
+
+/* Nightly copy of the whole spreadsheet into the AbhyasBackups Drive folder
+   (the last 14 are kept). Installed by setup(); also safe to run by hand. */
+function backupSpreadsheet() {
+  const folder = getOrCreateFolder_("AbhyasBackups");
+  const name = "Abhyas backup " + Utilities.formatDate(new Date(), "UTC", "yyyy-MM-dd");
+  if (!folder.getFilesByName(name).hasNext()) {
+    DriveApp.getFileById(getSpreadsheet_().getId()).makeCopy(name, folder);
+  }
+  const list = [];
+  const it = folder.getFiles();
+  while (it.hasNext()) { const f = it.next(); list.push({ f, t: f.getDateCreated().getTime() }); }
+  list.sort((a, b) => b.t - a.t);
+  list.slice(14).forEach(x => { try { x.f.setTrashed(true); } catch (e) {} });
+  return "Backup done: " + name;
+}
 
 function getOrCreateFolder_(name) {
   const iter = DriveApp.getFoldersByName(name);

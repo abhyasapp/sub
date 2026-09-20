@@ -101,7 +101,7 @@ const TIMERS = {
   solveSecondsFor5:  10 * 60,
   solveSecondsFor10: 20 * 60,
   solveSecondsFallback: 15 * 60,
-  uploadSeconds: 5 * 60,
+  uploadSeconds: 10 * 60,
   examSeconds:  3 * 60 * 60
 };
 
@@ -576,10 +576,10 @@ function _renderQotd(){
         <div class="qotd-timer-lbl">Upload closes in</div>
         <div class="qotd-phase-bar"><div class="qotd-phase-fill upload" id="qotd-bar" style="width:${(left/total)*100}%"></div></div>
         <label class="qotd-drop" for="qotd-pdf">
-          <input type="file" id="qotd-pdf" accept="application/pdf,.pdf" onchange="SUBJ._qotdFile(this)">
+          <input type="file" id="qotd-pdf" accept="application/pdf,.pdf,image/*" multiple onchange="SUBJ._qotdFile(this)">
           <span class="ii"><i class="ph ph-file-pdf"></i></span>
-          <span class="dn">Choose PDF of your answer</span>
-          <span class="ds">Scan or photograph all pages, combine into one PDF</span>
+          <span class="dn">Choose photos or a PDF of your answer</span>
+          <span class="ds">Select all your page photos at once. We turn them into one PDF for you.</span>
         </label>
         <div id="qotd-file-slot"></div>
         <button class="btn btn-solid btn-lg btn-blk" id="qotd-submit" style="margin-top:.7rem" disabled onclick="SUBJ._qotdSubmit()">
@@ -614,7 +614,42 @@ function _renderQotdFileChip(fileInfo){
   </div>`;
 }
 
+let _lastQotdPhase = null;
+let _hintTick = 0;
+
+function _paintQotdTimer(){
+  if(!QOTD) return;
+  const el = $('qotd-tmr');
+  if(!el) return;
+  const phase = _qotdPhase();
+  let left, total;
+  if(phase === 'solving'){
+    left = Math.max(0, Math.round((QOTD.solveEndsAt - Date.now()) / 1000));
+    total = _solveSecFor(QOTD.marks);
+    el.classList.toggle('urgent', left < 120);
+  } else if(phase === 'upload'){
+    left = Math.max(0, Math.round((QOTD.uploadEndsAt - Date.now()) / 1000));
+    total = TIMERS.uploadSeconds;
+    el.classList.toggle('urgent', left < 60);
+  } else return;
+  el.textContent = _fmtHMS(left);
+  const bar = $('qotd-bar');
+  if(bar) bar.style.width = ((left / total) * 100) + '%';
+}
+
+/* v1.14: repaint only the clock each second. Re-rendering the whole card (the
+   old behaviour) replaced the file picker and re-enabled Submit mid-upload. */
 function _startQotdTick(){
+  _stopQotdTick();
+  _lastQotdPhase = _qotdPhase();
+  _qotdTick = setInterval(() => {
+    const phase = _qotdPhase();
+    if(phase !== _lastQotdPhase){ _lastQotdPhase = phase; _renderQotd(); }
+    else _paintQotdTimer();
+    if(++_hintTick % 10 === 0 && typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+  }, 1000);
+}
+function _startQotdTickLegacy(){
   _stopQotdTick();
   _qotdTick = setInterval(() => {
     _renderQotd();
@@ -644,7 +679,93 @@ function _qotdBegin(){
   if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
 }
 
-function _qotdFile(input){
+/* ── Photos to PDF ──────────────────────────────────────────────────
+   Students photograph their handwritten pages; we turn the photos into one
+   PDF on the phone (pdf-lib, loaded on demand). A PDF can still be chosen. */
+const PDFLIB_URL = 'vendor/pdf-lib/pdf-lib.min.js';
+let _pdfLibPromise = null;
+function _loadPdfLib(){
+  if(window.PDFLib) return Promise.resolve(window.PDFLib);
+  if(_pdfLibPromise) return _pdfLibPromise;
+  _pdfLibPromise = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = PDFLIB_URL;
+    s.onload = () => window.PDFLib ? res(window.PDFLib) : rej(new Error('The PDF tools did not load.'));
+    s.onerror = () => { _pdfLibPromise = null; rej(new Error('Could not load the PDF tools. Check your connection and try again.')); };
+    document.head.appendChild(s);
+  });
+  return _pdfLibPromise;
+}
+function _readAsDataUrl(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = () => rej(new Error('Could not read that file.'));
+    r.readAsDataURL(file);
+  });
+}
+function _imageToJpeg(file, maxSide, quality){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth, h = img.naturalHeight;
+      const sc = Math.min(1, maxSide / Math.max(w, h));
+      w = Math.round(w * sc); h = Math.round(h * sc);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+      cx.drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b
+        ? b.arrayBuffer().then(buf => resolve({ bytes: new Uint8Array(buf), w, h }))
+        : reject(new Error('Could not process one of the photos.')), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('One of the photos could not be opened. Use JPG or PNG.')); };
+    img.src = url;
+  });
+}
+async function _prepareUpload(files){
+  const isPdf = f => /pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name);
+  const isImg = f => /^image\//i.test(f.type || '');
+  if(files.length === 1 && isPdf(files[0])){
+    const f = files[0];
+    if(f.size > MAX_PDF_BYTES) throw new Error('PDF too large. Max ' + Math.round(MAX_PDF_BYTES / 1024 / 1024) + ' MB.');
+    return { dataUrl: await _readAsDataUrl(f), filename: f.name, size: f.size };
+  }
+  if(!files.every(isImg)) throw new Error('Choose one PDF, or one or more photos of your pages.');
+  if(files.length > 20) throw new Error('Up to 20 photos at a time.');
+  const lib = await _loadPdfLib();
+  const doc = await lib.PDFDocument.create();
+  for(const f of files){
+    const j = await _imageToJpeg(f, 1800, 0.78);
+    const emb = await doc.embedJpg(j.bytes);
+    const page = doc.addPage([j.w, j.h]);
+    page.drawImage(emb, { x: 0, y: 0, width: j.w, height: j.h });
+  }
+  const out = await doc.save();
+  if(out.length > MAX_PDF_BYTES) throw new Error('Those photos are too large together. Take fewer, or lower-resolution photos.');
+  let bin = '';
+  for(let i = 0; i < out.length; i += 0x8000) bin += String.fromCharCode.apply(null, out.subarray(i, i + 0x8000));
+  return { dataUrl: 'data:application/pdf;base64,' + btoa(bin), filename: 'answer-' + Date.now() + '.pdf', size: out.length };
+}
+
+async function _qotdFile(input){
+  const files = Array.from(input.files || []);
+  if(!files.length) return;
+  if(files.some(f => /^image\//i.test(f.type || ''))) toast('Preparing your PDF…', 2500);
+  try{
+    const picked = await _prepareUpload(files);
+    _pendingQotdFile = picked;
+    _renderQotdFileChip(picked);
+    const btn = $('qotd-submit'); if(btn) btn.disabled = false;
+  }catch(e){
+    toast('❌ ' + (e.message || 'Could not read that file'));
+    input.value = '';
+  }
+}
+function _qotdFileLegacy(input){
   const f = input.files && input.files[0];
   if(!f) return;
   if(f.size > MAX_PDF_BYTES){
@@ -675,7 +796,13 @@ function _qotdClearFile(){
   const btn = $('qotd-submit'); if(btn) btn.disabled = true;
 }
 
+let _qotdSubmitting = false;
 async function _qotdSubmit(){
+  if(_qotdSubmitting) return;
+  _qotdSubmitting = true;
+  try { return await _qotdSubmitInner(); } finally { _qotdSubmitting = false; }
+}
+async function _qotdSubmitInner(){
   if(!QOTD || !_pendingQotdFile){ toast('Attach a PDF first'); return; }
   const q = _allQuestions().find(x => x.id === QOTD.questionId);
   if(!q){ toast('❌ Question no longer available'); return; }
@@ -866,10 +993,10 @@ function _renderExam(){
     <div class="card">
       <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload Answer PDF</h3></div>
       <label class="qotd-drop" for="exam-pdf">
-        <input type="file" id="exam-pdf" accept="application/pdf,.pdf" onchange="SUBJ._examFile(this)">
+        <input type="file" id="exam-pdf" accept="application/pdf,.pdf,image/*" multiple onchange="SUBJ._examFile(this)">
         <span class="ii"><i class="ph ph-file-pdf"></i></span>
-        <span class="dn">Choose your completed paper (PDF)</span>
-        <span class="ds">Scan all pages into one PDF, under 8 MB</span>
+        <span class="dn">Choose photos or a PDF of your paper</span>
+        <span class="ds">Select all page photos at once (or one PDF), under 8 MB</span>
       </label>
       <div id="exam-file-slot"></div>
       <button class="btn btn-solid btn-lg btn-blk" id="exam-submit" style="margin-top:.7rem" ${_pendingExamFile ? '' : 'disabled'} onclick="SUBJ._examSubmit()">
@@ -931,7 +1058,27 @@ function _examReset(){
   _renderExam();
 }
 
-function _examFile(input){
+async function _examFile(input){
+  const files = Array.from(input.files || []);
+  if(!files.length) return;
+  if(files.some(f => /^image\//i.test(f.type || ''))) toast('Preparing your PDF…', 2500);
+  try{
+    const picked = await _prepareUpload(files);
+    _pendingExamFile = picked;
+    const slot = $('exam-file-slot');
+    if(slot) slot.innerHTML = `<div class="qotd-file-chip">
+      <i class="ph ph-file-pdf" style="color:var(--grn);font-size:1.1rem"></i>
+      <span class="fn">${esc(picked.filename)}</span>
+      <span style="font-size:.66rem;color:var(--t3)">${Math.round(picked.size/1024)} KB</span>
+      <button type="button" aria-label="Remove file" onclick="SUBJ._examClearFile()"><i class="ph ph-x"></i></button>
+    </div>`;
+    const btn = $('exam-submit'); if(btn) btn.disabled = false;
+  }catch(e){
+    toast('❌ ' + (e.message || 'Could not read that file'));
+    input.value = '';
+  }
+}
+function _examFileLegacy(input){
   const f = input.files && input.files[0];
   if(!f) return;
   if(f.size > MAX_PDF_BYTES){

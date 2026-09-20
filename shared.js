@@ -168,6 +168,43 @@ function togglePwVisibility(btn) {
    Each page owns its own online-state variable and UI updates — this
    just answers "can we reach the backend right now, yes or no".
    ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   CRASH REPORTS (v1.15)
+   Sends a SHORT technical note (page, error message, script name, app version,
+   browser) to the Activity log so you find out about bugs from real phones.
+   At most 5 per page load, never any answers or personal details.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  let sent = 0;
+  const seen = {};
+  function report(msg, src, line) {
+    try {
+      if (sent >= 5) return;
+      msg = String(msg || '').slice(0, 200);
+      if (!msg || msg === 'Script error.' || seen[msg]) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      const url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || '';
+      if (!url) return;
+      seen[msg] = 1; sent++;
+      fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' }, keepalive: true,
+        body: JSON.stringify({
+          action: 'logClientError', msg: msg,
+          src: String(src || '').split('/').pop().slice(0, 80), line: line || 0,
+          page: (location.pathname || '').split('/').pop() || 'index',
+          v: (typeof APP_VERSION !== 'undefined' ? APP_VERSION : ''),
+          ua: (navigator.userAgent || '').slice(0, 80)
+        })
+      }).catch(function () {});
+    } catch (e) { /* never let the reporter itself throw */ }
+  }
+  window.addEventListener('error', function (e) { report(e.message, e.filename, e.lineno); });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    report(r && r.message ? r.message : String(r), 'promise', 0);
+  });
+})();
+
 async function pingBackend(gasUrl, timeoutMs = 8000) {
   if (!gasUrl) return false;
   try {

@@ -3,3 +3,11 @@ Thumbs.db
 node_modules/
 *.bak
 *.orig
+.clasp.json
+.env
+.env.*
+*.pem
+*.log
+.vscode/
+.idea/
+.patch-backup-*/

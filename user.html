@@ -8,6 +8,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="apple-mobile-web-app-title" content="Abhyas">
 <meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex,nofollow">
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <script>(function(){
   try{
@@ -31,10 +32,10 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<link rel="stylesheet" href="vendor/katex/katex.min.css">
+<script defer src="vendor/katex/katex.min.js"></script>
+<script defer src="vendor/katex/auto-render.min.js"></script>
 <link rel="stylesheet" href="vendor/phosphor/phosphor-regular.css">
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
@@ -1371,6 +1372,15 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   @page{margin:1.5cm}
 }
 </style>
+<style id="patch-114">
+/* v1.14: contrast, readable captions, visible menu button, trial pill */
+:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+:root{--fs-cap:.75rem}
+.qt-lbl{font-size:.625rem}
+.tb-menu{display:none}
+@media (max-width:960px){.tb-menu{display:inline-flex}}
+.tb-trial{background:var(--warning-soft)!important;color:var(--warning)!important;font-weight:700}
+</style>
 </head>
 <body>
 
@@ -1385,6 +1395,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   <div class="off-bar" id="offbar">Offline — showing what's saved on this device</div>
 
   <header id="tb">
+    <button class="tb-btn tb-menu" type="button" id="tb-menu" onclick="UI.sidebarToggle()" aria-label="Open menu"><i class="ph ph-list"></i></button>
     <button class="tb-brand" type="button" onclick="UI.go('home')" aria-label="Go to home">
       <span class="bd-mark"><img src="icon-192.png" alt=""></span>
       <span class="tb-name">
@@ -1395,6 +1406,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 
     <div class="tb-r">
       <div class="uchip" id="uchip">—</div>
+      <button class="tb-btn tb-trial" id="tb-trial" type="button" onclick="window.location.href='index.html?pay=1'" title="Your free trial. Tap to pay and keep your access." aria-label="Free trial time left. Tap to pay." hidden><i class="ph ph-hourglass-medium"></i><span id="tb-trial-txt"></span></button>
       <button class="tb-btn tb-admin" id="tb-admin-btn" onclick="APP_SWITCH.toAdmin()" title="Open the admin console" aria-label="Open the admin console" hidden>
         <i class="ph ph-shield-check"></i><span class="tb-admin-label">Admin</span>
       </button>
@@ -1513,7 +1525,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         </button>
       </div>
 
-      <div class="sb-foot"><div id="sb-version"></div></div>
+      <div class="sb-foot"><div id="sb-version"></div><div class="t-cap" style="text-align:center;margin-top:.4rem"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></div></div>
     </nav>
 
     <main id="main" tabindex="-1">
@@ -1558,6 +1570,14 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <span class="stk-tag" id="stk-tag">0 days</span>
           </div>
           <div class="sk-bar" id="sk-bar"></div>
+        </section>
+
+        <section class="streak-card" id="exam-card">
+          <div class="streak-top">
+            <h3><i class="ph ph-calendar-star"></i> Your exam</h3>
+            <button class="btn btn-sm btn-quiet" id="exam-date-edit" type="button" onclick="EXAM_DATE.edit()">Set date</button>
+          </div>
+          <div id="exam-card-body" class="t-callout">Set your exam date to see a countdown and how much to do each day.</div>
         </section>
 
         <h2 class="t-t3 mb2">This week</h2>
@@ -1925,6 +1945,10 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div id="cache-txt" class="t-callout mb3"></div>
           <div class="cpb" id="cpb"><div class="cpf" id="cpf"></div></div>
           <div id="cptxt" class="t-foot" style="margin:var(--sp-1) 0" aria-live="polite"></div>
+          <label class="flex center between" for="autosync-toggle" style="gap:var(--sp-3);padding:var(--sp-3) 0 0;cursor:pointer">
+            <span class="t-callout" style="color:var(--ink)">Save new chapters automatically on Wi-Fi<br><span class="t-foot">Off by default, so it never uses your mobile data.</span></span>
+            <input type="checkbox" id="autosync-toggle" onchange="try{localStorage.setItem('abhyas_autosync',JSON.stringify(this.checked))}catch(e){} if(this.checked) CACHE.autoSync();">
+          </label>
           <div class="bg mt3">
             <button class="btn btn-solid btn-lg" onclick="CACHE.dl()"><i class="ph ph-download-simple"></i> Download everything</button>
             <button class="btn btn-quiet" onclick="CACHE.purgeStale()"><i class="ph ph-broom"></i> Fix failed downloads</button>
@@ -2091,6 +2115,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
                 <div class="qb-ctr" id="ex-ctr">0<em>/0</em></div>
                 <div class="qb-left-actions">
                   <button class="qb-btn ok" onclick="QUIZ.submitExam()"><i class="ph ph-check"></i> Submit</button>
+                  <button class="qb-btn" type="button" onclick="QUIZ.showPalette()"><i class="ph ph-squares-four"></i> Grid</button>
                   <button class="qb-btn skip" id="ex-skip-nav" onclick="QUIZ.jumpToUnanswered()" style="display:none" title="Jump to the next unanswered question">Unanswered (<span id="ex-skip-count">0</span>)</button>
                 </div>
               </div>
@@ -2177,7 +2202,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+<script src="vendor/confetti/confetti.browser.js" defer></script>
 <script src="firebase-config.js"></script>
 <script>
 /* Firebase SDK is only needed once push is configured in firebase-config.js. */
@@ -3104,7 +3129,66 @@ window.SB_HINTS = {
     _renderMarquee();
   }
 };
-function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} }
+function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} }
+
+/* Exam countdown and today's question goal. Stored on this device only. */
+window.EXAM_DATE = {
+  KEY: 'abhyas_exam_date',
+  GOAL: 30,
+  get(){ try { return localStorage.getItem(this.KEY) || ''; } catch(e){ return ''; } },
+  edit(){
+    openMod('Your exam date',
+      '<div class="sf"><label for="ex-date">Exam date</label><input type="date" id="ex-date" value="' + esc(this.get()) + '"></div>' +
+      '<button class="btn btn-solid btn-blk" type="button" onclick="EXAM_DATE.save()">Save</button>' +
+      '<button class="btn btn-quiet btn-blk mt2" type="button" onclick="EXAM_DATE.clear()">Remove the date</button>');
+  },
+  save(){
+    const el = $('ex-date');
+    const v = el ? el.value : '';
+    if (!v) { toast('Pick a date first.'); return; }
+    try { localStorage.setItem(this.KEY, v); } catch(e){}
+    closeMod(); this.render();
+  },
+  clear(){
+    try { localStorage.removeItem(this.KEY); } catch(e){}
+    closeMod(); this.render();
+  },
+  render(){
+    const body = $('exam-card-body'), btn = $('exam-date-edit');
+    if (!body) return;
+    const v = this.get();
+    if (!v) { body.textContent = 'Set your exam date to see a countdown and how much to do each day.'; if (btn) btn.textContent = 'Set date'; return; }
+    const p = v.split('-').map(Number);
+    const target = new Date(p[0], p[1] - 1, p[2]).getTime();
+    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
+    const days = Math.round((target - t0.getTime()) / 86400000);
+    let doneToday = 0;
+    ((S.prog && S.prog.sessions) || []).forEach(s => { if ((s.at || 0) >= t0.getTime()) doneToday += (s.total || 0); });
+    if (btn) btn.textContent = 'Change';
+    if (days < 0) { body.textContent = 'That exam date has passed. Set a new one, or remove it.'; return; }
+    body.innerHTML =
+      '<div style="display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap">' +
+        '<span class="mono" style="font-size:var(--fs-num-lg);font-weight:700;color:var(--ink)">' + (days === 0 ? 'Today' : days + (days === 1 ? ' day' : ' days')) + '</span>' +
+        '<span>' + (days === 0 ? 'Good luck!' : 'to go') + '</span></div>' +
+      '<div class="t-foot" style="margin-top:.3rem">Today: ' + doneToday + ' of ' + this.GOAL + ' questions' + (doneToday >= this.GOAL ? ' (goal reached)' : '') + '</div>';
+  }
+};
+
+/* Trial time left, visible on every screen, with a one-tap route to payment. */
+window.TRIAL_PILL = {
+  render(){
+    const b = $('tb-trial'), t = $('tb-trial-txt');
+    if (!b || !t) return;
+    let a = null;
+    try { a = (S.user && S.user.access) || null; } catch(e){}
+    if (!a || a.level !== 'trial' || !a.trialExpiresAt) { b.hidden = true; return; }
+    const ms = new Date(a.trialExpiresAt).getTime() - Date.now();
+    b.hidden = false;
+    if (!(ms > 0)) { t.textContent = 'Trial ended'; return; }
+    const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+    t.textContent = h >= 48 ? Math.floor(h / 24) + 'd left' : h > 0 ? h + 'h ' + m + 'm left' : m + 'm left';
+  }
+};
 
 setInterval(_refreshHints, 30000);
 document.addEventListener('visibilitychange', () => {
@@ -3399,6 +3483,16 @@ const SERVER_PROG = {
       });
     });
 
+    if (data && data.cov && typeof data.cov === 'object') {
+      Object.keys(data.cov).forEach(fid => {
+        const c = data.cov[fid];
+        if (!c || typeof c !== 'object') return;
+        const practised = new Set();
+        String(c.p || '').split('').forEach((ch, i) => { if (ch !== '0') practised.add(fid + '_' + i); });
+        const att = Number(c.a) || 0, cor = Number(c.c) || 0;
+        byFile.set(fid, { fid, attempted: att, correct: cor, wrong: Math.max(0, att - cor), practised });
+      });
+    }
     const refMap = new Map();
     if (typeof ChapterData !== 'undefined') {
       ChapterData.allFileRefs().forEach(r => refMap.set(r.fid, r));

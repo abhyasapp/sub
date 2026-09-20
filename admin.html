@@ -41,7 +41,7 @@
 <title>Abhyas Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/phosphor/phosphor-regular.css">
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
@@ -697,6 +697,9 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
    answered. */
 #ov-confirm,#ov-pwd,#ov-review,#ov-user,#ov-sheet{ z-index:10020; }
 </style>
+<style id="patch-114">
+:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+</style>
 </head>
 <body>
 
@@ -1321,11 +1324,11 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
 <script src="subjective_chapters.js"></script>
 <script src="subjective-data.js"></script>
 <script src="subjective.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script src="vendor/pdf-lib/pdf-lib.min.js"></script>
 <script>
   if (typeof pdfjsLib !== 'undefined') {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
   }
 </script>
 <script src="pdf-viewer.js"></script>
@@ -2203,12 +2206,12 @@ const EXPIRING = {
       if (!res.count) {
         box.innerHTML = '<div class="empty" style="padding:var(--sp-8) var(--sp-4)"><i class="ph ph-hourglass"></i>' +
           '<div class="t">No trials ending soon</div>' +
-          '<div class="d">Students get an automatic reminder two hours before their trial runs out.</div></div>';
+          '<div class="d">When push notifications are set up, students are reminded two hours before their trial runs out.</div></div>';
         TODAY.render();
         return;
       }
       box.innerHTML =
-        '<p class="t-foot mb3">' + plural(res.count, 'trial') + ' ending within ' + hours + ' hours. Each student is pushed a reminder two hours before.</p>' +
+        '<p class="t-foot mb3">' + plural(res.count, 'trial') + ' ending within ' + hours + ' hours. Reminders go out two hours before, once push notifications are set up.</p>' +
         '<div class="rows">' + res.users.map(u => {
           const mins = Math.max(0, Math.round((new Date(u.trialExpiresAt).getTime() - Date.now()) / 60000));
           const left = mins < 60 ? mins + ' min left' : Math.round(mins / 60) + ' h left';
@@ -2543,6 +2546,21 @@ const CHAPTERS = {
   allChapters(){ this._build(); return [...new Set([...this._map.values()].map(v => v.chapter))].sort(); }
 };
 
+/* At most 4 file requests at once: 100 parallel getFile calls exceeded the
+   Apps Script concurrency limit and the global rate limit. */
+const _gate = (() => {
+  let active = 0;
+  const q = [];
+  const MAX = 4;
+  const next = () => {
+    if (active >= MAX || !q.length) return;
+    active++;
+    const job = q.shift();
+    Promise.resolve().then(job.fn).then(job.res, job.rej).finally(() => { active--; next(); });
+  };
+  return fn => new Promise((res, rej) => { q.push({ fn, res, rej }); next(); });
+})();
+
 const MISSED = {
   lastResults: [], _built: false,
   _buildFilters(){
@@ -2582,7 +2600,7 @@ const MISSED = {
       const cache = {};
       await Promise.all([...new Set(res.results.map(r => r.fileId))].map(async fid => {
         try {
-          const f = await ADMIN.post('getFile', { fileId: fid });
+          const f = await _gate(() => ADMIN.post('getFile', { fileId: fid }));
           if (f.success) {
             const raw = f.result;
             cache[fid] = Array.isArray(raw) ? raw : (raw?.questions || raw?.data || raw?.quiz || raw?.items || []);

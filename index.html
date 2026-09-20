@@ -38,15 +38,16 @@
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
 
 <title>Abhyas — Loksewa Civil Engineering practice, online and offline</title>
-<meta name="description" content="Practice Loksewa Civil Engineering, General Knowledge and IQ questions for Nepal's Lok Sewa Aayog exams. Works fully offline once a chapter is downloaded. Free trial to start.">
+<meta name="description" content="Practice Loksewa Civil Engineering and General Knowledge questions for Nepal's Lok Sewa Aayog exams. Works fully offline once a chapter is downloaded. Free trial to start.">
 <meta name="keywords" content="abhyas app, loksewa, lok sewa aayog, loksewa civil engineering, civil engineering exam prep nepal, level 7 engineering, PSC nepal, loksewa offline">
 <link rel="canonical" href="https://app.mku.name.np/">
 
 <meta property="og:type" content="website">
 <meta property="og:title" content="Abhyas — Loksewa Civil Engineering practice, online and offline">
-<meta property="og:description" content="Thousands of Loksewa Civil Engineering, GK and IQ questions. Study offline during load-shedding. Free trial to start.">
+<meta property="og:description" content="Thousands of Loksewa Civil Engineering and GK questions. Study offline during load-shedding. Free trial to start.">
 <meta property="og:url" content="https://app.mku.name.np/">
 <meta property="og:image" content="https://app.mku.name.np/icon-512.png">
 <meta property="og:locale" content="en_NP">
@@ -61,7 +62,7 @@
   "@type": "WebApplication",
   "name": "Abhyas",
   "alternateName": "Abhyas Loksewa Civil Engineering",
-  "description": "Loksewa Civil Engineering exam practice for Nepal — Level 7 Engineering, General Knowledge and IQ questions, online or fully offline.",
+  "description": "Loksewa Civil Engineering exam practice for Nepal — Level 7 Engineering and General Knowledge questions, online or fully offline.",
   "url": "https://app.mku.name.np/",
   "applicationCategory": "EducationalApplication",
   "operatingSystem": "Any (Progressive Web App)",
@@ -72,7 +73,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/phosphor/phosphor-regular.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -535,6 +536,10 @@ details.faq p{
 .cookie-banner p{flex:1;min-width:200px;font-size:var(--fs-foot);color:var(--ink-2);line-height:1.5}
 .cookie-banner .btn{width:auto;min-height:36px;padding:0 var(--sp-4);font-size:var(--fs-foot)}
 </style>
+<style id="patch-114">
+/* v1.14: small text now meets 4.5:1 contrast on the light theme */
+:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+</style>
 </head>
 <body>
 
@@ -667,6 +672,7 @@ details.faq p{
           </div>
         </div>
       </div>
+      <p class="field-hint" style="margin:0 0 var(--sp-3)">By creating an account you agree to the <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
       <button class="btn" id="btn-signup" type="submit">Create my account</button>
       <div class="link-row"><span>Already registered?</span><button type="button" onclick="APP.setMode('login')">Sign in</button></div>
     </form>
@@ -765,14 +771,14 @@ details.faq p{
 <div class="wide">
   <section class="section" id="about" aria-labelledby="about-h">
     <h2 id="about-h">What Abhyas is</h2>
-    <p class="lede">Practice for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam. Thousands of questions across the technical paper, plus the General Knowledge and IQ sections that sit alongside it.</p>
+    <p class="lede">Practice for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam. Thousands of questions across the technical paper, plus General Knowledge practice that sits alongside it.</p>
 
     <h3 class="t-cap" style="font-weight:700;margin-bottom:var(--sp-2)">Subjects covered</h3>
     <ul class="subject-list">
       <li>Structural Engineering</li><li>Engineering Survey</li><li>Construction Materials</li>
       <li>Concrete Technology</li><li>Geotechnical Engineering</li><li>Construction Management</li>
       <li>Estimating &amp; Costing</li><li>Engineering Drawing</li><li>Engineering Economics</li>
-      <li>Professional Practices</li><li>General Knowledge</li><li>IQ &amp; reasoning</li>
+      <li>Professional Practices</li><li>General Knowledge</li>
     </ul>
 
     <div class="point">
@@ -781,7 +787,7 @@ details.faq p{
     </div>
     <div class="point">
       <h3>It tells you what to revise next</h3>
-      <p>Accuracy per chapter, a daily streak, and a miss list that brings questions back on a spacing schedule until you've got them twice in a row. Your progress follows you to any device you sign in on.</p>
+      <p>Accuracy per chapter, a daily streak, and a miss list that brings questions back on a spacing schedule until you've got them right four times, days apart. Your progress follows you to any device you sign in on.</p>
     </div>
     <div class="point">
       <h3>Written answers, marked by a person</h3>
@@ -806,7 +812,7 @@ details.faq p{
       </details>
       <details class="faq">
         <summary>What does it cost?</summary>
-        <p>New accounts start on a free trial with full access. After that there's a one-time payment; the amount and the QR code are on the payment screen once your trial ends.</p>
+        <p>New accounts start on a free trial with full access. After that there's a one-time payment of <strong id="faq-price">a small amount</strong>; the QR code is on the payment screen once your trial ends.</p>
       </details>
       <details class="faq">
         <summary>Is my progress safe if I change phone?</summary>
@@ -819,7 +825,7 @@ details.faq p{
     </div>
   </section>
 
-  <p class="foot">Abhyas — Loksewa Civil Engineering practice for Nepal</p>
+  <p class="foot">Abhyas — Loksewa Civil Engineering practice for Nepal<br><a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a></p>
 </div>
 
 <script type="application/ld+json">
@@ -839,7 +845,7 @@ details.faq p{
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <div class="cookie-banner" id="cookie-banner" hidden role="region" aria-label="Cookie notice">
-  <p>Abhyas uses cookies to keep you signed in and to show ads that help keep the app free.</p>
+  <p>Abhyas keeps you signed in and saves your progress on this device. No ads, no tracking. <a href="privacy.html">Privacy</a></p>
   <button class="btn" onclick="COOKIE_NOTICE.accept()">Got it</button>
 </div>
 
@@ -888,7 +894,7 @@ const MODES = ['redirecting','login','signup','forgot','reset','payment','trial'
 
 const APP = {
   mode: 'login',
-  online: false,
+  online: (typeof navigator !== 'undefined' ? navigator.onLine : false),
   trialTimerId: null,
   fileData: null,
   session: null,
@@ -898,9 +904,11 @@ const APP = {
 
   async init(){
     this.checkNet();
-    setInterval(() => this.checkNet(), 15000);
+    setInterval(() => { if (!document.hidden) this.checkNet(); }, 15000);
     this.initGoogleSignIn();
+    this.loadPublicPrice();
     this.bindForms();
+    this.showStoredNotice();
 
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('resetToken') || params.get('reset');
@@ -916,9 +924,28 @@ const APP = {
     if (saved) {
       this.session = saved;
       if (saved.type === 'admin') { this.toast('Resuming your admin session…'); setTimeout(() => this.goAdmin(), 400); return; }
-      if (saved.type === 'user')  { this.resumeUserSession(saved); return; }
+      if (saved.type === 'user')  { this._wantPay = params.get('pay') === '1'; this.resumeUserSession(saved); return; }
     }
     this.setMode('login');
+  },
+
+  /* Show the real price on the landing page instead of hiding it until the trial ends. */
+  async loadPublicPrice(){
+    try {
+      const r = await this.api('getSettings', {}, 'GET', 8000);
+      const amt = r && r.success && r.settings && r.settings.paymentAmount;
+      const el = $('faq-price');
+      if (amt && el) el.textContent = 'Rs ' + amt;
+    } catch(e){}
+  },
+
+  /* If the app signed you out (for example the account was used on another
+     device), say so instead of dropping you on a bare sign-in form. */
+  showStoredNotice(){
+    try {
+      const n = localStorage.getItem('abhyas_notice');
+      if (n) { localStorage.removeItem('abhyas_notice'); this.toast(n, 8000); }
+    } catch(e){}
   },
 
   /* Real forms, so Enter submits and password managers behave. */
@@ -1303,6 +1330,7 @@ const APP = {
       if (end > Date.now()) {
         this.startTrialTimer(end);
         this.setMode('trial');
+        if (this._wantPay) this.setMode('payment');
         this.syncSessionQuietly(saved);
         return;
       }

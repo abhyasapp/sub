@@ -36,7 +36,8 @@ const LS = {
   PROFILE:'abhyas_profile',
   CHAPSTATS:'abhyas_chapstats',
   LAST_USER:'abhyas_last_user',
-  WK_ATTEMPTS:'abhyas_weekly_attempts'
+  WK_ATTEMPTS:'abhyas_weekly_attempts',
+  COV:'abhyas_cov'
 };
 
 const APP_NAME = 'Abhyas V1';
@@ -55,6 +56,7 @@ const S = {
   fcount: _load(LS.FCOUNT, {}),
   chapStats: _load(LS.CHAPSTATS, {}),
   weeklyAttempts: _load(LS.WK_ATTEMPTS, {}),
+  cov: _load(LS.COV, {}),
   dpi: null,
   localQs: null,
   // Quiz state — kept here because HOME/UI read S.quiz.active to gate nav.
@@ -69,7 +71,7 @@ if(!S.weeklyAttempts || typeof S.weeklyAttempts !== 'object') S.weeklyAttempts =
 
 /* ═══════════════ 3. UTILITIES ═══════════════ */
 function _load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
-const PSYNC_KEYS = new Set([LS.BK, LS.FL, LS.WR, LS.PROG, LS.STK, LS.CHAPSTATS]);
+const PSYNC_KEYS = new Set([LS.BK, LS.FL, LS.WR, LS.PROG, LS.STK, LS.CHAPSTATS, LS.COV]);
 let _lastStorageWarnAt = 0;
 function _save(k,v){
   try{
@@ -466,6 +468,67 @@ const CHAPSTATS = {
   }
 };
 
+/* ═══════════════ 3d. COV — per-file coverage ═══════════════
+   One tiny record per question file, kept apart from the 50-session history:
+     p = one character per question: '0' unseen, '1' last answer right, '2' last answer wrong
+     a = attempts, c = correct
+   A few KB for the whole library, so it syncs reliably, and "Practised" and
+   "Coverage" no longer shrink as old sessions are trimmed. */
+const COV = {
+  _ok(){
+    if(!S.cov || typeof S.cov !== 'object' || Array.isArray(S.cov)) S.cov = {};
+    return true;
+  },
+  _add(q){
+    if(!q || !q.uid) return;
+    const uid = String(q.uid);
+    const i = uid.lastIndexOf('_');
+    if(i < 1) return;
+    const fid = uid.slice(0, i);
+    if(fid === 'local') return;
+    const idx = parseInt(uid.slice(i + 1), 10);
+    if(!isFinite(idx) || idx < 0 || idx > 5000) return;
+    const rec = S.cov[fid] || (S.cov[fid] = {p:'', a:0, c:0});
+    if(rec.p.length <= idx) rec.p = rec.p.padEnd(idx + 1, '0');
+    rec.p = rec.p.slice(0, idx) + (q.ok ? '1' : '2') + rec.p.slice(idx + 1);
+    rec.a = (rec.a || 0) + 1;
+    if(q.ok) rec.c = (rec.c || 0) + 1;
+  },
+  record(qres){
+    if(!Array.isArray(qres) || !COV._ok()) return;
+    qres.forEach(q => COV._add(q));
+    _save(LS.COV, S.cov);
+  },
+  rebuildFromSessions(){
+    if(!COV._ok()) return;
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    for(let i = sessions.length - 1; i >= 0; i--){   // sessions are newest-first
+      (sessions[i].qres || []).forEach(q => COV._add(q));
+    }
+    _save(LS.COV, S.cov);
+  },
+  merge(remote){
+    if(!remote || typeof remote !== 'object' || !COV._ok()) return;
+    Object.keys(remote).forEach(fid => {
+      const r = remote[fid];
+      if(!r || typeof r !== 'object') return;
+      const rp = String(r.p || '');
+      const l = S.cov[fid];
+      if(!l){ S.cov[fid] = {p: rp, a: Number(r.a) || 0, c: Number(r.c) || 0}; return; }
+      let out = '';
+      const n = Math.max(rp.length, l.p.length);
+      for(let i = 0; i < n; i++){
+        const a = l.p[i] || '0', b = rp[i] || '0';
+        out += (a !== '0') ? a : b;
+      }
+      l.p = out;
+      l.a = Math.max(l.a || 0, Number(r.a) || 0);
+      l.c = Math.max(l.c || 0, Number(r.c) || 0);
+    });
+    _save(LS.COV, S.cov);
+  }
+};
+
 /* ═══════════════ 4. AUTH ═══════════════ */
 const AUTH = {
   async restore(){
@@ -530,16 +593,28 @@ const AUTH = {
       lastVerified: Date.now()
     };
   },
-  _bounce(){ window.location.href = 'index.html'; },
+  /* Never yank someone out of a quiz because their access changed:
+     wait until they leave the quiz screen, then send them to sign in. */
+  _bounce(){
+    const onScreen = () => { const w = document.getElementById('quiz-wrap'); return !!(w && w.style.display !== 'none'); };
+    if(onScreen()){
+      if(AUTH._bounceWaiting) return;
+      AUTH._bounceWaiting = true;
+      toast('Your access has changed. Finish this quiz and you will be taken to sign in.', 7000);
+      const t = setInterval(() => { if(!onScreen()){ clearInterval(t); window.location.href = 'index.html'; } }, 1500);
+      return;
+    }
+    window.location.href = 'index.html';
+  },
   _resetUserScopedLocalDataIfDifferentUser(username){
     const lastUser = _load(LS.LAST_USER, '');
     if(lastUser && lastUser !== username){
-      [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT].forEach(k=>{
+      [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT, LS.COV].forEach(k=>{
         try{ localStorage.removeItem(k); }catch(e){}
       });
       S.prog = {total:0, correct:0, sessions:[]};
       S.bk = []; S.fl = []; S.wr = [];
-      S.stk = {days:[], last:''};
+      S.stk = {days:[], last:''}; S.cov = {};
       S.chapStats = {};
       S.tt = {sessions:[], reminders:{enabled:false, leadMinutes:5}};
     }
@@ -626,6 +701,7 @@ const AUTH = {
           AUTH._bounce();
         }
       } else if(res.sessionInvalid){
+        try{ localStorage.setItem('abhyas_notice', 'You were signed out because this account was used on another device, or the session expired. Please sign in again.'); }catch(e){}
         localStorage.removeItem(LS.USER);
         AUTH._bounce();
       }
@@ -688,7 +764,37 @@ const PSYNC = {
   _capList(arr, max){
     return Array.isArray(arr) && arr.length > max ? arr.slice(-max) : arr;
   },
+  /* v1.14: fits the payload under the server limit by shedding per-question
+     detail from the OLDEST sessions first (the old code could not shrink at
+     all, so active students' backups failed for good). Also syncs COV. */
   _syncPayload(){
+    const CEIL = this._SYNC_PAYLOAD_CEILING;
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions.map(s => ({...s})) : [];
+    const lim = { bk: this._MAX_SYNCED_LIST_ITEMS, fl: this._MAX_SYNCED_LIST_ITEMS, wr: this._MAX_SYNCED_LIST_ITEMS };
+    const build = () => JSON.stringify({
+      prog: { ...(S.prog || {}), sessions },
+      chapStats: S.chapStats,
+      cov: S.cov || {},
+      bk: this._capList(S.bk, lim.bk),
+      fl: this._capList(S.fl, lim.fl),
+      wr: this._capList(S.wr, lim.wr),
+      stk: S.stk
+    });
+    let json = build();
+    // 1) Sessions are newest-first: drop per-question detail from the oldest first.
+    for(let i = sessions.length - 1; i >= 0 && json.length > CEIL; i--){
+      if(sessions[i].qres){ delete sessions[i].qres; json = build(); }
+    }
+    // 2) Then trim the review lists (newest items are last, so the tail is kept).
+    while(json.length > CEIL && lim.bk > 20){
+      lim.bk = lim.fl = lim.wr = Math.max(20, Math.floor(lim.bk / 2));
+      json = build();
+    }
+    // 3) Last resort: drop the oldest sessions entirely.
+    while(json.length > CEIL && sessions.length > 10){ sessions.pop(); json = build(); }
+    return json;
+  },
+  _syncPayloadLegacy(){
     const build = (bkMax, flMax, wrMax, sessMax) => {
       const prog = (S.prog && S.prog.sessions && S.prog.sessions.length > sessMax)
         ? { ...S.prog, sessions: S.prog.sessions.slice(-sessMax) }
@@ -770,6 +876,7 @@ const PSYNC = {
         });
         _save(LS.CHAPSTATS, S.chapStats);
       }
+      if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
       if(data.bk){ S.bk=data.bk; _save(LS.BK,S.bk); }
       if(data.fl){ S.fl=data.fl; _save(LS.FL,S.fl); }
       if(data.wr){ S.wr=data.wr; _save(LS.WR,S.wr); }
@@ -958,12 +1065,14 @@ const WEEKLY = {
         for(const a of attemptsRes.attempts){
           const local = this.attempts[a.weeklyId];
           if(local && !local.synced) continue;
+          if(local && local.standing) a.standing = local.standing;
           this.attempts[a.weeklyId] = a;
         }
         this._saveAttempts();
       }
       this._renderHomeCard();
       this._startTick();
+      this._loadStandings();
     }catch(e){ this._renderHomeCard(); }
   },
 
@@ -1002,7 +1111,7 @@ const WEEKLY = {
       if(attempted){
         return `<div class="qb-btn ok" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.92" onclick='WEEKLY.open(${idJson})'>
           <span><i class="ph ph-check-circle"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
-          <span class="ctag tg" style="font-size:.62rem;font-weight:700">✓ ${attempted.pct}% · Review</span>
+          <span class="ctag tg" style="font-size:.62rem;font-weight:700">✓ ${attempted.pct}%${attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : ''} · Review</span>
         </div>`;
       }
 
@@ -1022,6 +1131,74 @@ const WEEKLY = {
         <span style="font-size:.62rem;opacity:.75">Review only</span>
       </div>`;
     }).join('');
+  },
+
+  /* Rank and percentile, fetched once a set's exam window has closed. */
+  async _loadStandings(){
+    if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
+    let changed = false;
+    for(const s of this.sets){
+      const a = this.attempts[s.id];
+      if(!a || a.standing || !s.releaseAt || this.examOpen(s)) continue;
+      try{
+        const r = await netFetch(APPS, {
+          method:'POST', headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify({action:'getWeeklyStanding', username:S.user.username, token:S.user.token, weeklyId:s.id})
+        }, 15000);
+        const res = await r.json();
+        if(res && res.success && res.ready && res.attempted){
+          a.standing = {rank:res.rank, total:res.total, percentile:res.percentile};
+          changed = true;
+        }
+      }catch(e){}
+    }
+    if(changed){ this._saveAttempts(); this._renderHomeCard(); }
+  },
+
+  /* Records the start on the server so closing the app and restarting cannot
+     be used to look at the questions and try again. Returns 'go' or 'stop'. */
+  async _startOnServer(s){
+    if(!S.online || S.forcedOffline || !S.user || !S.user.token) return 'go';
+    let res = null;
+    try{
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'startWeeklyAttempt', username:S.user.username, token:S.user.token, weeklyId:s.id})
+      }, 15000);
+      res = await r.json();
+    }catch(e){ return 'go'; }
+    if(!res || !res.success) return 'go';
+    if(res.alreadyAttempted && res.attempt){
+      this.attempts[s.id] = res.attempt; this._saveAttempts(); this._renderHomeCard();
+      toast('Already submitted. Showing your recorded result.', 4000);
+      this._startReview(s, res.attempt);
+      return 'stop';
+    }
+    if(res.windowClosed){
+      toast('The exam window has closed. Viewing answers only.', 4000);
+      this._startReview(s, null);
+      return 'stop';
+    }
+    if(res.resumed){
+      const snap = _load(LS.EXAM_SNAP, null);
+      const mine = !!(snap && snap.scope && snap.scope.weeklyId === s.id && snap.username === S.user.username && snap.qs && snap.qs.length);
+      if(mine){
+        const adj = (snap.left || 0) - Math.floor((Date.now() - (snap.savedAt || Date.now())) / 1000);
+        if(adj <= 0){
+          QUIZ._resumeSnapshot(snap, 0);
+          toast('Time ran out while you were away. Submitting what you had.', 5000);
+          QUIZ.submitExam();
+        } else {
+          QUIZ._resumeSnapshot(snap, adj);
+          toast('Continuing your test where you left off.', 3000);
+        }
+        return 'stop';
+      }
+      toast('You started this test earlier without submitting, so your one attempt is used. Showing the answers.', 7000);
+      this._startReview(s, null);
+      return 'stop';
+    }
+    return 'go';
   },
 
   _startTick(){
@@ -1084,6 +1261,7 @@ const WEEKLY = {
     }
 
     toast(`📝 Graded exam — you get ONE attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left.`, 5000);
+    if(await WEEKLY._startOnServer(s) === 'stop') return;
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
       weeklyId: s.id,
       weeklyTitle: s.title,
@@ -1226,6 +1404,7 @@ const UI = {
    quiz engine calls into it, but that's a one-way dependency. */
 const PROG = {
   track(correct){
+    { const _d = today(); if(!S._tc || S._tc.d !== _d) S._tc = {d:_d, n:0}; S._tc.n++; if(S._tc.n === 5) STREAK.markToday(); }
     S.prog.total = (S.prog.total || 0) + 1;
     if(correct) S.prog.correct = (S.prog.correct || 0) + 1;
     _save(LS.PROG, S.prog);
@@ -1774,6 +1953,8 @@ const CACHE = {
     const refs = ChapterData.allFileRefs();
     const cachedKeys = new Set(await QDB.keys());
     const _isCached = key => cachedKeys.has(key);
+    const _as = document.getElementById('autosync-toggle');
+    if(_as) _as.checked = !!_load('abhyas_autosync', false);
 
     const tag = document.getElementById('cache-tag');
     const txt = document.getElementById('cache-txt');
@@ -1904,6 +2085,7 @@ const CACHE = {
   },
 
   async autoSync(){
+    if(!_load('abhyas_autosync', false)) return;   // opt-in only: never spend mobile data unasked
     if(!S.online || S.forcedOffline) return;
     const cachedKeys = new Set(await QDB.keys());
     const missing = ChapterData.allFileRefs().filter(r=>!cachedKeys.has(r.key));
@@ -1912,9 +2094,9 @@ const CACHE = {
     /* Mobile data is expensive here. Never spend it on a download nobody
        asked for — offer it instead, every time, not just once. */
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    const isCellular = conn && /cellular|2g|3g|slow-2g/i.test(conn.effectiveType || conn.type || '');
+    const isCellular = conn && (conn.type === 'cellular' || /^(slow-2g|2g|3g)$/i.test(conn.effectiveType || ''));
     const saver = conn && conn.saveData;
-    if ((isCellular || saver) && missing.length > 5) {
+    if (isCellular || saver) {
       const lastOffer = _load('abhyas_autosync_offered_at', 0);
       if (Date.now() - lastOffer > 24*60*60*1000) {
         _save('abhyas_autosync_offered_at', Date.now());
@@ -1960,6 +2142,7 @@ const DATA = {
       version: (typeof APP_VERSION!=='undefined' ? APP_VERSION : 1),
       prog: S.prog,
       chapStats: S.chapStats,
+      cov: S.cov,
       bk: S.bk, fl: S.fl, wr: S.wr, stk: S.stk, tt: S.tt,
       weeklyAttempts: S.weeklyAttempts
     };
@@ -2017,6 +2200,7 @@ const DATA = {
       });
       _save(LS.CHAPSTATS, S.chapStats);
     }
+    if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
     if(data.bk){ S.bk = data.bk; _save(LS.BK, S.bk); }
     if(data.fl){ S.fl = data.fl; _save(LS.FL, S.fl); }
     if(data.wr){ S.wr = data.wr; _save(LS.WR, S.wr); }
@@ -2057,14 +2241,14 @@ const DATA = {
   reset(){
     if(!confirm('⚠️ This deletes ALL progress, bookmarks, flags, wrong answers, and timetable on this device. Continue?')) return;
     if(!confirm('Are you absolutely sure? This cannot be undone.')) return;
-    [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT].forEach(k=>localStorage.removeItem(k));
+    [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
     toast('⚠️ All data reset');
     location.reload();
   },
 
   async wipeDevice(){
     if(!confirm('Erase ALL local data on this device (progress, bookmarks, flags, wrong-bank, cached question sets)? This cannot be undone. Anything already backed up to the cloud will still be there next time you log in online.')) return;
-    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT, LS.EXAM_SNAP, LS.TT_NOTIFIED, LS.CLOUD, LS.PROFILE, LS.LAST_USER].forEach(k=>localStorage.removeItem(k));
+    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT, LS.EXAM_SNAP, LS.TT_NOTIFIED, LS.CLOUD, LS.PROFILE, LS.LAST_USER, LS.COV].forEach(k=>localStorage.removeItem(k));
     await QDB.clear();
     toast('🗑 Local data wiped — reloading…');
     setTimeout(()=>location.reload(), 1200);
@@ -2088,8 +2272,8 @@ const DATA = {
     if(!res || !res.success){ toast('❌ ' + ((res && res.error) || 'Reset failed')); return; }
     clearTimeout(PSYNC._timer); PSYNC._timer = null;
     S.prog = {total:0,correct:0,sessions:[]}; S.bk = []; S.fl = []; S.wr = [];
-    S.stk = {days:[],last:''}; S.chapStats = {}; S.fcount = {};
-    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.FCOUNT, LS.EXAM_SNAP].forEach(k=>localStorage.removeItem(k));
+    S.stk = {days:[],last:''}; S.chapStats = {}; S.fcount = {}; S.cov = {};
+    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.FCOUNT, LS.EXAM_SNAP, LS.COV].forEach(k=>localStorage.removeItem(k));
     toast('✅ Progress reset everywhere — reloading…');
     setTimeout(()=>location.reload(), 900);
   },
@@ -2155,14 +2339,14 @@ const TUTORIAL = {
         <ul style="margin:0 0 0 1.1rem;padding:0">
           <li><b><i class="ph ph-star"></i> Bookmarks</b> — save with a label.</li>
           <li><b><i class="ph ph-flag"></i> Flagged</b> — a quick "come back to this".</li>
-          <li><b><i class="ph ph-x-circle"></i> Wrong Bank</b> — auto-collected; needs two correct in a row, spaced apart, before it retires.</li>
+          <li><b><i class="ph ph-x-circle"></i> Wrong Bank</b> — auto-collected; comes back after 1, 3, 7 and 14 days; get it right each time and it retires.</li>
         </ul>` },
     { icon: '<i class="ph ph-calendar-check"></i>', title: 'Weekly Sets',
       body: `<p>Every so often a fresh question set unlocks on the Dashboard. You get <b>exactly one attempt</b> — a graded, timed exam. Once you submit, you can only review.</p>` },
     { icon: '<i class="ph ph-pencil-line"></i>', title: 'Subjective',
       body: `<p>Under <b>Subjective</b> in the sidebar, three panels:</p>
         <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b>Q of the Day</b> — one question, timed write, then a 5-minute PDF upload.</li>
+          <li><b>Q of the Day</b> — one question, timed write, then upload photos or a PDF of your answer.</li>
           <li><b>Proper Exam</b> — a full 100-mark paper on demand.</li>
           <li><b>Question List</b> — topic-wise index.</li>
         </ul>` },
@@ -2256,8 +2440,14 @@ const APP = {
     await QDB.migrateFromLocalStorage();
     if(typeof migrateSessionScopes === 'function') migrateSessionScopes();
     if(!Object.keys(S.chapStats).length && S.prog.sessions?.length) CHAPSTATS.rebuildFromSessions();
+    if(!S.cov || !Object.keys(S.cov).length) COV.rebuildFromSessions();
 
-    const qKeys = await QDB.keys();
+    /* Only scan the whole question cache once per app version: reading every
+       cached set on every launch was a startup spike on low-end phones. */
+    const _appV = String(typeof APP_VERSION !== 'undefined' ? APP_VERSION : '');
+    const _scanned = _load('abhyas_qscan', '') === _appV;
+    const qKeys = _scanned ? [] : await QDB.keys();
+    _save('abhyas_qscan', _appV);
     for(const k of qKeys){
       try{
         const v = await QDB.get(k);
@@ -2408,6 +2598,7 @@ window.TUTORIAL = TUTORIAL;
 window.APP = APP;
 window.WEEKLY = WEEKLY;
 window.CHAPSTATS = CHAPSTATS;
+window.COV = COV;
 window.PSYNC = PSYNC;
 window.NETCHECK = NETCHECK;
 window.GETFILE_GATE = GETFILE_GATE;

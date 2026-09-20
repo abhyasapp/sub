@@ -62,7 +62,21 @@ function fidFromUid(uid){
   return i > -1 ? uid.slice(0,i) : uid;
 }
 
+/* v1.14: read coverage from S.cov (per-file record) instead of the rolling
+   50-session history, so Practised / Attempted / Correct no longer decay. */
 function fileStatsMap(leaves){
+  const map = new Map();
+  leaves.forEach(ref=>{
+    if(map.has(ref.fid)) return;
+    const c = (S.cov && S.cov[ref.fid]) || null;
+    const practised = new Set();
+    if(c && c.p){ for(let i = 0; i < c.p.length; i++){ if(c.p[i] !== '0') practised.add(ref.fid + '_' + i); } }
+    const a = c ? (c.a || 0) : 0, k = c ? (c.c || 0) : 0;
+    map.set(ref.fid, {practised, attempted:a, correct:k, wrong:Math.max(0, a - k)});
+  });
+  return map;
+}
+function _fileStatsMapFromSessions(leaves){
   const map = new Map();
   leaves.forEach(ref=>{ if(!map.has(ref.fid)) map.set(ref.fid, {practised:new Set(), attempted:0, correct:0, wrong:0}); });
   S.prog.sessions.forEach(s=>{
@@ -180,6 +194,7 @@ const ONPROG = {
     S.prog.total   = Math.max(0,(S.prog.total||0)   - removedTotal);
     S.prog.correct = Math.max(0,(S.prog.correct||0) - removedCorrectTotal);
     _save(LS.PROG, S.prog);
+    if(S.cov && typeof S.cov === 'object'){ delete S.cov[fid]; _save(LS.COV, S.cov); }
     toast(removedTotal ? `✅ Reset "${label}" — ${removedTotal} record(s) cleared` : `Nothing to reset for "${label}"`);
     ONPROG.render();
     if(typeof HOME!=='undefined' && HOME.render) HOME.render();
@@ -332,6 +347,14 @@ const ONPROG = {
 };
 
 /* ═══════════════ ON — Online Study picker ═══════════════ */
+/* Tidier subtopic labels in the picker (the stored names stay untouched so
+   cache keys and progress keep working). */
+function prettySub(name){
+  return String(name)
+    .replace(/^UNCLASSIFIED\s+Unclassified questions/i, 'Mixed questions')
+    .replace(/\s*&\s*/g, ' & ');
+}
+
 const ON = {
   onLv(){
     const lv=document.getElementById('on-lv').value;
@@ -363,6 +386,10 @@ const ON = {
           const o=document.createElement('option');o.value=book;o.textContent=`${book}${fc?'':' (coming soon)'}`;bs.appendChild(o);
         });
         bs.disabled=false;
+        /* Every chapter has one book, so skip that step: pick it and move on. */
+        const _bk = Object.keys(books);
+        bs.style.display = _bk.length === 1 ? 'none' : '';
+        if(_bk.length === 1){ bs.value = _bk[0]; ON.onBook(); return; }
       }
     }
     ONPROG.render();
@@ -389,11 +416,11 @@ const ON = {
           o.dataset.key=cacheKey;
           o.dataset.sub=n;
           if(isOfflineMode && !isCached){
-            o.textContent = `🔒 ${n} (not cached)`;
+            o.textContent = `🔒 ${prettySub(n)} (not cached)`;
             o.disabled = true;
             o.style.color = 'var(--t3)';
           } else {
-            o.textContent = isCached ? `📦 ${n}` : n;
+            o.textContent = isCached ? `📦 ${prettySub(n)}` : prettySub(n);
             anyEnabled = true;
           }
           ts.appendChild(o);
@@ -576,6 +603,7 @@ const REV = {
     if(isCorrect){
       const item = S.wr.find(x=>x.uid===question.uid);
       if(!item) return;
+      if(item._nextDue && item._nextDue > Date.now()) return;   // only counts once it is due again
       item._streak = (item._streak||0) + 1;
       if(item._streak >= SR_INTERVALS.length){ REV.removeWrong(question.uid); }
       else {
@@ -686,6 +714,13 @@ const QUIZ = {
       if(cached && !_validCache(cached)) throw new Error('Cached data is invalid (a previous network error was stored). Go online to refresh it.');
       throw new Error('You are offline and this set is not cached yet. Go to the Offline Cache tab to download it while online.');
     }
+    /* Cache-first: a set you already downloaded opens instantly and costs no
+       data. A quiet background refresh (at most once a day per set) picks up
+       any fixes. Before v1.14 every open waited on the server. */
+    if(attempt === 1 && kind !== 'bg'){
+      const hit = await QDB.get(cacheKey);
+      if(_validCache(hit)){ QUIZ._maybeRevalidate(fileId, cacheKey); return hit; }
+    }
     try{
       const timeoutMs = attempt === 1 ? 25000 : 15000;
       /* Backend v1.11 turned on GETFILE_REQUIRES_AUTH: getFile now needs a
@@ -744,6 +779,38 @@ const QUIZ = {
       }
       throw err;
     }
+  },
+  _reval: {},
+  _maybeRevalidate(fileId, cacheKey){
+    try{
+      const TS_KEY = 'abhyas_qts';
+      const map = _load(TS_KEY, {});
+      if(Date.now() - (map[cacheKey] || 0) < 24*60*60*1000 || QUIZ._reval[cacheKey]) return;
+      QUIZ._reval[cacheKey] = true;
+      QUIZ._revalidateQuiet(fileId, cacheKey)
+        .then(ok => { if(ok){ const m = _load(TS_KEY, {}); m[cacheKey] = Date.now(); _save(TS_KEY, m); } })
+        .catch(() => {})
+        .finally(() => { delete QUIZ._reval[cacheKey]; });
+    }catch(e){}
+  },
+  /* Silent refresh of one cached set: no toasts, no retries, never throws. */
+  async _revalidateQuiet(fileId, cacheKey){
+    if(!S.online || S.forcedOffline) return false;
+    if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take('bg');
+    const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
+    const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId, ...auth})}`, {redirect:'follow'}, 25000);
+    const text = await r.text();
+    if(text.trim().startsWith('<')) return false;
+    let data;
+    try{ data = JSON.parse(text); }catch(e){ return false; }
+    if(!data || data.rateLimited || data.sessionInvalid || data.needsPayment) return false;
+    if(typeof data === 'object' && !Array.isArray(data) && data.success === true){
+      if(data.result !== undefined) data = data.result;
+      else if(data.data !== undefined) data = data.data;
+      else if(data.questions !== undefined) data = data.questions;
+    }
+    if(!data || (typeof data === 'object' && !Array.isArray(data) && data.success === false)) return false;
+    return await QDB.set(cacheKey, data);
   },
   _cacheWarned: false,
 
@@ -829,6 +896,22 @@ const QUIZ = {
   startWith(qsArr, mode, chapterName, scope=null){
     if(!qsArr || !qsArr.length){ toast('No questions to study'); return; }
     QUIZ._stopTimer();
+    /* Practice moves you forward: questions you have not seen yet come first
+       (stable order), so "20 questions" is the next 20, not the same 20. */
+    if(mode !== 'exam' && !(scope && scope.weeklyId) && S.cov){
+      const seenQ = q => {
+        const uid = String((q && q.uid) || '');
+        const i = uid.lastIndexOf('_');
+        if(i < 1) return false;
+        const c = S.cov[uid.slice(0, i)];
+        if(!c || !c.p) return false;
+        const ch = c.p[parseInt(uid.slice(i + 1), 10)];
+        return !!ch && ch !== '0';
+      };
+      const fresh = qsArr.filter(q => !seenQ(q));
+      const old = qsArr.filter(seenQ);
+      if(fresh.length && old.length) qsArr = fresh.concat(old);
+    }
     if(qsArr.length > 20){
       QUIZ._showLimitPicker(qsArr, mode, chapterName, scope);
       return;
@@ -850,7 +933,7 @@ const QUIZ = {
       <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.5rem;max-width:340px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true" aria-labelledby="qlm-title">
         <div style="font-size:1.2rem;margin-bottom:.35rem">${mode==='exam'?'<i class="ph ph-note-pencil"></i>':'<i class="ph ph-lightning"></i>'}</div>
         <div id="qlm-title" style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--t1);margin-bottom:.2rem">${esc(chapterName||'Quiz')}</div>
-        <div style="font-size:.74rem;color:var(--t3);margin-bottom:1rem">${pluralize(total,'question')} available — how many do you want to do?</div>
+        <div style="font-size:.74rem;color:var(--t3);margin-bottom:1rem">${pluralize(total,'question')} available (unseen ones come first). How many do you want to do?</div>
         <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.75rem">
           ${presets.map(n=>`<button data-qn="${n}" class="qlm-preset" style="padding:.35rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.76rem;cursor:pointer;font-family:var(--ff)">${n}</button>`).join('')}
           <button data-qn="${total}" class="qlm-preset" style="padding:.35rem .7rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r1);color:var(--t2);font-size:.76rem;cursor:pointer;font-family:var(--ff)">All ${total}</button>
@@ -951,21 +1034,25 @@ const QUIZ = {
       const picks = shuf(refs).slice(0, Math.min(10, refs.length));
       const all = [];
       let failed = 0;
-      for(const ref of picks){
-        try{
-          const raw = await QUIZ._fetch(ref.fid, ref.key);
-          const qs2 = normQ(raw, ref.fid);
-          all.push(...qs2);
-        }catch(e){
-          failed++;
-          console.warn('[daily] Failed to load', ref.key, e.message);
+      let _di = 0;
+      const _dworker = async () => {
+        while(_di < picks.length){
+          const ref = picks[_di++];
+          try{
+            const raw = await QUIZ._fetch(ref.fid, ref.key);
+            all.push(...normQ(raw, ref.fid));
+          }catch(e){
+            failed++;
+            console.warn('[daily] Failed to load', ref.key, e.message);
+          }
         }
-      }
+      };
+      await Promise.all(Array.from({length: Math.min(4, picks.length)}, _dworker));
       if(!all.length){ toast('❌ Could not load daily challenge — try caching data first'); return; }
       if(failed>0) toast(`⚠️ ${failed} file(s) failed — challenge uses ${all.length} questions`);
       const qsArr = shuf(all).slice(0,30);
       QUIZ.startWith(qsArr, 'flashcard', '🌟 Daily Challenge');
-      STREAK.markToday();
+      /* the streak now counts once five answers are given (see PROG.track) */
     })();
   },
 
@@ -990,7 +1077,16 @@ const QUIZ = {
     }
     toast('⏳ Building your adaptive practice set…');
     const need = TARGET - pool.length;
-    const picks = shuf(refs).slice(0, Math.min(8, refs.length));
+    /* Weak-topic mode now actually targets weak chapters: files from chapters
+       where your accuracy is under 60% (with at least 5 answers) come first. */
+    const _acc = ref => {
+      const rec = S.chapStats[`${ChapterData.chapterName(ref.lv, ref.ch)} — ${ref.book}`];
+      return (rec && rec.attempted >= 5) ? (rec.correct / rec.attempted) * 100 : null;
+    };
+    const _weak = refs.filter(r => { const a = _acc(r); return a !== null && a < 60; });
+    const _rest = refs.filter(r => !_weak.includes(r));
+    if(_weak.length) toast('Focusing on the chapters you find hardest.', 3000);
+    const picks = shuf(_weak).slice(0, 5).concat(shuf(_rest)).slice(0, Math.min(8, refs.length));
     let failed = 0;
     const stopAt = pool.length + need*2;
     for(const ref of picks){
@@ -1024,6 +1120,38 @@ const QUIZ = {
     },1000);
   },
   _stopTimer(){ if(S.quiz.timer){ clearInterval(S.quiz.timer); S.quiz.timer=null; } },
+
+  /* Question grid for timed tests: jump anywhere, and see answered / blank /
+     marked-for-review at a glance. */
+  toggleMark(qi){
+    if(!S.quiz.marked) S.quiz.marked = new Set();
+    if(S.quiz.marked.has(qi)) S.quiz.marked.delete(qi); else S.quiz.marked.add(qi);
+    const b = document.querySelector(`#eqc-${qi} .ib.mark-btn`);
+    if(b) b.classList.toggle('fl-on', S.quiz.marked.has(qi));
+    if(document.getElementById('pal-grid')) QUIZ.showPalette(true);
+  },
+  showPalette(refresh){
+    if(!S.quiz || !S.quiz.qs) return;
+    const marked = S.quiz.marked || new Set();
+    const tiles = S.quiz.qs.map((q, i) => {
+      const done = S.quiz.ans[i] !== null && S.quiz.ans[i] !== undefined;
+      const m = marked.has(i);
+      const bg = m ? 'var(--warning-soft)' : done ? 'var(--accent-soft)' : 'var(--bg-sunken)';
+      const bd = m ? 'var(--warning)' : done ? 'var(--accent)' : 'var(--sep-strong)';
+      const col = m ? 'var(--warning)' : done ? 'var(--accent)' : 'var(--ink-2)';
+      const state = m ? 'marked for review' : done ? 'answered' : 'not answered';
+      return `<button type="button" onclick="QUIZ.goTo(${i})" aria-label="Question ${i+1}, ${state}" style="min-width:0;height:40px;border-radius:8px;border:1.5px solid ${bd};background:${bg};color:${col};font-weight:700;font-family:var(--mono);font-size:.8rem">${i+1}</button>`;
+    }).join('');
+    const nAns = S.quiz.ans.filter(a => a !== null && a !== undefined).length;
+    const html = `<p class="t-foot mb3">${nAns} answered · ${S.quiz.qs.length - nAns} blank · ${marked.size} marked for review</p><div id="pal-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:6px">${tiles}</div>`;
+    if(refresh){ const b = document.getElementById('mbody'); if(b) b.innerHTML = html; return; }
+    openMod('Question grid', html);
+  },
+  goTo(i){
+    closeMod();
+    const el = document.getElementById('eqc-' + i);
+    if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+  },
 
   _lastSnapAt: 0,
   _SNAPSHOT_SIZE_CEILING: 2 * 1024 * 1024,
@@ -1061,9 +1189,11 @@ const QUIZ = {
     }
     // Weekly sets are one-attempt-only — discard the snapshot silently,
     // since resuming would bypass the one-shot rule.
+    /* v1.15: the start of a weekly test is recorded on the server, so a saved
+       test on this device may be resumed. Only drop it once already submitted. */
     if(snap.scope && snap.scope.weeklyId){
-      QUIZ._clearExamSnapshot();
-      return;
+      const done = (typeof WEEKLY !== 'undefined' && WEEKLY.attempts && WEEKLY.attempts[snap.scope.weeklyId]);
+      if(done){ QUIZ._clearExamSnapshot(); return; }
     }
     const elapsedSinceSave = Math.floor((Date.now() - snap.savedAt) / 1000);
     const adjustedLeft = snap.left - elapsedSinceSave;
@@ -1360,7 +1490,7 @@ const QUIZ = {
       const savedAns = S.quiz.ans[qi];
       return `
       <div class="eqc${savedAns!==null?' answered':''}" id="eqc-${qi}">
-        <div class="qm"><span class="qn mono">Q${qi+1}</span>${qSearchHtml(q)}</div>
+        <div class="qm"><span class="qn mono">Q${qi+1}</span><span style="display:inline-flex;gap:.3rem;align-items:center"><button type="button" class="ib mark-btn${S.quiz.marked && S.quiz.marked.has(qi) ? ' fl-on' : ''}" onclick="QUIZ.toggleMark(${qi})" title="Mark for review" aria-label="Mark question ${qi+1} for review"><i class="ph ph-flag"></i></button>${qSearchHtml(q)}</span></div>
         <div class="qt" style="font-size:.85rem">${esc(q.q)}</div>
         ${qImgHtml(q)}
         ${q.options.map((opt,oi)=>{
@@ -1518,6 +1648,7 @@ const QUIZ = {
       weeklyTitle: scope.weeklyTitle || '',
       qres
     };
+    if(typeof COV !== 'undefined') COV.record(qres);
     PROG.recordSession(sessionObj);
     CHAPSTATS.record(sessionObj);
 
@@ -1550,6 +1681,7 @@ document.addEventListener('keydown', e=>{
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if(e.key==='Escape'){ if(S.quiz.active) QUIZ.quit(); return; }
+  if(e.ctrlKey || e.metaKey || e.altKey) return;   // Ctrl+C / Ctrl+A must never answer a question
   if(S.quiz.reviewOnly) return;   // review mode has no keyboard answering
   if(S.quiz.mode!=='exam'){
     if(e.key==='ArrowRight') QUIZ.fcNav(1);
@@ -1558,9 +1690,9 @@ document.addEventListener('keydown', e=>{
       const i=Number(e.key)-1;
       if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
     }
-    const letterIdx = 'abcdABCD'.indexOf(e.key);
+    const letterIdx = 'abcdeABCDE'.indexOf(e.key);
     if(letterIdx > -1){
-      const i = letterIdx % 4;
+      const i = letterIdx % 5;
       if(S.quiz.qs[S.quiz.idx]?.options[i]!==undefined) QUIZ.fcAnswer(i);
     }
   }

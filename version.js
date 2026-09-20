@@ -44,4 +44,13 @@
           configured; sw precaches icon-512/favicon; manifest tidy-up;
           privacy page.
    ═══════════════════════════════════════════════════════════════════════ */
-const APP_VERSION = '1.13';
+/* 1.14 - launch hardening: opt-in auto-download, cache-first question sets,
+          per-file coverage store, sync payload that always fits, quiz
+          keyboard fix, photo-to-PDF written answers, trial pill in the top
+          bar, quiz-safe session expiry, tolerant service worker with offline
+          fonts/KaTeX/pdf.js, privacy + terms pages, honest copy. */
+/* 1.15 - phase 2: unseen-first practice, real weak-topic mode, question grid
+          and mark-for-review, exam countdown, weekly test start/resume/rank
+          recorded on the server, safer uploads, cached settings, nightly
+          spreadsheet backup, client error log, self-hosted assets. */
+const APP_VERSION = '1.15';

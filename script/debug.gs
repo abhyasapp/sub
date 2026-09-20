@@ -145,6 +145,11 @@ function resetAdminPasswordToSeed() {
 }
 
 function testAll() {
+  if (!ALLOW_RESET_ALL) {
+    const msg = "testAll() refused: it resets the owner password and creates/deletes a test user. Set ALLOW_RESET_ALL = true (temporarily) to run it.";
+    console.error(msg);
+    return msg;
+  }
   console.log("═══ FULL SYSTEM TEST ═══");
   setup();
   console.log("✅ Setup complete");
