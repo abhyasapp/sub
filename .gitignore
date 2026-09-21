@@ -11,3 +11,5 @@ node_modules/
 .vscode/
 .idea/
 .patch-backup-*/
+setup_chapters_loader.py
+user.html.bak
