@@ -264,37 +264,10 @@ def cmd_tidy(root: Path, args):
                     if not git_move(root, name, str(dst.relative_to(root)), dry=False):
                         shutil.move(str(src), str(dst))
             moved += 1
-
-    # README case collision
-    collision = _has_readme_collision(root)
-    if collision:
-        say(colour("Resolving README case collision", C.BOLD))
-        # Prefer README.md (all-caps, conventional); merge Readme.md into it.
-        upper = root / "README.md"
-        lower = root / "Readme.md"
-        if lower.exists() and upper.exists():
-            say(f"  {C.YELLOW}merge{C.RESET} Readme.md -> README.md (content appended)")
-            if not dry:
-                backup.mkdir(exist_ok=True)
-                shutil.copy2(upper, backup / "README.md")
-                shutil.copy2(lower, backup / "Readme.md")
-                with open(upper, "ab") as f:
-                    f.write(b"\n\n<!-- Merged from Readme.md by repo_tidy -->\n")
-                    f.write(lower.read_bytes())
-                if args.no_git or not in_git(root) or not git_tracked(root, "Readme.md"):
-                    lower.unlink()
-                else:
-                    subprocess.run(["git", "rm", "-f", "Readme.md"],
-                                   cwd=root, capture_output=True, text=True)
-        elif lower.exists():
-            say(f"  {C.YELLOW}rename{C.RESET} Readme.md -> README.md")
-            if not dry:
-                backup.mkdir(exist_ok=True)
-                shutil.copy2(lower, backup / "Readme.md")
-                if args.no_git or not in_git(root) or not git_tracked(root, "Readme.md"):
-                    lower.rename(upper)
-                else:
-                    git_move(root, "Readme.md", "README.md", dry=False)
+    # README handling removed on 2026-09-21. Windows treats README.md and
+    # Readme.md as the same file, and the merge logic above could delete
+    # the file entirely. If you ever need to rename the README, do it by
+    # hand with: git mv Readme.md README.md
 
     say()
     if dry:
