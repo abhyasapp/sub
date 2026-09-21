@@ -22,7 +22,7 @@
 'use strict';
 
 /* ── Config ───────────────────────────────────────────────────────── */
-const FILE_ID   = '1KwsnqX1IRPQInNr8ozn5TvnOA-bGuc2U';
+const FILE_ID   = '1wr_2W4UHotzWe6djopAXxmPIaNGBhLqM';
 const API_KEY   = 'AIzaSyAkm6iyFSV8lB82zWfD9gdjwdoldjXa2Vk';
 const CACHE_KEY = 'abhyas_chapters_cache_v2';
 const TTL_MS    = 24 * 60 * 60 * 1000;
