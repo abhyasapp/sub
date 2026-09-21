@@ -13,3 +13,9 @@ node_modules/
 .patch-backup-*/
 setup_chapters_loader.py
 user.html.bak
+
+.fix-backup-*
+.finish-fix-backup-*
+.patch-backup-*
+.repo-tidy-backup-*
+*.bak

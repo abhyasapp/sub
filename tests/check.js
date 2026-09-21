@@ -12,6 +12,20 @@ const root = path.resolve(__dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const exists = f => fs.existsSync(path.join(root, f));
 
+/* Look for a file at the root, then under script/, then under gas/.
+   The .gs files live wherever the developer wants them; the tests
+   should not care. */
+function findPath(name){
+  const candidates = [name, 'script/' + name, 'gas/' + name];
+  for (const c of candidates) if (exists(c)) return c;
+  return name;
+}
+function readGs(name){
+  const p = findPath(name);
+  if (!exists(p)) return '';
+  return read(p);
+}
+
 let passed = 0, failed = 0, warned = 0;
 function section(t) { console.log('\n' + t); }
 function ok(name, cond, detail) {
@@ -23,7 +37,8 @@ function warn(name, detail) { warned++; console.log('  warn  ' + name + (detail 
 
 const JS_FILES = ['app.js', 'objective.js', 'subjective.js', 'cloud-sync.js', 'shared.js', 'config.js',
   'version.js', 'pdf-viewer.js', 'chapters-data.js', 'subjective-data.js', 'subjective_chapters.js',
-  'firebase-config.js', 'sw.js', 'code.gs', 'setup.gs', 'private-files.gs', 'debug.gs'].filter(exists);
+  'firebase-config.js', 'sw.js', 'code.gs', 'setup.gs', 'private-files.gs', 'debug.gs']
+  .map(findPath).filter(exists);
 const HTML_FILES = ['index.html', 'user.html', 'admin.html', 'privacy.html', 'terms.html'].filter(exists);
 
 function inlineScripts(html) {
@@ -55,7 +70,7 @@ catch (e) { ok('manifest.json is valid JSON', false, e.message); }
 /* ── 2. Versions ───────────────────────────────────────────────────── */
 section('Versions');
 const vClient = (read('version.js').match(/APP_VERSION\s*=\s*'([^']+)'/) || [])[1];
-const vServer = (read('code.gs').match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
+const vServer = (readGs('code.gs').match(/APP_VERSION\s*=\s*"([^"]+)"/) || [])[1];
 ok('version.js and code.gs agree', vClient && vClient === vServer, 'client ' + vClient + ', server ' + vServer);
 
 /* ── 3. Local links ────────────────────────────────────────────────── */
