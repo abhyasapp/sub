@@ -1603,6 +1603,17 @@ const QUIZ = {
     document.getElementById('res-chap').textContent = S.quiz.ch;
     const grade = pct>=90?'🏆 Outstanding!':pct>=75?'🎯 Great job!':pct>=50?'👍 Keep practicing':'📚 Needs more review';
     document.getElementById('res-grade').textContent = grade;
+    /* Loksewa-style score: each wrong answer costs 0.2 of a mark. Shown as an
+       extra line; the main percentage above is unchanged. */
+    let negEl = document.getElementById('res-neg');
+    if(!negEl){
+      negEl = document.createElement('div');
+      negEl.id = 'res-neg';
+      negEl.className = 't-foot';
+      negEl.style.marginTop = '.3rem';
+      document.getElementById('res-grade').after(negEl);
+    }
+    negEl.textContent = total ? `Loksewa-style score: ${Math.max(0, correct - wrong * 0.2).toFixed(1)} / ${total} (each wrong answer costs 0.2)` : '';
 
     document.getElementById('res-stats').innerHTML = `
       <div class="sc"><div class="sv tcy">${total}</div><div class="stat-lbl">Total</div></div>

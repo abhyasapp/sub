@@ -292,6 +292,13 @@ Batch actions (`adminGrantAccessBatch`, `adminReviewPaymentsBatch`) mutate the a
 
 ---
 
+## What v1.15 added
+
+- **Weekly test integrity:** the start of a graded weekly test is recorded on the server (`WeeklyStarts` sheet). Restarting cannot be used to peek at the questions; a saved test can be resumed on the same device, and the server refuses submissions long after the window closes. Rank and percentile appear when the window closes (`getWeeklyStanding`).
+- **Backend:** Drive uploads happen before the script lock is taken; public settings are cached for two minutes; a nightly trigger copies the spreadsheet into the `AbhyasBackups` Drive folder (last 14 kept); `logClientError` stores short crash reports in the Activity log.
+- **Study flow:** unseen questions come first, weak-topic mode targets chapters under 60%, timed tests have a question grid and mark-for-review, the picker skips the pointless book step, and Home has an exam-date countdown.
+- **Self-hosted assets:** `vendor-assets.py` downloads pdf.js, pdf-lib, KaTeX, confetti and the Inter/JetBrains Mono fonts from the npm registry into `vendor/` and points the pages at them. Safe to re-run; run it again after any version bump.
+
 ## 11. Known gaps / roadmap
 
 - **`app.js` (~3,100 lines) and `CODE.gs` (~3,200 lines) are both large single files.** Splitting either into modules would help long-term maintainability, but hasn't been done — it's a real structural risk to attempt without a live test environment to validate against.

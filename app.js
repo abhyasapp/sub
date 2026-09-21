@@ -529,6 +529,50 @@ const COV = {
   }
 };
 
+/* ═══════════════ 3e. ASK — in-app confirm dialog ═══════════════
+   Replaces the browser's confirm()/prompt() for the destructive actions
+   (installed apps on iOS can suppress the native boxes). Usage:
+     if(!(await ASK.confirm({title, body, ok, danger, requireText}))) return; */
+const ASK = {
+  confirm(o){
+    o = o || {};
+    return new Promise(resolve => {
+      const prev = document.activeElement;
+      const need = o.requireText ? String(o.requireText) : '';
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:10040;display:flex;align-items:center;justify-content:center;padding:1.2rem;background:var(--scrim);backdrop-filter:blur(4px)';
+      wrap.setAttribute('role', 'dialog');
+      wrap.setAttribute('aria-modal', 'true');
+      wrap.innerHTML = `<div style="width:100%;max-width:380px;background:var(--surface-2,var(--surface));border:1px solid var(--sep);border-radius:var(--r-sheet);box-shadow:var(--sh-modal,var(--sh-3));padding:1.25rem">
+        <div style="font-size:var(--fs-t3);font-weight:650;margin-bottom:.4rem">${esc(o.title || 'Are you sure?')}</div>
+        <div class="t-callout" style="margin-bottom:${need ? '.8rem' : '1.1rem'};line-height:1.55">${esc(o.body || '')}</div>
+        ${need ? `<input class="input" id="ask-typed" autocomplete="off" placeholder="Type ${esc(need)} to confirm" style="margin-bottom:1rem">` : ''}
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-quiet" id="ask-no" style="flex:1" type="button">Cancel</button>
+          <button class="btn ${o.danger ? 'btn-r' : 'btn-solid'}" id="ask-yes" style="flex:1" type="button" ${need ? 'disabled' : ''}>${esc(o.ok || 'Confirm')}</button>
+        </div></div>`;
+      document.body.appendChild(wrap);
+      const onKey = e => { if(e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); done(false); } };
+      const done = v => {
+        document.removeEventListener('keydown', onKey, true);
+        wrap.remove();
+        try{ if(prev && prev.focus) prev.focus(); }catch(e){}
+        resolve(v);
+      };
+      document.addEventListener('keydown', onKey, true);
+      wrap.addEventListener('click', e => { if(e.target === wrap) done(false); });
+      wrap.querySelector('#ask-no').onclick = () => done(false);
+      const yes = wrap.querySelector('#ask-yes');
+      yes.onclick = () => done(true);
+      const typed = wrap.querySelector('#ask-typed');
+      if(typed){
+        typed.addEventListener('input', () => { yes.disabled = typed.value.trim().toUpperCase() !== need.toUpperCase(); });
+        typed.focus();
+      } else { yes.focus(); }
+    });
+  }
+};
+
 /* ═══════════════ 4. AUTH ═══════════════ */
 const AUTH = {
   async restore(){
@@ -655,7 +699,7 @@ const AUTH = {
     }
   },
   async logout(){
-    if(!confirm('Log out?'))return;
+    if(!(await ASK.confirm({title:'Log out?', body:'Your progress is saved to your account.', ok:'Log out'}))) return;
     if(S.user && S.user.token && S.online && !S.forcedOffline && PSYNC._timer){
       let confirmed = false;
       try{
@@ -1407,9 +1451,21 @@ const PROG = {
     { const _d = today(); if(!S._tc || S._tc.d !== _d) S._tc = {d:_d, n:0}; S._tc.n++; if(S._tc.n === 5) STREAK.markToday(); }
     S.prog.total = (S.prog.total || 0) + 1;
     if(correct) S.prog.correct = (S.prog.correct || 0) + 1;
-    _save(LS.PROG, S.prog);
+    PROG._saveSoon();
     HOME.updateStats();
     HOME.updateBadges();
+  },
+
+  /* Progress is written in a batch shortly after the last answer instead of
+     rewriting the whole history on every tap (kinder to low-end phones), and
+     always flushed when the page is hidden or closed. */
+  _st: null,
+  _saveSoon(){
+    if(PROG._st) clearTimeout(PROG._st);
+    PROG._st = setTimeout(() => { PROG._st = null; _save(LS.PROG, S.prog); }, 400);
+  },
+  flushNow(){
+    if(PROG._st){ clearTimeout(PROG._st); PROG._st = null; _save(LS.PROG, S.prog); }
   },
 
   recordSession(sess){
@@ -1536,18 +1592,32 @@ const STREAK = {
     _save(LS.STK, S.stk);
     HOME.render();
   },
+  /* Streak forgiveness (v1.18): allow ONE silent skipped day in the chain.
+     Travelling, festivals, illness — none of them should destroy a long
+     streak. The skip is never announced and never shown to the student. */
   currentStreak(){
     const set = new Set(S.stk.days||[]);
     if(!set.size) return 0;
     const hasToday = set.has(today());
     const hasYesterday = set.has(localDateOffset(new Date(), -1));
-    if(!hasToday && !hasYesterday) return 0;
+    if(!hasToday && !hasYesterday){
+      if(!set.has(localDateOffset(new Date(), -2))) return 0;
+    }
     let n = 0;
     let offset = hasToday ? 0 : 1;
-    while(set.has(localDateOffset(new Date(), -offset))){
-      n++;
-      offset++;
-      if(n > 400) break;
+    let skipBudget = 1;                 // one free skip for the whole chain
+    while(n <= 400){
+      if(set.has(localDateOffset(new Date(), -offset))){
+        n++;
+        offset++;
+        continue;
+      }
+      if(skipBudget > 0){
+        skipBudget--;
+        offset++;
+        continue;
+      }
+      break;
     }
     return n;
   },
@@ -1915,6 +1985,41 @@ const TT = {
     }
   },
 
+  /* Real reminders: a calendar file (repeating weekly) that any phone's
+     calendar app will alert on, even when Abhyas is closed. */
+  exportICS(){
+    const sess = (S.tt.sessions || []).filter(s => (s.start || s.time));
+    if(!sess.length){ toast('Add a session to your study plan first.'); return; }
+    const pad = n => String(n).padStart(2, '0');
+    const codes = ['SU','MO','TU','WE','TH','FR','SA'];
+    const clean = t => String(t).replace(/([,;\\])/g, '\\$1').replace(/[\r\n]+/g, ' ');
+    const lead = Math.max(0, Number(S.tt.reminders && S.tt.reminders.leadMinutes) || 5);
+    const now = new Date();
+    const stamp = now.getUTCFullYear() + pad(now.getUTCMonth() + 1) + pad(now.getUTCDate()) + 'T' + pad(now.getUTCHours()) + pad(now.getUTCMinutes()) + '00Z';
+    const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Abhyas//Study plan//EN', 'CALSCALE:GREGORIAN'];
+    sess.forEach(s => {
+      const st = String(s.start || s.time).split(':').map(Number);
+      const en = s.end ? String(s.end).split(':').map(Number) : [(st[0] + 1) % 24, st[1]];
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      d.setDate(d.getDate() + (((Number(s.day) || 0) - d.getDay() + 7) % 7));
+      const ymd = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate());
+      lines.push('BEGIN:VEVENT', 'UID:abhyas-' + s.id + '@app.mku.name.np', 'DTSTAMP:' + stamp,
+        'DTSTART:' + ymd + 'T' + pad(st[0]) + pad(st[1]) + '00',
+        'DTEND:' + ymd + 'T' + pad(en[0]) + pad(en[1]) + '00',
+        'RRULE:FREQ=WEEKLY;BYDAY=' + codes[Number(s.day) || 0],
+        'SUMMARY:' + clean((s.name || s.label || 'Study') + ' (Abhyas)'),
+        'BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Study session', 'TRIGGER:-PT' + lead + 'M', 'END:VALARM',
+        'END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    const blob = new Blob([lines.join('\r\n')], {type:'text/calendar'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'abhyas-study-plan.ics';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Open the file to add your study plan to your calendar.', 4500);
+  },
   exportJ(){
     const blob = new Blob([JSON.stringify(S.tt,null,2)],{type:'application/json'});
     const a = document.createElement('a');
@@ -2003,7 +2108,7 @@ const CACHE = {
     toast('🗑 Removed from offline cache');
   },
   async clearAll(){
-    if(!confirm('Remove ALL cached question sets? You will need to be online to study again until you re-cache.')) return;
+    if(!(await ASK.confirm({title:'Remove all downloads?', body:'You will need to be online to study again until you download the chapters again.', ok:'Remove all', danger:true}))) return;
     await QDB.clear();
     CACHE.render();
     toast('🗑 Offline cache cleared');
@@ -2227,7 +2332,7 @@ const DATA = {
 
   async restoreCloud(){
     if(!S.online){ toast('❌ Need internet to restore'); return; }
-    if(!confirm('Replace progress, bookmarks, flags, and wrong-answer bank on THIS device with your last cloud backup? This cannot be undone.')) return;
+    if(!(await ASK.confirm({title:'Restore from your backup?', body:'This replaces the progress, saved questions, flags and miss list on THIS device with your last cloud backup. It cannot be undone.', ok:'Restore', danger:true}))) return;
     PSYNC._setStatus('Restoring…');
     await PSYNC.forceRestore();
   },
@@ -2238,7 +2343,14 @@ const DATA = {
     toast('🧹 Question cache cleared');
   },
 
-  reset(){
+  async reset(){
+    if(!(await ASK.confirm({title:'Reset this device?', body:'This deletes ALL progress, bookmarks, flags, wrong answers and study plan on this device. Your cloud backup is not touched.', ok:'Continue', danger:true}))) return;
+    if(!(await ASK.confirm({title:'Are you absolutely sure?', body:'This cannot be undone.', ok:'Yes, reset', danger:true}))) return;
+    [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
+    toast('All data reset');
+    location.reload();
+  },
+  _resetLegacy(){
     if(!confirm('⚠️ This deletes ALL progress, bookmarks, flags, wrong answers, and timetable on this device. Continue?')) return;
     if(!confirm('Are you absolutely sure? This cannot be undone.')) return;
     [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
@@ -2256,6 +2368,26 @@ const DATA = {
 
   /* ---- v1.13: cloud reset + account deletion ----------- ABHYAS_PATCH_1_13 ---- */
   async resetCloud(){
+    if(!S.user || !S.user.token){ toast('Log in first'); return; }
+    if(!S.online || S.forcedOffline){ toast('Go online first. This also clears your cloud copy.'); return; }
+    if(!(await ASK.confirm({title:'Reset your progress everywhere?', body:'This deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.', ok:'Reset everywhere', danger:true, requireText:'RESET'}))){ toast('Cancelled. Nothing was changed.'); return; }
+    let res;
+    try{
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({action:'resetMyProgress', username:S.user.username, token:S.user.token, confirm:'RESET'})
+      }, 30000);
+      res = await r.json();
+    }catch(e){ toast('Could not reach the server. Nothing was changed.'); return; }
+    if(!res || !res.success){ toast((res && res.error) || 'Reset failed'); return; }
+    clearTimeout(PSYNC._timer); PSYNC._timer = null;
+    S.prog = {total:0,correct:0,sessions:[]}; S.bk = []; S.fl = []; S.wr = [];
+    S.stk = {days:[],last:''}; S.chapStats = {}; S.fcount = {}; S.cov = {};
+    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.FCOUNT, LS.EXAM_SNAP, LS.COV].forEach(k=>localStorage.removeItem(k));
+    toast('Progress reset everywhere. Reloading…');
+    setTimeout(()=>location.reload(), 900);
+  },
+  async _resetCloudLegacy(){
     if(!S.user || !S.user.token){ toast('❌ Log in first'); return; }
     if(!S.online || S.forcedOffline){ toast('❌ Go online first — this also clears your cloud copy'); return; }
     if(!confirm('Reset your progress EVERYWHERE?\n\nThis deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.')) return;
@@ -2287,7 +2419,7 @@ const DATA = {
     const typed = cfEl ? cfEl.value.trim().toUpperCase() : '';
     if(!password){ toast('Enter your password first'); return; }
     if(typed !== 'DELETE'){ toast('Type DELETE in the box to confirm'); return; }
-    if(!confirm('Permanently delete your account?\n\nYour login, progress, payment record, weekly-set attempts and written answers (including uploaded files) are removed from the server. This cannot be undone.')) return;
+    if(!(await ASK.confirm({title:'Delete your account?', body:'Your login, progress, payment record, weekly-set attempts and written answers (including uploaded files) are removed from the server. This cannot be undone.', ok:'Delete my account', danger:true}))) return;
     let res;
     try{
       const r = await netFetch(APPS, {
@@ -2441,6 +2573,10 @@ const APP = {
     if(typeof migrateSessionScopes === 'function') migrateSessionScopes();
     if(!Object.keys(S.chapStats).length && S.prog.sessions?.length) CHAPSTATS.rebuildFromSessions();
     if(!S.cov || !Object.keys(S.cov).length) COV.rebuildFromSessions();
+    /* Known question counts (content-index.js) make progress bars right from the first launch. */
+    if(window.CONTENT_INDEX && typeof window.CONTENT_INDEX === 'object'){
+      Object.keys(window.CONTENT_INDEX).forEach(k => { if(S.fcount[k] == null) S.fcount[k] = window.CONTENT_INDEX[k]; });
+    }
 
     /* Only scan the whole question cache once per app version: reading every
        cached set on every launch was a startup spike on low-end phones. */
@@ -2589,6 +2725,8 @@ window.NET = NET;
 window.UI = UI;
 window.PWA = PWA;
 window.PROG = PROG;
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') PROG.flushNow(); });
+window.addEventListener('pagehide', () => PROG.flushNow());
 window.HOME = HOME;
 window.STREAK = STREAK;
 window.TT = TT;
@@ -2599,6 +2737,7 @@ window.APP = APP;
 window.WEEKLY = WEEKLY;
 window.CHAPSTATS = CHAPSTATS;
 window.COV = COV;
+window.ASK = ASK;
 window.PSYNC = PSYNC;
 window.NETCHECK = NETCHECK;
 window.GETFILE_GATE = GETFILE_GATE;

@@ -53,4 +53,16 @@
           and mark-for-review, exam countdown, weekly test start/resume/rank
           recorded on the server, safer uploads, cached settings, nightly
           spreadsheet backup, client error log, self-hosted assets. */
-const APP_VERSION = '1.15';
+/* 1.16 - phase 3: question editor + growth panel + announcements in the admin
+          console, text-size button, study-plan calendar export, styled confirm
+          dialogs, landing-page sample question, automatic checks (tests/). */
+/* 1.17 - phase 4: chapter cards + Continue, sign in with email or mobile,
+          payment screenshot shrunk on the phone, approval-time note,
+          question-count index, Content-Security-Policy, batched progress saves. */
+/* 1.18 - solo-student 10/10: personalized Today plan, exam readiness on Home,
+          chapter strength verdicts, "Just 5" quick session, resume chip,
+          pace feedback, streak forgiveness, image fullscreen, copy-explanation
+          button, fast-guess flag on results. */
+/* 1.19 - confidence rating (Sure / Not sure / Guessed), misconceptions card,
+          recovery mode after 3+ days away, read-aloud button. */
+const APP_VERSION = '1.19';

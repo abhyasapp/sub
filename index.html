@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://*.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://accounts.google.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="theme-color" content="#F2F4F3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -591,8 +592,8 @@ details.faq p{
     <!-- ── Sign in ── -->
     <form id="form-login" autocomplete="on" novalidate>
       <div class="field">
-        <label for="in-user">Username</label>
-        <input class="input" type="text" id="in-user" placeholder="Your username" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next">
+        <label for="in-user">Username, email or mobile</label>
+        <input class="input" type="text" id="in-user" placeholder="Username, email or mobile" autocomplete="username" autocapitalize="none" spellcheck="false" enterkeyhint="next">
       </div>
       <div class="field">
         <label for="in-pass">Password</label>
@@ -769,6 +770,20 @@ details.faq p{
 </main>
 
 <div class="wide">
+  <section class="section" id="try" aria-labelledby="try-h" style="margin-top:var(--sp-8)">
+    <h2 id="try-h">Try a question</h2>
+    <p class="lede">No account needed. Here is the kind of practice you get.</p>
+    <div class="card" id="try-card">
+      <p id="try-q" style="font-weight:600;margin-bottom:var(--sp-3)"></p>
+      <div id="try-opts" style="display:flex;flex-direction:column;gap:var(--sp-2)"></div>
+      <p id="try-exp" class="t-callout" style="margin-top:var(--sp-3)" hidden></p>
+      <div style="display:flex;gap:var(--sp-2);margin-top:var(--sp-3);flex-wrap:wrap">
+        <button class="btn btn-sec btn-sm" type="button" id="try-next" onclick="TRY_Q.next()" hidden style="margin-top:0">Another question</button>
+        <button class="btn btn-sm" type="button" onclick="APP.setMode('signup');document.getElementById('main-card').scrollIntoView({behavior:'smooth'})">Create a free account</button>
+      </div>
+    </div>
+  </section>
+
   <section class="section" id="about" aria-labelledby="about-h">
     <h2 id="about-h">What Abhyas is</h2>
     <p class="lede">Practice for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam. Thousands of questions across the technical paper, plus General Knowledge practice that sits alongside it.</p>
@@ -1312,7 +1327,8 @@ const APP = {
         const when = p.submittedAt ? new Date(p.submittedAt).toLocaleString() : '';
         $('st-msg').textContent =
           'Transaction ' + p.txId + (when ? ', sent on ' + when : '') +
-          '. An admin will check it and your access opens as soon as it\u2019s approved.';
+          '. An admin will check it and your access opens as soon as it\u2019s approved.' +
+          ((this.session && this.session.settings && this.session.settings.paymentEta) ? ' Payments are usually checked ' + this.session.settings.paymentEta + '.' : '');
       }
     } catch(e){ console.warn('[APP] payment status poll failed:', e); }
   },
@@ -1540,7 +1556,48 @@ const APP = {
 
   onQrError(){ $('qr-img').style.display = 'none'; $('qr-fallback').style.display = 'flex'; },
 
-  onFile(){
+  /* The payment screenshot is shrunk on the phone (max 1600 px, JPEG) so it
+     uploads quickly on a weak connection and never hits the size limit. */
+  async onFile(){
+    const input = $('pay-file'), nameEl = $('pay-file-name');
+    const f = input.files[0];
+    if (!f) { this.fileData = null; nameEl.textContent = 'No file chosen'; return; }
+    nameEl.textContent = f.name;
+    if (!/^image\//i.test(f.type || '')) {
+      this.showErr('Please choose an image: a screenshot or a photo of the payment.');
+      input.value = ''; nameEl.textContent = 'No file chosen'; this.fileData = null;
+      return;
+    }
+    try {
+      this.fileData = await this.shrinkImage(f, 1600, 0.82);
+      nameEl.textContent = f.name + ' (ready to send)';
+    } catch (e) {
+      this.showErr('Could not read that image. Try a screenshot instead.');
+      input.value = ''; nameEl.textContent = 'No file chosen'; this.fileData = null;
+    }
+  },
+  shrinkImage(file, maxSide, quality){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const sc = Math.min(1, maxSide / Math.max(w, h));
+        w = Math.round(w * sc); h = Math.round(h * sc);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+        cx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        const out = c.toDataURL('image/jpeg', quality);
+        if (out.length > 6 * 1024 * 1024) reject(new Error('too large')); else resolve(out);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('bad image')); };
+      img.src = url;
+    });
+  },
+  _onFileLegacy(){
     const f = $('pay-file').files[0];
     const nameEl = $('pay-file-name');
     if (!f) { this.fileData = null; nameEl.textContent = 'No file chosen'; return; }
@@ -1640,6 +1697,51 @@ const APP = {
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 220); }, durationMs);
   }
 };
+
+/* Sample questions so a visitor can feel the app before signing up. */
+const TRY_Q = {
+  QS: [
+    { q: 'Which of the following is the SI unit of dynamic viscosity?',
+      o: ['Pa·s (N·s/m²)', 'm²/s', 'N/m', 'kg/m³'], a: 0,
+      e: 'Dynamic viscosity is shear stress divided by velocity gradient, so its unit is Pa·s. The unit m²/s belongs to kinematic viscosity.' },
+    { q: 'A simply supported beam of span L carries a uniformly distributed load w. The maximum bending moment is:',
+      o: ['wL²/8', 'wL²/4', 'wL/2', 'wL²/12'], a: 0,
+      e: 'The maximum moment occurs at mid-span and equals wL²/8. The maximum shear force is wL/2 at the supports.' },
+    { q: 'The modulus of elasticity of mild steel is about:',
+      o: ['200 GPa', '20 GPa', '2 GPa', '2000 GPa'], a: 0,
+      e: 'Steel is about 2 × 10⁵ MPa (200 GPa). Concrete is far softer, roughly 25 to 30 GPa.' }
+  ],
+  i: -1,
+  next(){ this.i = (this.i + 1) % this.QS.length; this.render(); },
+  render(){
+    const c = this.QS[this.i];
+    const q = $('try-q'), o = $('try-opts'), e = $('try-exp'), n = $('try-next');
+    if (!q || !o) return;
+    q.textContent = c.q; e.hidden = true; n.hidden = true; o.innerHTML = '';
+    c.o.forEach((t, k) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'btn btn-sec';
+      b.style.cssText = 'justify-content:flex-start;text-align:left;white-space:normal;margin-top:0';
+      b.textContent = String.fromCharCode(65 + k) + '.  ' + t;
+      b.onclick = () => TRY_Q.pick(k);
+      o.appendChild(b);
+    });
+  },
+  pick(k){
+    const c = this.QS[this.i];
+    Array.from($('try-opts').children).forEach((b, j) => {
+      b.disabled = true;
+      if (j === c.a) { b.style.background = 'var(--success-soft)'; b.style.color = 'var(--success)'; }
+      else if (j === k) { b.style.background = 'var(--danger-soft)'; b.style.color = 'var(--danger)'; }
+    });
+    const e = $('try-exp');
+    e.textContent = (k === c.a ? 'Correct. ' : 'Not quite. ') + c.e;
+    e.hidden = false;
+    $('try-next').hidden = false;
+  }
+};
+TRY_Q.i = Math.floor(Math.random() * TRY_Q.QS.length) - 1;
+TRY_Q.next();
 
 const COOKIE_NOTICE = {
   KEY: 'abhyas_cookie_ack',

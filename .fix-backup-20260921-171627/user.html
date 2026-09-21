@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://*.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://accounts.google.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="theme-color" content="#F2F4F3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
@@ -1374,76 +1373,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   @page{margin:1.5cm}
 }
 </style>
-<style id="patch-119">
-/* v1.19: confidence rating, misconceptions, recovery, read-aloud */
-.conf-prompt{padding:var(--sp-2) 0 0;text-align:center;animation:view-in var(--dur-base) var(--ease-out)}
-.conf-q{font-size:var(--fs-cap);color:var(--ink-3);margin-bottom:var(--sp-2);font-weight:600}
-.conf-btns{display:inline-flex;gap:2px;padding:3px;background:var(--bg-sunken);border-radius:var(--r-input)}
-.conf-btn{min-height:30px;padding:0 var(--sp-3);border-radius:calc(var(--r-input) - 3px);font-size:var(--fs-foot);font-weight:600;color:var(--ink-2);background:transparent;border:none;font-family:var(--font);cursor:pointer;transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)}
-.conf-btn:hover{color:var(--ink)}
-.conf-btn.on{background:var(--accent);color:var(--on-accent)}
-.conf-btn.on[data-level="guess"]{background:var(--warning);color:#fff}
-.conf-btn.on[data-level="unsure"]{background:var(--info);color:#fff}
-.misconception-card{background:var(--warning-soft);border:1px solid var(--warning-line);border-radius:var(--r-panel);padding:var(--sp-4);margin-bottom:var(--sp-3)}
-.misconception-card .head{display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-2);color:var(--warning);font-weight:650;font-size:var(--fs-t3)}
-.misconception-card .count{margin-left:auto;font-family:var(--mono);font-size:var(--fs-callout)}
-.misconception-card p{font-size:var(--fs-foot);color:var(--ink-2);margin-bottom:var(--sp-3);line-height:1.5}
-.recovery-card{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--r-panel);padding:var(--sp-4);margin-bottom:var(--sp-3)}
-.recovery-card .head{display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-2);color:var(--accent);font-weight:650;font-size:var(--fs-t3)}
-.recovery-card p{font-size:var(--fs-foot);color:var(--ink-2);margin-bottom:var(--sp-3);line-height:1.5}
-.fc-tools{display:flex;justify-content:flex-end;margin-bottom:var(--sp-1)}
-.fc-tools .tts-btn{min-height:28px;padding:0 var(--sp-2);border-radius:var(--r-control);background:var(--bg-sunken);border:1px solid var(--sep);color:var(--ink-3);font-size:var(--fs-cap);font-weight:600;display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-family:var(--font)}
-.fc-tools .tts-btn:hover{color:var(--accent);border-color:var(--accent-line)}
-.fc-tools .tts-btn.speaking{background:var(--accent);color:var(--on-accent);border-color:transparent}
-</style>
-<style id="patch-118">
-/* v1.18: personalized Today plan, readiness, resume, chapter verdicts */
-.today-card{background:var(--surface);border:1px solid var(--accent-line);border-radius:var(--r-panel);padding:var(--sp-4);margin-bottom:var(--sp-3);box-shadow:var(--sh-1)}
-.today-card h3{font-size:var(--fs-t3);font-weight:650;display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-3)}
-.today-card h3 i{color:var(--accent)}
-.today-row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0;font-size:var(--fs-callout);border-top:1px solid var(--hairline)}
-.today-row:first-of-type{border-top:none}
-.today-row .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.today-row .pct{font-family:var(--mono);font-size:var(--fs-foot);font-weight:700;flex-shrink:0}
-.today-row .pct.low{color:var(--danger)}
-.today-row .pct.mid{color:var(--warning)}
-.today-row .pct.ok{color:var(--success)}
-.today-row .mins{font-size:var(--fs-cap);color:var(--ink-3);flex-shrink:0;min-width:3rem;text-align:right}
-.today-actions{display:flex;gap:var(--sp-2);margin-top:var(--sp-3)}
-.today-actions .btn{flex:1}
-.readiness{background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-panel);padding:var(--sp-4);margin-bottom:var(--sp-3)}
-.readiness-top{display:flex;align-items:baseline;justify-content:space-between;gap:var(--sp-2);margin-bottom:var(--sp-2)}
-.readiness-val{font-family:var(--mono);font-size:var(--fs-num-lg);font-weight:700;color:var(--accent);line-height:1}
-.readiness-val.warn{color:var(--warning)}
-.readiness-val.low{color:var(--danger)}
-.readiness-bar{height:8px;background:var(--bg-sunken);border-radius:4px;overflow:hidden;margin-bottom:var(--sp-2)}
-.readiness-bar-fill{height:100%;background:var(--accent);transition:width var(--dur-slow) var(--ease)}
-.readiness-detail{font-size:var(--fs-foot);color:var(--ink-2);line-height:1.5}
-.resume-chip{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-3);background:var(--info-soft);border:1px solid var(--info-line);border-radius:var(--r-card);margin-bottom:var(--sp-3);font-size:var(--fs-callout);cursor:pointer;font-family:var(--font);width:100%;text-align:left;color:var(--ink)}
-.resume-chip:hover{background:var(--info);color:#fff;border-color:var(--info)}
-.resume-chip i{flex-shrink:0}
-.resume-chip .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.resume-chip .arrow{flex-shrink:0;opacity:.6}
-.chap-verdicts{display:flex;flex-direction:column;gap:var(--sp-1);margin-top:var(--sp-2)}
-.chap-verdict{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-2);border-radius:var(--r-control);font-size:var(--fs-callout);cursor:pointer;background:none;border:none;font-family:var(--font);width:100%;text-align:left}
-.chap-verdict:hover{background:var(--bg-sunken)}
-.chap-verdict .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
-.chap-verdict .mark{font-size:.9rem;flex-shrink:0}
-.chap-verdict.ready .mark{color:var(--success)}
-.chap-verdict.needs .mark{color:var(--warning)}
-.chap-verdict.weak .mark{color:var(--danger)}
-.pace-line{display:inline;font-size:var(--fs-foot);color:var(--ink-2)}
-.pace-line .on-track{color:var(--success);font-weight:600}
-.pace-line .behind{color:var(--warning);font-weight:600}
-.img-fullscreen{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:10050;display:none;align-items:center;justify-content:center;padding:1rem}
-.img-fullscreen.show{display:flex}
-.img-fullscreen img{max-width:100%;max-height:100%;border-radius:var(--r-input);object-fit:contain;touch-action:pinch-zoom}
-.img-fullscreen .close{position:absolute;top:1rem;right:1rem;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;font-size:1.3rem;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer}
-.qcard img.question-figure{cursor:zoom-in}
-.qcard img.question-figure:hover{opacity:.92}
-.expl .expl-copy{float:right;margin-left:.5rem}
-.fast-guess-line{text-align:center;color:var(--warning);margin:-1rem 0 var(--sp-3);font-size:var(--fs-foot)}
-</style>
 <style id="patch-114">
 /* v1.14: contrast, readable captions, visible menu button, trial pill */
 :root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
@@ -1452,21 +1381,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .tb-menu{display:none}
 @media (max-width:960px){.tb-menu{display:inline-flex}}
 .tb-trial{background:var(--warning-soft)!important;color:var(--warning)!important;font-weight:700}
-</style>
-<style id="patch-117">
-/* v1.17: chapter cards */
-.chg-tabs{display:flex;gap:2px;padding:3px;margin-bottom:var(--sp-3);background:var(--bg-sunken);border-radius:var(--r-input)}
-.chg-tabs button{flex:1;min-height:36px;border-radius:calc(var(--r-input) - 3px);font-size:var(--fs-callout);font-weight:600;color:var(--ink-2)}
-.chg-tabs button.active{background:var(--surface);color:var(--ink);box-shadow:var(--sh-1)}
-.chg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:var(--sp-2);margin-bottom:var(--sp-4)}
-.chg-card{text-align:left;padding:var(--sp-3);min-height:96px;display:flex;flex-direction:column;gap:var(--sp-2);
-  background:var(--surface);border:1px solid var(--sep);border-radius:var(--r-card);
-  transition:border-color var(--dur-fast) var(--ease),transform var(--dur-fast) var(--ease)}
-.chg-card:hover:not([disabled]){border-color:var(--accent)}
-.chg-card:active:not([disabled]){transform:scale(.985)}
-.chg-card[disabled]{opacity:.5;cursor:default}
-.chg-name{font-size:var(--fs-callout);font-weight:650;line-height:1.3;color:var(--ink)}
-.chg-meta{font-size:var(--fs-cap);color:var(--ink-3);margin-top:auto}
 </style>
 </head>
 <body>
@@ -1613,7 +1527,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         </button>
       </div>
 
-      <div class="sb-foot"><div id="sb-version"></div><div class="t-cap" style="text-align:center;margin-top:.4rem"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="mailto:abhyasbymku@gmail.com">Help</a></div></div>
+      <div class="sb-foot"><div id="sb-version"></div><div class="t-cap" style="text-align:center;margin-top:.4rem"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a></div></div>
     </nav>
 
     <main id="main" tabindex="-1">
@@ -1642,35 +1556,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         </div>
 
         <div class="due-strip" id="due-strip" hidden></div>
-
-        <div id="recovery-slot"></div>
-        <div id="misconception-slot"></div>
-        <div id="resume-slot"></div>
-
-        <section class="today-card" id="today-card">
-          <h3><i class="ph ph-list-checks"></i> Today's plan</h3>
-          <div id="today-body"></div>
-          <div class="today-actions">
-            <button class="btn btn-solid" id="today-start" onclick="TODAY_PLAN.start()">
-              <i class="ph ph-play-circle"></i> Start today's plan
-            </button>
-            <button class="btn btn-a" onclick="TODAY_PLAN.quick5()" title="Just 5 questions — about 2 minutes">
-              <i class="ph ph-lightning"></i> Just 5
-            </button>
-          </div>
-        </section>
-
-        <section class="readiness" id="readiness-card" hidden>
-          <div class="readiness-top">
-            <div>
-              <div class="t-cap" style="font-weight:700;color:var(--ink-2)">Exam readiness</div>
-              <div class="readiness-val" id="readiness-val">&mdash;</div>
-            </div>
-            <div class="t-foot" id="readiness-conf" style="text-align:right"></div>
-          </div>
-          <div class="readiness-bar"><div class="readiness-bar-fill" id="readiness-fill" style="width:0%"></div></div>
-          <div class="readiness-detail" id="readiness-detail"></div>
-        </section>
 
         <section class="start-block">
           <div class="greet-line">
@@ -1711,11 +1596,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div class="scard"><div class="sv ta2" id="hs-pct">0%</div><div class="stat-lbl">Accuracy</div></div>
         </div>
         <p class="t-foot mb4" style="margin-top:.5rem"><i class="ph ph-clock"></i> <span id="hs-time">0m</span> studied in the last 7 days</p>
-
-        <section class="card">
-          <div class="card-hd"><h3><i class="ph ph-target"></i> Chapter strength</h3><button class="btn btn-sm btn-quiet" onclick="UI.go('progress')">Full progress</button></div>
-          <div class="chap-verdicts" id="chap-verdicts"></div>
-        </section>
 
         <div class="g2-grid">
           <div class="card">
@@ -1843,17 +1723,16 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
       <div class="view" id="view-online">
         <div class="pg-head">
           <h2><i class="ph ph-books"></i> Chapters</h2>
-          <p>Pick a chapter, then a set of questions. Anything you open is saved to this device for offline study.</p>
+          <p>Pick a level, chapter, book and subtopic. Anything you open is saved to this device for offline study.</p>
         </div>
         <div id="on-offline-warn" class="banner banner-danger" style="display:none">
           <i class="ph ph-wifi-slash"></i>
           <span><strong>You're offline.</strong> Only subtopics already downloaded will open. <a onclick="UI.go('offline')" style="cursor:pointer;text-decoration:underline">See what's downloaded</a></span>
         </div>
-        <div id="chgrid"></div>
         <div class="on-card-banner"><span><i class="ph ph-cloud-arrow-down"></i></span> Questions stream from Drive and save themselves for offline use as you go.</div>
 
         <div class="card">
-          <div class="card-hd"><h3>Or choose step by step</h3></div>
+          <div class="card-hd"><h3>Choose what to study</h3></div>
           <select class="sel-c" id="on-lv" onchange="ON.onLv()" aria-label="Level">
             <option value="">Select a level…</option>
             <option value="level5">Level 5 — Diploma</option>
@@ -2217,9 +2096,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <div id="fc-img-wrap" style="display:none;margin:var(--sp-3) 0">
               <img id="fc-img" alt="Question figure" loading="lazy" style="border-radius:var(--r-input);border:1px solid var(--sep)" onerror="this.parentElement.style.display='none'">
             </div>
-            <div class="fc-tools" id="fc-tools"></div>
             <div id="fc-opts"></div>
-            <div id="fc-conf"></div>
             <div class="expl" id="fc-expl"></div>
             <div class="kbd-hint">
               <kbd>A</kbd>–<kbd>D</kbd> or <kbd>1</kbd>–<kbd>5</kbd> to answer · <kbd>←</kbd><kbd>→</kbd> to move · <kbd>Esc</kbd> to quit
@@ -2325,11 +2202,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   <div class="bn-sheet-grid" id="bn-sheet-grid"></div>
 </div>
 
-<div id="img-fullscreen" class="img-fullscreen" role="dialog" aria-modal="true" aria-label="Question image" onclick="IMGZOOM.close()">
-  <button class="close" aria-label="Close image" onclick="event.stopPropagation();IMGZOOM.close()"><i class="ph ph-x"></i></button>
-  <img id="img-fullscreen-img" alt="" onclick="event.stopPropagation()">
-</div>
-
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
 <div class="mbg" id="mbg" role="dialog" aria-modal="true" aria-labelledby="mtitle" onclick="closeMod()">
@@ -2351,10 +2223,9 @@ if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
 <script src="config.js"></script>
 <script src="version.js"></script>
 <script src="shared.js"></script>
-<script src="chapters-loader.js"></script>
+<script src="chapters-loader.js">
 <script src="subjective_chapters.js"></script>
 <script src="subjective-data.js"></script>
-<script src="content-index.js"></script>
 <script src="app.js"></script>
 <script src="objective.js"></script>
 <script src="subjective.js"></script>
@@ -2421,30 +2292,9 @@ function _syncSkip(){
 })();
 
 if (typeof QUIZ !== 'undefined') {
-  // Per-question timing — reset whenever a new quiz starts
-  const _doStart = QUIZ._doStart.bind(QUIZ);
-  QUIZ._doStart = function(){
-    if (typeof FAST_GUESS !== 'undefined') FAST_GUESS.reset();
-    try { if (typeof RECOVERY !== 'undefined') RECOVERY.markActive(); } catch(e){}
-    try { if (typeof READALOUD !== 'undefined') READALOUD.stop(); } catch(e){}
-    if (S && S.quiz) S.quiz.conf = {};
-    return _doStart.apply(QUIZ, arguments);
-  };
-  // Wrap fcAnswer so we know how long each question took
-  const _fcAnswer = QUIZ.fcAnswer.bind(QUIZ);
-  QUIZ.fcAnswer = function(i){
-    if (S.quiz && !S.quiz.reviewOnly && S.quiz.ans[S.quiz.idx] === null) {
-      if (typeof FAST_GUESS !== 'undefined') FAST_GUESS.markAnswered(S.quiz.idx);
-    }
-    return _fcAnswer(i);
-  };
-
   const _rf = QUIZ._renderFlashcard.bind(QUIZ);
   QUIZ._renderFlashcard = function(){
     _rf(); _cleanChip('fc-chip');
-    if (typeof FAST_GUESS !== 'undefined') FAST_GUESS.markShown(S.quiz.idx);
-    try { if (typeof CONF !== 'undefined') CONF.render(); } catch(e){}
-    try { if (typeof READALOUD !== 'undefined') READALOUD.render(); } catch(e){}
     if (!S.quiz.qs) return;
     const i = S.quiz.idx, n = S.quiz.qs.length, last = i === n - 1;
     _ctr('fc-ctr', i + 1, n);
@@ -2504,26 +2354,6 @@ if (typeof QUIZ !== 'undefined') {
     const cb = $('qlm-shuffle');
     if (cb && !cb.disabled) cb.checked = false;
   };
-
-  // Annotate the results card with a fast-guess warning
-  (function(){
-    const res = $('res-wrap');
-    if (!res || !window.MutationObserver) return;
-    new MutationObserver(() => {
-      if (res.style.display === 'none') return;
-      const stats = $('res-stats');
-      if (!stats || stats.parentNode.querySelector('.fast-guess-line')) return;
-      if (typeof FAST_GUESS === 'undefined' || !S.quiz) return;
-      const fast = FAST_GUESS.fastWrongIndexes(S.quiz);
-      if (!fast.length) return;
-      const line = document.createElement('p');
-      line.className = 'fast-guess-line';
-      line.innerHTML = '<i class="ph ph-lightning"></i> ' + fast.length +
-        ' wrong answer' + (fast.length > 1 ? 's' : '') +
-        ' in under 10 seconds \u2014 you may have been guessing. Slow down on the next attempt.';
-      stats.parentNode.insertBefore(line, stats.nextSibling);
-    }).observe(res, { attributes: true, attributeFilter: ['style'] });
-  })();
 
   const _re = QUIZ._renderExam.bind(QUIZ);
   QUIZ._renderExam = function(){
@@ -3066,8 +2896,6 @@ UI._goRaw = function(v){
   _updateBottomNav(real);
   BN.close();
 
-  if (real === 'online' && typeof CH_GRID !== 'undefined') CH_GRID.render();
-
   if (real === 'weekly' && typeof WEEKLY !== 'undefined') {
     if (typeof WEEKLY._renderHomeCard === 'function') WEEKLY._renderHomeCard();
     const outer = $('weekly-sets-outer'), empty = $('weekly-empty');
@@ -3310,129 +3138,6 @@ window.SB_HINTS = {
     _renderMarquee();
   }
 };
-/* Chapters screen: chapter cards with progress, a Continue card, and a set
-   picker, instead of four dropdowns. The dropdowns stay below as "step by
-   step" for anyone who prefers them. */
-window.CH_GRID = {
-  lv: '',
-  LEVELS: [['level7', 'Level 7'], ['level5', 'Level 5'], ['gk', 'General Knowledge']],
-
-  _stats(refs){
-    let seen = 0, total = 0, known = 0;
-    refs.forEach(r => {
-      const c = S.cov && S.cov[r.fid];
-      if (c && c.p) for (let i = 0; i < c.p.length; i++) if (c.p[i] !== '0') seen++;
-      const n = S.fcount && S.fcount[r.fid];
-      if (n != null) { total += n; known++; }
-    });
-    return { seen: seen, total: total, complete: refs.length > 0 && known === refs.length };
-  },
-
-  _last(){
-    return ((S.prog && S.prog.sessions) || []).find(x => x.fid && x.lv && x.ch) || null;
-  },
-
-  _ref(fid){
-    return ChapterData.allFileRefs().find(r => r.fid === fid) || null;
-  },
-
-  render(){
-    const box = $('chgrid');
-    if (!box || typeof ChapterData === 'undefined') return;
-    const last = this._last();
-    if (!this.lv) this.lv = (last && last.lv) || 'level7';
-
-    let html = '';
-    const lastRef = last ? this._ref(last.fid) : null;
-    if (lastRef) {
-      const st = this._stats([lastRef]);
-      html += '<div class="card" style="border-color:var(--accent-line);background:var(--accent-soft)">' +
-        '<div class="t-cap" style="color:var(--accent);font-weight:700">Continue</div>' +
-        '<div class="t-t3" style="margin:2px 0 var(--sp-2)">' + esc(ChapterData.chapterName(lastRef.lv, lastRef.ch)) + ': ' + esc(prettySub(lastRef.subtopic)) + '</div>' +
-        '<div class="t-foot mb3">' + (st.total ? st.seen + ' of ' + st.total + ' seen' : st.seen + ' seen') + '</div>' +
-        '<div class="bg"><button class="btn btn-solid" type="button" onclick="CH_GRID.startFid(\'' + lastRef.fid + '\',\'flashcard\')">Practise</button>' +
-        '<button class="btn btn-quiet" type="button" onclick="CH_GRID.startFid(\'' + lastRef.fid + '\',\'exam\')">Timed test</button></div></div>';
-    }
-
-    const tabs = this.LEVELS.map(l =>
-      '<button type="button" class="' + (l[0] === this.lv ? 'active' : '') + '" onclick="CH_GRID.setLevel(\'' + l[0] + '\')">' + esc(l[1]) + '</button>').join('');
-    const chs = ChapterData.chapters(this.lv);
-    const cards = Object.keys(chs).map(ch => {
-      const refs = ChapterData.chapterFileRefs(this.lv, ch);
-      const has = refs.length > 0;
-      const st = this._stats(refs);
-      const pct = (st.complete && st.total) ? Math.min(100, Math.round(st.seen / st.total * 100)) : null;
-      const meta = !has ? 'Coming soon'
-        : (pct !== null ? pct + '% seen · ' : (st.seen ? st.seen + ' seen · ' : '')) + refs.length + (refs.length === 1 ? ' set' : ' sets');
-      return '<button type="button" class="chg-card"' + (has ? '' : ' disabled') + ' onclick="CH_GRID.open(\'' + this.lv + '\',\'' + ch + '\')">' +
-        '<span class="chg-name">' + esc(chs[ch]) + '</span>' +
-        (has ? '<span class="pb" style="display:block"><span class="pb-f" style="display:block;width:' + (pct === null ? 0 : pct) + '%"></span></span>' : '') +
-        '<span class="chg-meta">' + esc(meta) + '</span></button>';
-    }).join('');
-    box.innerHTML = html + '<div class="chg-tabs">' + tabs + '</div><div class="chg-grid">' + cards + '</div>';
-  },
-
-  setLevel(id){ this.lv = id; this.render(); },
-
-  async open(lv, ch){
-    const refs = ChapterData.chapterFileRefs(lv, ch);
-    if (!refs.length) return;
-    const name = ChapterData.chapterName(lv, ch);
-    let keys = new Set();
-    try { keys = new Set(await QDB.keys()); } catch(e){}
-    const offline = !(S.online && !S.forcedOffline);
-    const rows = refs.map(r => {
-      const st = this._stats([r]);
-      const cached = keys.has(r.key);
-      const blocked = offline && !cached;
-      return '<div class="row" style="padding:var(--sp-2) 0">' +
-        '<div class="row-main"><div class="t-callout" style="color:var(--ink);font-weight:600">' + esc(prettySub(r.subtopic)) + '</div>' +
-        '<div class="t-cap">' + (st.total ? st.seen + ' of ' + st.total + ' seen' : (st.seen ? st.seen + ' seen' : 'Not started')) +
-        (cached ? ' · saved on this device' : (blocked ? ' · needs a connection' : '')) + '</div></div>' +
-        '<button class="btn btn-sm btn-a" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'flashcard\')">Practise</button>' +
-        '<button class="btn btn-sm btn-quiet" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'exam\')">Test</button></div>';
-    }).join('');
-    const head = refs.length > 1
-      ? '<div class="bg mb3"><button class="btn btn-solid" type="button"' + (offline ? ' disabled' : '') + ' onclick="CH_GRID.startChapter(\'' + lv + '\',\'' + ch + '\',\'flashcard\')">Practise the whole chapter</button>' +
-        '<button class="btn btn-quiet" type="button"' + (offline ? ' disabled' : '') + ' onclick="CH_GRID.startChapter(\'' + lv + '\',\'' + ch + '\',\'exam\')">Timed test</button></div>'
-      : '';
-    openMod(name, head + '<div class="rows">' + rows + '</div>');
-  },
-
-  go(fid, mode){ closeMod(); this.startFid(fid, mode); },
-
-  startFid(fid, mode){
-    const r = this._ref(fid);
-    if (!r) { toast('That set is not available.'); return; }
-    const name = ChapterData.chapterName(r.lv, r.ch) + ' \u2014 ' + r.book;
-    QUIZ.load(r.fid, r.key, mode, name, { lv: r.lv, ch: r.ch, book: r.book, sub: r.subtopic, fid: r.fid });
-  },
-
-  async startChapter(lv, ch, mode){
-    closeMod();
-    const refs = ChapterData.chapterFileRefs(lv, ch);
-    if (!refs.length) return;
-    QUIZ._showLoader('Loading ' + refs.length + ' sets…');
-    const all = [];
-    let i = 0, done = 0, failed = 0;
-    const worker = async () => {
-      while (i < refs.length) {
-        const ref = refs[i++];
-        try { all.push(...normQ(await QUIZ._fetch(ref.fid, ref.key), ref.fid)); }
-        catch(e){ failed++; }
-        done++;
-        const m = $('quiz-loader-msg');
-        if (m) m.textContent = 'Loading sets (' + done + '/' + refs.length + ')…';
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(4, refs.length) }, worker));
-    QUIZ._hideLoader();
-    if (!all.length) { toast('Could not load this chapter. Download it while online first.', 5000); return; }
-    if (failed) toast(failed + ' set(s) could not load. Starting with ' + all.length + ' questions.', 4000);
-    QUIZ.startWith(all, mode, ChapterData.chapterName(lv, ch) + ' \u2014 ' + refs[0].book, { lv: lv, ch: ch });
-  }
-};
-
 /* Announcement banner from the admin console. Also watches the content
    version: when an admin fixes a question, this phone refreshes its
    downloaded chapters the next time they are opened. */
@@ -3505,597 +3210,7 @@ window.FONT = {
   }
 };
 
-function _renderHomeExtras(){
-  try { if (typeof RECOVERY !== 'undefined') RECOVERY.render(); } catch(e){}
-  try { if (typeof MISCONCEPTIONS !== 'undefined') MISCONCEPTIONS.render(); } catch(e){}
-  try { if (typeof TODAY_PLAN !== 'undefined') TODAY_PLAN.render(); } catch(e){}
-  try { if (typeof TODAY_PLAN !== 'undefined') TODAY_PLAN._renderResume(); } catch(e){}
-  try { if (typeof READINESS !== 'undefined') READINESS.render(); } catch(e){}
-  try { if (typeof CHAP_VERDICTS !== 'undefined') CHAP_VERDICTS.render(); } catch(e){}
-  try { if (typeof PACE !== 'undefined') PACE.render(); } catch(e){}
-}
-
-/* ═══════════════════════════════════════════════════════════════════
-   CONF — confidence rating after each flashcard answer.
-   "Sure" + wrong  → misconception (surfaced on Home).
-   "Guess" + right → not credited as mastery; SR doesn't advance.
-   No tap          → treated as "not sure" (the default).
-   ═══════════════════════════════════════════════════════════════════ */
-window.CONF = {
-  render(){
-    const box = $('fc-conf');
-    if (!box) return;
-    if (!S.quiz || !S.quiz.qs) { box.innerHTML = ''; return; }
-    const idx = S.quiz.idx;
-    const answered = S.quiz.ans[idx] !== null && S.quiz.ans[idx] !== undefined;
-    if (!answered || S.quiz.reviewOnly) { box.innerHTML = ''; return; }
-    const chosen = (S.quiz.conf && S.quiz.conf[idx]) || null;
-    box.innerHTML =
-      '<div class="conf-prompt">' +
-        '<div class="conf-q">How sure were you?</div>' +
-        '<div class="conf-btns" role="group" aria-label="Confidence in this answer">' +
-          '<button type="button" class="conf-btn' + (chosen === 'sure' ? ' on' : '') + '" data-level="sure" onclick="QUIZ.setConf(\'sure\')">Sure</button>' +
-          '<button type="button" class="conf-btn' + (chosen === 'unsure' ? ' on' : '') + '" data-level="unsure" onclick="QUIZ.setConf(\'unsure\')">Not sure</button>' +
-          '<button type="button" class="conf-btn' + (chosen === 'guess' ? ' on' : '') + '" data-level="guess" onclick="QUIZ.setConf(\'guess\')">Guessed</button>' +
-        '</div>' +
-      '</div>';
-  }
-};
-
-QUIZ.setConf = function(level){
-  if (!S.quiz || S.quiz.reviewOnly) return;
-  const idx = S.quiz.idx;
-  if (!S.quiz.conf) S.quiz.conf = {};
-  S.quiz.conf[idx] = level;
-  const q = S.quiz.qs[idx];
-  const ans = S.quiz.ans[idx];
-  if (q && ans !== null && level === 'sure' && !isOk(ans, q.correct)) {
-    const item = (S.wr || []).find(x => x.uid === q.uid);
-    if (item) { item._misconception = true; _save(LS.WR, S.wr); }
-  }
-  if (q && ans !== null && level === 'guess' && isOk(ans, q.correct)) {
-    const item = (S.wr || []).find(x => x.uid === q.uid);
-    if (item && item._nextDue) { item._nextDue = Date.now(); _save(LS.WR, S.wr); }
-  }
-  CONF.render();
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   MISCONCEPTIONS — questions you were confident about and got wrong.
-   ═══════════════════════════════════════════════════════════════════ */
-window.MISCONCEPTIONS = {
-  list(){
-    try { return (S.wr || []).filter(x => x._misconception); } catch(e){ return []; }
-  },
-  render(){
-    const box = $('misconception-slot');
-    if (!box) return;
-    const items = this.list();
-    if (!items.length) { box.innerHTML = ''; return; }
-    box.innerHTML =
-      '<section class="misconception-card">' +
-        '<div class="head"><i class="ph ph-warning-circle"></i> Misconceptions to fix' +
-          '<span class="count">' + items.length + '</span></div>' +
-        '<p>You were <b>sure</b> of the wrong answer on these. Fixing a misconception raises your score faster than anything else \u2014 the idea is already in your head, it just needs correcting.</p>' +
-        '<button class="btn btn-solid btn-blk" onclick="MISCONCEPTIONS.start()">' +
-          '<i class="ph ph-target"></i> Review these ' + items.length + ' now' +
-        '</button>' +
-      '</section>';
-  },
-  start(){
-    const items = this.list();
-    if (!items.length) return;
-    QUIZ.startWith(items.slice(), 'flashcard', '\U0001F3AF Misconceptions', null);
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   RECOVERY — welcome back after 3+ days away.
-   A short, easy re-entry beats a full normal session when a student
-   has been away: the worst thing is they open the app, see 400 wrong
-   answers due, and close it again.
-   ═══════════════════════════════════════════════════════════════════ */
-window.RECOVERY = {
-  KEY: 'abhyas_last_active',
-  DAYS: 3,
-
-  markActive(){
-    try { localStorage.setItem(this.KEY, String(Date.now())); } catch(e){}
-  },
-  _gapMs(){
-    try {
-      const raw = Number(localStorage.getItem(this.KEY) || 0);
-      if (!raw) return 0;
-      return Date.now() - raw;
-    } catch(e){ return 0; }
-  },
-  shouldShow(){
-    const gap = this._gapMs();
-    return gap >= this.DAYS * 24 * 60 * 60 * 1000;
-  },
-  render(){
-    const box = $('recovery-slot');
-    if (!box) return;
-    if (!this.shouldShow()) { box.innerHTML = ''; return; }
-    const days = Math.round(this._gapMs() / 86400000);
-    box.innerHTML =
-      '<section class="recovery-card">' +
-        '<div class="head"><i class="ph ph-hand-waving"></i> Welcome back</div>' +
-        '<p>It\u2019s been ' + days + ' day' + (days === 1 ? '' : 's') + '. Nothing is lost \u2014 your progress and streak are safe. Let\u2019s start with 5 gentle questions from the chapters you\u2019re strongest at.</p>' +
-        '<div class="bg">' +
-          '<button class="btn btn-solid" onclick="RECOVERY.start()"><i class="ph ph-play-circle"></i> Start gently</button>' +
-          '<button class="btn btn-quiet" onclick="RECOVERY.dismiss()">Skip for now</button>' +
-        '</div>' +
-      '</section>';
-  },
-  dismiss(){
-    // Do not mark active here — if they browse and close without studying,
-    // the card should come back next time.
-    const box = $('recovery-slot');
-    if (box) box.innerHTML = '';
-  },
-  async start(){
-    const refs = this._strongFiles();
-    if (!refs.length) { QUIZ.daily(); return; }
-    toast('Loading 5 gentle questions\u2026', 1500);
-    const all = [];
-    for (const ref of refs.slice(0, 2)) {
-      try {
-        const raw = await QUIZ._fetch(ref.fid, ref.key);
-        all.push(...normQ(raw, ref.fid));
-      } catch(e){}
-      if (all.length >= 15) break;
-    }
-    if (!all.length) { QUIZ.daily(); return; }
-    QUIZ.startWith(shuf(all).slice(0, 5), 'flashcard', '\U0001F44B Back gently', null);
-    this.markActive();
-  },
-  _strongFiles(){
-    try {
-      const entries = (typeof CHAPSTATS !== 'undefined' && CHAPSTATS.entries) ? CHAPSTATS.entries() : [];
-      const strongChapters = new Set(
-        entries.filter(e => e.attempted >= 5 && e.accuracy >= 70).map(e => e.chapter)
-      );
-      if (!strongChapters.size) return [];
-      const all = ChapterData.allFileRefs();
-      return shuf(all.filter(r => strongChapters.has(ChapterData.chapterName(r.lv, r.ch))));
-    } catch(e){ return []; }
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   READALOUD — SpeechSynthesis for the current question.
-   ═══════════════════════════════════════════════════════════════════ */
-window.READALOUD = {
-  _btn: null,
-  supported(){
-    return typeof window.speechSynthesis !== 'undefined' &&
-           typeof window.SpeechSynthesisUtterance !== 'undefined';
-  },
-  _text(){
-    if (!S.quiz || !S.quiz.qs) return '';
-    const q = S.quiz.qs[S.quiz.idx];
-    if (!q) return '';
-    const opts = (q.options || []).map((o, i) => String.fromCharCode(65 + i) + ': ' + o).join('. ');
-    return (q.q || '') + '. ' + opts;
-  },
-  render(){
-    const box = $('fc-tools');
-    if (!box) return;
-    if (!this.supported()) { box.innerHTML = ''; return; }
-    const speaking = window.speechSynthesis.speaking;
-    box.innerHTML =
-      '<button type="button" class="tts-btn' + (speaking ? ' speaking' : '') + '" ' +
-        'onclick="READALOUD.toggle()" aria-label="Read this question aloud">' +
-        '<i class="ph ph-speaker-high"></i> ' + (speaking ? 'Stop' : 'Read') +
-      '</button>';
-  },
-  toggle(){
-    if (!this.supported()) return;
-    if (window.speechSynthesis.speaking) { this.stop(); return; }
-    const text = this._text();
-    if (!text) return;
-    try {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-IN';
-      u.rate = 0.95;
-      u.onend = () => READALOUD.render();
-      u.onerror = () => READALOUD.render();
-      window.speechSynthesis.speak(u);
-      this.render();
-    } catch(e){}
-  },
-  stop(){
-    if (!this.supported()) return;
-    try { window.speechSynthesis.cancel(); } catch(e){}
-    this.render();
-  }
-};
-
-/* PACE — ahead or behind, in plain words under the study-time line. */
-window.PACE = {
-  render(){
-    const el = $('hs-time');
-    if (!el || !el.parentElement) return;
-    let pace = null;
-    try { pace = PACE._compute(); } catch(e){}
-    let line = el.parentElement.querySelector('.pace-line');
-    if (!line) {
-      line = document.createElement('span');
-      line.className = 'pace-line';
-      el.parentElement.appendChild(line);
-    }
-    if (!pace) { line.textContent = ''; return; }
-    if (pace.onTrack) {
-      line.innerHTML = ' \u00b7 <span class="on-track"><i class="ph ph-check-circle"></i> on pace for your target</span>';
-    } else {
-      const gap = Math.max(1, Math.round((pace.target - pace.actual) / 60));
-      line.innerHTML = ' \u00b7 <span class="behind"><i class="ph ph-warning-circle"></i> ' + gap + ' min behind your weekly pace</span>';
-    }
-  },
-  _compute(){
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    let actualSec = 0;
-    ((S.prog && S.prog.sessions) || []).forEach(s => {
-      if ((s.at || 0) >= weekAgo) actualSec += (s.durationSec || 0);
-    });
-    let targetSec = 5 * 3600;
-    try {
-      const v = (typeof EXAM_DATE !== 'undefined' && EXAM_DATE.get) ? EXAM_DATE.get() : '';
-      if (v) {
-        const p = v.split('-').map(Number);
-        const target = new Date(p[0], p[1] - 1, p[2]).getTime();
-        const days = Math.max(1, Math.round((target - Date.now()) / 86400000));
-        targetSec = Math.min(20 * 3600, Math.max(3 * 3600, (120 * 3600) / Math.max(7, days) * 7));
-      }
-    } catch(e){}
-    return { actual: actualSec, target: targetSec, onTrack: actualSec >= targetSec * 0.85 };
-  }
-};
-function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} try { ANNOUNCE.load(); } catch(e){} try { _renderHomeExtras(); } catch(e){} }
-
-/* ═══════════════════════════════════════════════════════════════════
-   TODAY_PLAN — what should I do right now?
-   Combines weakest chapters, due spaced-repetition review, and one
-   new topic into a single action. Removing the decision is the
-   biggest UX win for a solo student.
-   ═══════════════════════════════════════════════════════════════════ */
-window.TODAY_PLAN = {
-  _plan: null,
-
-  _entries(){
-    try {
-      if (typeof CHAPSTATS === 'undefined' || !CHAPSTATS.entries) return [];
-      return CHAPSTATS.entries().filter(e => e.attempted >= 5);
-    } catch(e){ return []; }
-  },
-
-  _weakest(n){
-    return this._entries()
-      .slice()
-      .sort((a, b) => a.accuracy - b.accuracy)
-      .slice(0, n);
-  },
-
-  _dueReview(){
-    try {
-      if (typeof REV === 'undefined' || !REV.dueWrong) return 0;
-      return REV.dueWrong().length;
-    } catch(e){ return 0; }
-  },
-
-  _resumeCtx(){
-    try {
-      const sessions = (S.prog && S.prog.sessions) || [];
-      const last = sessions.find(s => s.fid && s.lv && s.ch);
-      if (!last || !last.fid) return null;
-      const ref = ChapterData.allFileRefs().find(r => r.fid === last.fid);
-      if (!ref) return null;
-      const at = last.at || 0;
-      if (Date.now() - at > 14 * 24 * 60 * 60 * 1000) return null;
-      return {
-        fid: ref.fid,
-        title: ChapterData.chapterName(ref.lv, ref.ch),
-        subtopic: ref.subtopic || ref.book || '',
-        when: at
-      };
-    } catch(e){ return null; }
-  },
-
-  _renderResume(){
-    const slot = $('resume-slot');
-    if (!slot) return;
-    const ctx = this._resumeCtx();
-    if (!ctx) { slot.innerHTML = ''; return; }
-    const mins = Math.max(1, Math.round((Date.now() - ctx.when) / 60000));
-    const when = mins < 60 ? mins + ' min ago' : Math.round(mins / 60) + ' h ago';
-    slot.innerHTML =
-      '<button class="resume-chip" onclick="TODAY_PLAN.resume()">' +
-        '<i class="ph ph-play"></i>' +
-        '<span class="grow">Continue <b>' + esc(ctx.title) + '</b>' +
-          (ctx.subtopic ? ' \u00b7 ' + esc(ctx.subtopic) : '') +
-          '<span class="t-cap" style="display:block;opacity:.7">Last opened ' + when + '</span>' +
-        '</span>' +
-        '<i class="ph ph-arrow-right arrow"></i>' +
-      '</button>';
-  },
-
-  resume(){
-    const ctx = this._resumeCtx();
-    if (!ctx) { toast('Nothing to resume yet.'); return; }
-    const ref = ChapterData.allFileRefs().find(r => r.fid === ctx.fid);
-    if (!ref) { toast('That chapter is no longer available.'); return; }
-    QUIZ.load(ref.fid, ref.key, 'flashcard',
-      ChapterData.chapterName(ref.lv, ref.ch) + ' \u2014 ' + ref.book,
-      { lv: ref.lv, ch: ref.ch, book: ref.book, sub: ref.subtopic, fid: ref.fid });
-  },
-
-  render(){
-    const box = $('today-body');
-    if (!box) return;
-
-    const weak = this._weakest(3);
-    const due = this._dueReview();
-    const newRef = this._pickNew();
-
-    const lines = [];
-    weak.forEach(w => {
-      const pct = w.accuracy;
-      const cls = pct < 50 ? 'low' : pct < 70 ? 'mid' : 'ok';
-      lines.push(
-        '<div class="today-row">' +
-          '<i class="ph ph-target" style="color:var(--ink-3)"></i>' +
-          '<span class="lbl">' + esc(w.chapter) + '</span>' +
-          '<span class="pct ' + cls + '">' + pct + '%</span>' +
-          '<span class="mins">10 min</span>' +
-        '</div>'
-      );
-    });
-    if (due > 0) {
-      lines.push(
-        '<div class="today-row">' +
-          '<i class="ph ph-arrow-counter-clockwise" style="color:var(--accent)"></i>' +
-          '<span class="lbl">Spaced review due</span>' +
-          '<span class="pct mid">' + due + '</span>' +
-          '<span class="mins">5 min</span>' +
-        '</div>'
-      );
-    }
-    if (newRef) {
-      lines.push(
-        '<div class="today-row">' +
-          '<i class="ph ph-sparkle" style="color:var(--accent)"></i>' +
-          '<span class="lbl">Try something new: ' + esc(ChapterData.chapterName(newRef.lv, newRef.ch)) + '</span>' +
-          '<span class="pct ok">new</span>' +
-          '<span class="mins">10 min</span>' +
-        '</div>'
-      );
-    }
-    if (!lines.length) {
-      lines.push(
-        '<div class="today-row">' +
-          '<i class="ph ph-sparkle" style="color:var(--accent)"></i>' +
-          '<span class="lbl">A general mix to warm you up</span>' +
-          '<span class="pct ok">10 Q</span>' +
-          '<span class="mins">10 min</span>' +
-        '</div>'
-      );
-    }
-    box.innerHTML = lines.join('');
-    this._plan = { weak, due, newRef };
-  },
-
-  _pickNew(){
-    try {
-      const all = ChapterData.allFileRefs();
-      const seen = new Set();
-      Object.keys(S.cov || {}).forEach(fid => {
-        const c = S.cov[fid];
-        if (c && c.a > 0) seen.add(fid);
-      });
-      const fresh = all.filter(r => !seen.has(r.fid));
-      if (!fresh.length) return null;
-      return fresh[Math.floor(Math.random() * fresh.length)];
-    } catch(e){ return null; }
-  },
-
-  start(){
-    const p = this._plan;
-    if (!p) { QUIZ.daily(); return; }
-    if (p.due > 0 && typeof REV !== 'undefined' && REV.start) { REV.start('wr', 'flashcard', true); return; }
-    if (p.weak.length) {
-      const first = p.weak[0];
-      const ref = ChapterData.allFileRefs().find(r =>
-        ChapterData.chapterName(r.lv, r.ch) === first.chapter
-      );
-      if (ref) {
-        QUIZ.load(ref.fid, ref.key, 'flashcard',
-          ChapterData.chapterName(ref.lv, ref.ch) + ' \u2014 ' + ref.book,
-          { lv: ref.lv, ch: ref.ch, book: ref.book, sub: ref.subtopic, fid: ref.fid });
-        return;
-      }
-    }
-    if (p.newRef) {
-      const r = p.newRef;
-      QUIZ.load(r.fid, r.key, 'flashcard',
-        ChapterData.chapterName(r.lv, r.ch) + ' \u2014 ' + r.book,
-        { lv: r.lv, ch: r.ch, book: r.book, sub: r.subtopic, fid: r.fid });
-      return;
-    }
-    QUIZ.daily();
-  },
-
-  quick5(){
-    toast('Loading 5 questions\u2026', 1500);
-    const p = this._plan;
-    const refs = p && p.newRef
-      ? [p.newRef]
-      : (typeof ChapterData !== 'undefined' ? ChapterData.allFileRefs() : []).slice(0, 3);
-    if (!refs.length) { toast('No content available yet.'); return; }
-    (async () => {
-      const all = [];
-      for (const ref of refs) {
-        try {
-          const raw = await QUIZ._fetch(ref.fid, ref.key);
-          all.push(...normQ(raw, ref.fid));
-        } catch(e){}
-        if (all.length >= 15) break;
-      }
-      if (!all.length) { toast('Could not load a quick set \u2014 try again.'); return; }
-      const picked = shuf(all).slice(0, 5);
-      QUIZ.startWith(picked, 'flashcard', '\u26a1 Quick 5', null);
-    })();
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   READINESS — predicted exam score, right on the Home screen.
-   ═══════════════════════════════════════════════════════════════════ */
-window.READINESS = {
-  render(){
-    const card = $('readiness-card');
-    if (!card) return;
-    let p = null;
-    try { p = (typeof PROG !== 'undefined' && PROG.predict) ? PROG.predict() : null; } catch(e){}
-    if (!p) { card.hidden = true; return; }
-    card.hidden = false;
-    const v = p.predicted;
-    const cls = v >= 70 ? '' : v >= 50 ? 'warn' : 'low';
-    const el = $('readiness-val');
-    if (el) { el.textContent = v + '%'; el.className = 'readiness-val ' + cls; }
-    const conf = $('readiness-conf');
-    if (conf) conf.textContent = p.confidence + ' confidence \u00b7 \u00b1 ' + p.margin + '%';
-    const fill = $('readiness-fill');
-    if (fill) {
-      fill.style.width = v + '%';
-      fill.style.background = v >= 70 ? 'var(--success)' : v >= 50 ? 'var(--warning)' : 'var(--danger)';
-    }
-    const det = $('readiness-detail');
-    if (det) {
-      const weakest = TODAY_PLAN._weakest(2);
-      if (weakest.length) {
-        det.innerHTML = 'Focus on: ' +
-          weakest.map(w => '<b>' + esc(w.chapter) + '</b> (' + w.accuracy + '%)').join(' \u00b7 ');
-      } else {
-        det.textContent = 'Complete a few more sessions for a sharper estimate.';
-      }
-    }
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   CHAP_VERDICTS — one-line verdict per chapter.
-   ═══════════════════════════════════════════════════════════════════ */
-window.CHAP_VERDICTS = {
-  render(){
-    const box = $('chap-verdicts');
-    if (!box) return;
-    let entries = [];
-    try { entries = (typeof CHAPSTATS !== 'undefined') ? CHAPSTATS.entries() : []; } catch(e){}
-    entries = entries.filter(e => e.attempted >= 3);
-    if (!entries.length) {
-      box.innerHTML = '<p class="t-foot" style="padding:var(--sp-2) 0">Complete a few sessions to see which chapters are strongest.</p>';
-      return;
-    }
-    entries.sort((a, b) => a.accuracy - b.accuracy);
-    box.innerHTML = entries.slice(0, 5).map(e => {
-      const pct = e.accuracy;
-      const kind = pct >= 80 ? 'ready' : pct >= 60 ? 'needs' : 'weak';
-      const icon = pct >= 80 ? 'ph-check-circle' : pct >= 60 ? 'ph-warning-circle' : 'ph-x-circle';
-      return '<button class="chap-verdict ' + kind + '" onclick="CHAP_VERDICTS.go(\'' + escAttrJs(e.chapter) + '\')">' +
-        '<i class="ph ' + icon + ' mark"></i>' +
-        '<span class="lbl">' + esc(e.chapter) + '</span>' +
-        '<span class="t-cap mono">' + e.correct + '/' + e.attempted + '</span>' +
-        '<span class="t-cap" style="color:var(--ink-3);font-weight:650">' + pct + '%</span>' +
-      '</button>';
-    }).join('');
-  },
-  go(chapter){
-    try {
-      UI.go('online');
-      setTimeout(() => {
-        const refs = ChapterData.allFileRefs();
-        const ref = refs.find(r => ChapterData.chapterName(r.lv, r.ch) === chapter);
-        if (!ref) return;
-        const lvSel = $('on-lv');
-        if (lvSel && ref.lv) {
-          lvSel.value = ref.lv;
-          if (typeof ON !== 'undefined' && ON.onLv) ON.onLv();
-          const chSel = $('on-ch');
-          if (chSel) { chSel.value = ref.ch; if (ON.onCh) ON.onCh(); }
-        }
-      }, 200);
-    } catch(e){ UI.go('progress'); }
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   IMGZOOM — click any question image to open it full-screen.
-   ═══════════════════════════════════════════════════════════════════ */
-window.IMGZOOM = {
-  open(src, alt){
-    const box = $('img-fullscreen');
-    const img = $('img-fullscreen-img');
-    if (!box || !img) return;
-    img.src = src;
-    img.alt = alt || 'Question image';
-    box.classList.add('show');
-    document.body.style.overflow = 'hidden';
-  },
-  close(){
-    const box = $('img-fullscreen');
-    if (!box) return;
-    box.classList.remove('show');
-    document.body.style.overflow = '';
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   COPY_EXPL — copy an explanation so it can be shared.
-   ═══════════════════════════════════════════════════════════════════ */
-window.COPY_EXPL = {
-  async copy(text, btn){
-    if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
-      if (btn) {
-        const orig = btn.innerHTML;
-        btn.innerHTML = '<i class="ph ph-check"></i>';
-        setTimeout(() => { btn.innerHTML = orig; }, 1200);
-      }
-      if (typeof toast === 'function') toast('Explanation copied');
-    } catch(e){
-      if (typeof toast === 'function') toast('Could not copy \u2014 long-press the text instead');
-    }
-  }
-};
-
-/* ═══════════════════════════════════════════════════════════════════
-   FAST_GUESS — flag wrong answers made in under 10 seconds.
-   ═══════════════════════════════════════════════════════════════════ */
-window.FAST_GUESS = {
-  _shownAt: {},
-  _durations: {},
-  markShown(idx){ if (this._shownAt[idx] == null) this._shownAt[idx] = Date.now(); },
-  markAnswered(idx){
-    if (this._shownAt[idx] == null) return;
-    this._durations[idx] = Date.now() - this._shownAt[idx];
-    delete this._shownAt[idx];
-  },
-  reset(){ this._shownAt = {}; this._durations = {}; },
-  fastWrongIndexes(quiz){
-    const out = [];
-    if (!quiz || !quiz.qs || !quiz.ans) return out;
-    quiz.qs.forEach((q, i) => {
-      const ms = this._durations[i];
-      if (ms == null) return;
-      const wasWrong = !isOk(quiz.ans[i], q.correct);
-      if (wasWrong && ms < 10000) out.push(i);
-    });
-    return out;
-  }
-};
+function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} try { ANNOUNCE.load(); } catch(e){} }
 
 /* Exam countdown and today's question goal. Stored on this device only. */
 window.EXAM_DATE = {
@@ -4166,46 +3281,6 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 setTimeout(_refreshHints, 800);
-
-/* ── Image zoom: any question figure opens full-screen on tap ── */
-document.addEventListener('click', function(e){
-  const img = e.target.closest && e.target.closest('.qcard img, #fc-img-wrap img, #ex-qs img, #res-review img');
-  if (!img) return;
-  if (img.classList.contains('avatar') || img.closest('.bd-mark') || img.closest('.img-fullscreen')) return;
-  if ((img.naturalWidth || 0) < 200) return;
-  e.preventDefault();
-  IMGZOOM.open(img.src, img.alt);
-});
-
-/* Give every question figure a class so it is styled and cursorable. */
-const _figureObserver = new MutationObserver(() => {
-  document.querySelectorAll('.qcard img, #fc-img-wrap img, #ex-qs img, #res-review img').forEach(img => {
-    if (!img.classList.contains('question-figure') && !img.classList.contains('avatar')) {
-      img.classList.add('question-figure');
-    }
-  });
-});
-_figureObserver.observe(document.body, { childList: true, subtree: true });
-
-/* ── Copy-explanation button on every shown explanation ── */
-function _decorateExplanations(){
-  document.querySelectorAll('.expl.show').forEach(el => {
-    if (el.querySelector('.expl-copy')) return;
-    const text = el.textContent.trim();
-    if (!text) return;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'expl-copy ib';
-    btn.style.cssText = 'width:26px;height:26px;border-radius:6px;background:var(--surface);color:var(--ink-3);border:1px solid var(--sep)';
-    btn.title = 'Copy this explanation';
-    btn.setAttribute('aria-label', 'Copy this explanation');
-    btn.innerHTML = '<i class="ph ph-copy"></i>';
-    btn.addEventListener('click', e => { e.stopPropagation(); COPY_EXPL.copy(text, btn); });
-    el.insertBefore(btn, el.firstChild);
-  });
-}
-new MutationObserver(() => { try { _decorateExplanations(); } catch(e){} })
-  .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
 
 if (typeof HOME !== 'undefined' && HOME.updateBadges) {
   const _ub = HOME.updateBadges.bind(HOME);

@@ -72,7 +72,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.15";
+const APP_VERSION = "1.19";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -314,6 +314,7 @@ function doGet(e) {
       case "submitpayment":        result = submitPayment(e.parameter); break;
       case "getpaymentstatus":     result = getPaymentStatus(e.parameter); break;
 
+      case "getpublicinfo":        result = getPublicInfo(); break;
       case "getsettings":          result = getSettings(); break;
       case "getfile":              result = handleGetFile(e.parameter); break;
 
@@ -327,6 +328,7 @@ function doGet(e) {
       case "adminpromoteowner":         result = adminPromoteOwner(e.parameter); break;
       case "adminpromoteusertoadmin":   result = adminPromoteUserToAdmin(e.parameter); break;
 
+      case "admintrends":          result = adminTrends(e.parameter); break;
       case "adminstats":           result = adminStats(e.parameter); break;
       case "adminlistusers":       result = adminListUsers(e.parameter); break;
       case "adminupdateuser":      result = adminUpdateUser(e.parameter); break;
@@ -351,6 +353,8 @@ function doGet(e) {
       case "adminweeklysetresults":    result = adminWeeklySetResults(e.parameter); break;
 
       case "adminlistquestionreports":         result = adminListQuestionReports(e.parameter); break;
+      case "admingetquestion":     result = adminGetQuestion(e.parameter); break;
+      case "adminupdatequestion":  result = adminUpdateQuestion(e.parameter); break;
       case "adminupdatequestionreportstatus":  result = adminUpdateQuestionReportStatus(e.parameter); break;
       case "admindeletequestionreport":        result = adminDeleteQuestionReport(e.parameter); break;
 
@@ -995,10 +999,30 @@ function autoResizeCapped_(sheet, colStart, colCount, maxWidthPx) {
    AUTH — LOGIN / SIGNUP / SESSION
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* v1.17: an email address or a Nepali mobile number can be used to sign in.
+   Unknown values fall through and fail with the same "Invalid username or
+   password" message as before, so nothing new is revealed. */
+function resolveLoginIdentifier_(id) {
+  const s = String(id || "").trim();
+  if (!s || s.length > MAX_EMAIL_LEN) return s;
+  try {
+    const sheet = getUsersSheet_();
+    if (s.indexOf("@") > 0) {
+      const f = findUserByField_(sheet, 3, s);
+      if (f) return String(f.row[0]);
+    } else if (/^(98|97|96|99)\d{8}$/.test(s)) {
+      const f = findUserByField_(sheet, 4, s);
+      if (f) return String(f.row[0]);
+    }
+  } catch (e) { /* fall back to the value as typed */ }
+  return s;
+}
+
 function handleLogin(p) {
-  const username = String(p.username || "").trim();
+  let username = String(p.username || "").trim();
   const password = String(p.password == null ? "" : p.password);
   if (!username || !password) return { success: false, error: "Enter username and password." };
+  username = resolveLoginIdentifier_(username);
   if (username.length > MAX_USERNAME_LEN || password.length > MAX_PASSWORD_LEN) {
     return { success: false, error: "Invalid username or password." };
   }
@@ -4856,6 +4880,190 @@ function backupSpreadsheet() {
   list.sort((a, b) => b.t - a.t);
   list.slice(14).forEach(x => { try { x.f.setTrashed(true); } catch (e) {} });
   return "Backup done: " + name;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.16 — PUBLIC INFO, GROWTH PANEL, QUESTION EDITOR
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Tiny public response for the student app: the announcement banner text and
+   a content version that changes whenever a question is edited, so phones
+   refresh their downloaded chapters right away. */
+function getPublicInfo() {
+  const s = getSettings();
+  const all = (s && s.settings) || {};
+  return { success: true, announcement: String(all.announcement || ""), contentVersion: String(all.contentVersion || "") };
+}
+
+function setSettingValue_(key, value) {
+  const sheet = getSettingsSheet_();
+  const data = sheet.getDataRange().getValues();
+  let done = false;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][0]) === key) { sheet.getRange(i + 1, 2).setValue(value); done = true; break; }
+  }
+  if (!done) sheet.appendRow([key, value]);
+  _invalidateSheet_(SETTINGS_SHEET);
+  CacheService.getScriptCache().remove("pub_settings");
+}
+
+/* Sign-ups and payments per day (Nepal time) plus the headline numbers. */
+function adminTrends(p) {
+  const chk = checkAdminCan_(p, "dashboard");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const days = Math.max(7, Math.min(90, Number(p.days) || 30));
+  const data = _cachedSheetData_(USERS_SHEET, getUsersSheet_).data;
+  const tz = "Asia/Kathmandu";
+  const dayKey = t => Utilities.formatDate(new Date(t), tz, "yyyy-MM-dd");
+
+  const series = [], byKey = {};
+  const nowMs = Date.now();
+  for (let i = days - 1; i >= 0; i--) {
+    const k = dayKey(nowMs - i * 86400000);
+    if (!byKey[k]) { byKey[k] = { date: k, signups: 0, paid: 0 }; series.push(byKey[k]); }
+  }
+
+  let total = 0, paid = 0, trial = 0, awaiting = 0, notPaid = 0, periodSignups = 0, periodPaid = 0;
+  for (let i = 1; i < data.length; i++) {
+    total++;
+    const status = String(data[i][7] || "");
+    const created = new Date(data[i][8]).getTime();
+    const approved = new Date(data[i][9]).getTime();
+    if (status === "active") paid++;
+    else if (status === "trial") trial++;
+    else if (status === "payment_pending") awaiting++;
+    else if (status === "expired" || status === "rejected") notPaid++;
+    if (!isNaN(created)) { const b = byKey[dayKey(created)]; if (b) { b.signups++; periodSignups++; } }
+    if (status === "active" && !isNaN(approved)) { const b = byKey[dayKey(approved)]; if (b) { b.paid++; periodPaid++; } }
+  }
+  const amount = Number(getSettingValue_("paymentAmount", 100)) || 0;
+  return {
+    success: true, days, series,
+    totals: {
+      total, paid, trial, awaiting, notPaid,
+      paidRate: total ? Math.round((paid / total) * 100) : 0,
+      periodSignups, periodPaid, amount, revenueEstimate: paid * amount
+    }
+  };
+}
+
+/* ── Question editor (used from the admin Reports screen) ── */
+
+function _questionArray_(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") {
+    const keys = ["questions", "data", "quiz", "items"];
+    for (let i = 0; i < keys.length; i++) if (Array.isArray(raw[keys[i]])) return raw[keys[i]];
+  }
+  return null;
+}
+
+function _pickKey_(obj, names) {
+  for (let i = 0; i < names.length; i++) {
+    if (Object.prototype.hasOwnProperty.call(obj, names[i])) return names[i];
+  }
+  return null;
+}
+
+function _questionView_(q) {
+  const tk = _pickKey_(q, ["q", "question", "Question", "stem", "ques", "text"]);
+  const ok = _pickKey_(q, ["options", "opts", "choices", "Options"]);
+  const ck = _pickKey_(q, ["correct", "answer", "ans", "Answer"]);
+  const ek = _pickKey_(q, ["explanation", "explain", "exp", "solution", "hint"]);
+  let correct = ck ? q[ck] : null;
+  if (typeof correct === "string" && /^[a-eA-E]$/.test(correct.trim())) correct = "abcde".indexOf(correct.trim().toLowerCase());
+  correct = (correct === null || correct === "" || isNaN(Number(correct))) ? null : Number(correct);
+  return {
+    q: tk ? String(q[tk]) : "",
+    options: (ok && Array.isArray(q[ok])) ? q[ok].map(String) : [],
+    correct: correct,
+    explanation: ek ? String(q[ek] || "") : "",
+    keys: { text: tk, options: ok, correct: ck, explanation: ek }
+  };
+}
+
+function adminGetQuestion(p) {
+  const chk = checkAdminCan_(p, "qreports_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const fileId = String(p.fileId || "").trim();
+  const index = Number(p.index);
+  if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId) || !(index >= 0)) return { success: false, error: "Invalid question reference." };
+  const res = readJsonFileById_(fileId);
+  if (!res.success) return res;
+  const arr = _questionArray_(res.result);
+  if (!arr || !arr[index] || typeof arr[index] !== "object") return { success: false, error: "That question was not found in the file." };
+  const view = _questionView_(arr[index]);
+  if (!view.keys.text || !view.keys.options || view.options.length < 2) {
+    return { success: false, error: "This question uses a format the editor cannot change. Edit the JSON file in Drive instead." };
+  }
+  return { success: true, index, total: arr.length,
+           question: { q: view.q, options: view.options, correct: view.correct, explanation: view.explanation } };
+}
+
+function adminUpdateQuestion(p) {
+  const chk = checkAdminCan_(p, "qreports_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const actor = chk.actor;
+
+  const fileId = String(p.fileId || "").trim();
+  const index = Number(p.index);
+  const expected = String(p.expectedQ || "").trim();
+  if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId) || !(index >= 0)) return { success: false, error: "Invalid question reference." };
+
+  let fields;
+  try { fields = (p.fields && typeof p.fields === "object") ? p.fields : JSON.parse(p.fields || "{}"); }
+  catch (e) { return { success: false, error: "The changes were not understood." }; }
+
+  const newQ = String(fields.q || "").trim().slice(0, 2000);
+  const options = Array.isArray(fields.options) ? fields.options.map(o => String(o == null ? "" : o).trim().slice(0, 500)) : [];
+  const correct = Number(fields.correct);
+  const explanation = String(fields.explanation || "").trim().slice(0, 3000);
+  if (!newQ) return { success: false, error: "The question text cannot be empty." };
+  if (options.length < 2 || options.length > 6 || options.some(o => !o)) return { success: false, error: "Every option needs text (2 to 6 options)." };
+  if (!(correct >= 0 && correct < options.length) || Math.floor(correct) !== correct) return { success: false, error: "Choose which option is correct." };
+
+  return withLock_(() => {
+    let file;
+    try { file = DriveApp.getFileById(fileId); }
+    catch (e) { return { success: false, error: "Could not open the question file. (" + (e.message || e) + ")" }; }
+    if (file.getSize() > MAX_JSON_FILE_BYTES) return { success: false, error: "The file is too large to edit here." };
+
+    let raw;
+    try { raw = JSON.parse(file.getBlob().getDataAsString("UTF-8")); }
+    catch (e) { return { success: false, error: "The question file is not valid JSON." }; }
+    const arr = _questionArray_(raw);
+    if (!arr || !arr[index] || typeof arr[index] !== "object") return { success: false, error: "That question was not found in the file." };
+
+    const q = arr[index];
+    const view = _questionView_(q);
+    if (!view.keys.text || !view.keys.options) return { success: false, error: "This question uses a format the editor cannot change." };
+    if (view.q.trim() !== expected) return { success: false, error: "The file changed since you opened it. Close this and open the report again." };
+
+    /* A copy of the file is kept before every edit. */
+    try {
+      file.makeCopy("before-edit_" + Date.now() + "_" + file.getName(), getOrCreateFolder_("QuestionEditBackups"));
+    } catch (e) { return { success: false, error: "Could not make a backup, so nothing was changed." }; }
+
+    q[view.keys.text] = newQ;
+    q[view.keys.options] = options;
+    const ck = view.keys.correct || "correct";
+    const orig = q[ck];
+    if (typeof orig === "string" && /^[a-eA-E]$/.test(orig.trim())) {
+      q[ck] = (orig.trim() === orig.trim().toLowerCase()) ? "abcde".charAt(correct) : "ABCDE".charAt(correct);
+    } else if (typeof orig === "string") {
+      q[ck] = String(correct);
+    } else {
+      q[ck] = correct;
+    }
+    q[view.keys.explanation || "explanation"] = explanation;
+
+    try { file.setContent(JSON.stringify(raw, null, 2)); }
+    catch (e) { return { success: false, error: "Could not write the file: " + (e.message || e) }; }
+
+    setSettingValue_("contentVersion", String(Date.now()));
+    logAction_(actor, "Edit Question", fileId + "#" + index, "Question text, options, answer or explanation changed (backup kept)");
+    return { success: true };
+  });
 }
 
 function getOrCreateFolder_(name) {

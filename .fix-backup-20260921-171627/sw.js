@@ -67,11 +67,10 @@ const SHELL = [
   './terms.html',
 
   './config.js',
-  './content-index.js',
   './version.js',
   './shared.js',
   './firebase-config.js',
-  './chapters-loader.js',
+  './chapters-data.js',
   './cloud-sync.js',
 
   './app.js',

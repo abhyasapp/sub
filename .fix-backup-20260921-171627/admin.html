@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://script.google.com https://script.googleusercontent.com https://accounts.google.com https://*.googleapis.com https://www.gstatic.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com; frame-src https://accounts.google.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="theme-color" content="#F6F7F6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0F1213" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
@@ -1248,11 +1247,6 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
             <input type="hidden" id="set-qr">
           </div>
           <div class="field">
-            <label for="set-eta">Typical approval time <span class="dim">(optional)</span></label>
-            <input class="input" type="text" id="set-eta" placeholder="within 12 hours">
-            <span class="field-hint">Shown to students after they send a payment.</span>
-          </div>
-          <div class="field">
             <label for="set-announce">Announcement banner <span class="dim">(optional)</span></label>
             <textarea class="textarea" id="set-announce" style="min-height:64px" placeholder="For example: The next weekly test opens on Wednesday at 8 am."></textarea>
             <span class="field-hint">Shown at the top of every student's Home screen until you clear it. Keep it short.</span>
@@ -1334,7 +1328,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
 
 <script src="version.js"></script>
 <script src="shared.js"></script>
-<script src="chapters-loader.js"></script>
+<script src="chapters-data.js"></script>
 <script src="subjective_chapters.js"></script>
 <script src="subjective-data.js"></script>
 <script src="subjective.js"></script>
@@ -3890,7 +3884,6 @@ const SETTINGS = {
     $('set-amount').value = s.paymentAmount || '';
     $('set-inst').value = s.paymentInstructions || '';
     $('set-announce').value = s.announcement || '';
-    $('set-eta').value = s.paymentEta || '';
     $('set-trial').value = s.trialHours || '';
     const preview = $('set-qr-preview'), status = $('set-qr-status');
     if (s.qrCodeUrl) {
@@ -3958,7 +3951,6 @@ const SETTINGS = {
       { key:'paymentAmount', value: amount },
       { key:'paymentInstructions', value: $('set-inst').value },
       { key:'trialHours', value: trial },
-      { key:'paymentEta', value: $('set-eta').value.trim().slice(0, 60) },
       { key:'announcement', value: $('set-announce').value.trim().slice(0, 300) }
     ];
     const btn = $('btn-save-settings');
