@@ -1693,6 +1693,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <span class="stk-tag" id="stk-tag">0 days</span>
           </div>
           <div class="sk-bar" id="sk-bar"></div>
+          <p class="t-cap" id="streak-insurance" style="text-align:center;margin-top:var(--sp-2);opacity:.75"></p>
         </section>
 
         <section class="streak-card" id="exam-card">
@@ -1716,6 +1717,9 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div class="card-hd"><h3><i class="ph ph-target"></i> Chapter strength</h3><button class="btn btn-sm btn-quiet" onclick="UI.go('progress')">Full progress</button></div>
           <div class="chap-verdicts" id="chap-verdicts"></div>
         </section>
+
+        <div id="weekly-board-slot"></div>
+        <div id="badges-strip"></div>
 
         <div class="g2-grid">
           <div class="card">
@@ -2437,6 +2441,63 @@ if (typeof QUIZ !== 'undefined') {
       if (typeof FAST_GUESS !== 'undefined') FAST_GUESS.markAnswered(S.quiz.idx);
     }
     return _fcAnswer(i);
+  };
+
+  /* Results screen: sort wrong-first, surface marked count, and persist
+     marked questions as 'Need Check' bookmarks so they come back later. */
+  const _origShowResults = QUIZ._showResults.bind(QUIZ);
+  QUIZ._showResults = function(){
+    _origShowResults();
+    try {
+      const stats = document.getElementById('res-stats');
+
+      /* Auto-bookmark marked questions with the 'Need Check' tag. */
+      const marked = (S.quiz && S.quiz.marked) ? S.quiz.marked : new Set();
+      if(marked.size && S.quiz && S.quiz.qs){
+        let added = 0;
+        marked.forEach(idx => {
+          const q = S.quiz.qs[idx];
+          if(!q || !q.uid) return;
+          const existing = (S.bk || []).find(b => b.uid === q.uid);
+          if(!existing){
+            S.bk.push(Object.assign({}, q, { tag: 'Need Check' }));
+            added++;
+          } else if(!existing.tag){
+            existing.tag = 'Need Check';
+            added++;
+          }
+        });
+        if(added){
+          _save(LS.BK, S.bk);
+          try { if(typeof HOME !== 'undefined' && HOME.updateBadges) HOME.updateBadges(); } catch(e){}
+        }
+      }
+
+      if(stats && !stats.parentElement.querySelector('.marked-line') && marked.size > 0){
+        const p = document.createElement('p');
+        p.className = 'marked-line t-foot';
+        p.style.cssText = 'text-align:center;color:var(--warning);margin-top:.4rem';
+        p.innerHTML = '<i class="ph ph-flag"></i> You marked ' + marked.size +
+          ' question' + (marked.size === 1 ? '' : 's') + ' for review';
+        stats.parentElement.insertBefore(p, stats.nextSibling);
+      }
+
+      /* Reorder the review list: wrong first, then skipped, then correct. */
+      const box = document.getElementById('res-review');
+      if(box && S.quiz && S.quiz.qs){
+        const cards = Array.from(box.children);
+        if(cards.length === S.quiz.qs.length){
+          const pairs = cards.map((c, i) => {
+            const a = S.quiz.ans[i];
+            const ok = isOk(a, S.quiz.qs[i].correct);
+            const rank = (a === null) ? 1 : (ok ? 3 : 0);
+            return { c: c, rank: rank, i: i };
+          });
+          pairs.sort((x, y) => x.rank - y.rank || x.i - y.i);
+          pairs.forEach(p => box.appendChild(p.c));
+        }
+      }
+    } catch (e) { /* cosmetic — never break results over it */ }
   };
 
   const _rf = QUIZ._renderFlashcard.bind(QUIZ);
@@ -3513,6 +3574,9 @@ function _renderHomeExtras(){
   try { if (typeof READINESS !== 'undefined') READINESS.render(); } catch(e){}
   try { if (typeof CHAP_VERDICTS !== 'undefined') CHAP_VERDICTS.render(); } catch(e){}
   try { if (typeof PACE !== 'undefined') PACE.render(); } catch(e){}
+  try { if (typeof STREAK_INSURANCE !== 'undefined') STREAK_INSURANCE.paint(); } catch(e){}
+  try { if (typeof BADGES_UI !== 'undefined') BADGES_UI.render(); } catch(e){}
+  try { if (typeof WEEKLY_BOARD !== 'undefined') WEEKLY_BOARD.render(); } catch(e){}
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3950,6 +4014,170 @@ window.TODAY_PLAN = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
+   WEEKLY_BOARD — leaderboard for the most recently closed weekly test.
+   Uses getWeeklyStanding, which already exists on the backend.
+   ═══════════════════════════════════════════════════════════════════ */
+window.WEEKLY_BOARD = {
+  _cache: {},
+  async _fetch(id){
+    if(this._cache[id] !== undefined) return this._cache[id];
+    if(!S.online || S.forcedOffline || !S.user || !S.user.token){
+      this._cache[id] = null;
+      return null;
+    }
+    try{
+      const r = await netFetch(APPS, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({ action:'getWeeklyStanding',
+          username:S.user.username, token:S.user.token, weeklyId:id })
+      }, 15000);
+      const res = await r.json();
+      const val = (res && res.success && res.ready && res.attempted) ? res : null;
+      this._cache[id] = val;
+      return val;
+    }catch(e){ this._cache[id] = null; return null; }
+  },
+  async render(){
+    const slot = $('weekly-board-slot');
+    if(!slot) return;
+    slot.innerHTML = '';
+    if(typeof WEEKLY === 'undefined') return;
+
+    const sets = WEEKLY.sets || [];
+    const attempts = WEEKLY.attempts || {};
+    const closed = sets.filter(s => s.released && !WEEKLY.examOpen(s) && attempts[s.id]);
+    if(!closed.length) return;
+
+    closed.sort((a,b) =>
+      (attempts[b.id].submittedAt || 0) - (attempts[a.id].submittedAt || 0));
+    const s = closed[0];
+    const a = attempts[s.id];
+    const st = a.standing || await this._fetch(s.id);
+    if(!st || !st.rank) return;
+
+    const pct = st.percentile || 0;
+    const icon = pct >= 90 ? 'ph-trophy' : pct >= 75 ? 'ph-target' : pct >= 50 ? 'ph-thumbs-up' : 'ph-trend-up';
+    const topPct = Math.max(1, 100 - pct);
+    const beat = Math.max(0, st.total - st.rank);
+
+    slot.innerHTML =
+      '<section class="card" style="border-color:var(--accent-line)">' +
+        '<div class="card-hd"><h3><i class="ph ' + icon + '"></i> Weekly leaderboard</h3>' +
+          '<span class="ctag ta">' + esc(s.title) + '</span></div>' +
+        '<div class="stats-row" style="margin-bottom:var(--sp-3)">' +
+          '<div class="scard"><div class="sv ta2">' + st.rank + '</div><div class="stat-lbl">Your rank</div></div>' +
+          '<div class="scard"><div class="sv">' + st.total + '</div><div class="stat-lbl">Attempts</div></div>' +
+          '<div class="scard"><div class="sv tcy">' + (a.pct || 0) + '%</div><div class="stat-lbl">Your score</div></div>' +
+          '<div class="scard"><div class="sv">' + (st.avgPct || 0) + '%</div><div class="stat-lbl">Average</div></div>' +
+        '</div>' +
+        '<p class="t-foot">Top ' + topPct + '% of students. You beat ' + beat + ' of them.</p>' +
+      '</section>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   STREAK_INSURANCE — surface the silent skip.
+   ═══════════════════════════════════════════════════════════════════ */
+window.STREAK_INSURANCE = {
+  paint(){
+    const el = $('streak-insurance');
+    if(!el) return;
+    try{
+      const days = (S.stk && S.stk.days) || [];
+      if(days.length < 3){ el.textContent = ''; return; }
+      const set = new Set(days);
+      const pad = n => String(n).padStart(2, '0');
+      let misses = 0;
+      for(let i = 1; i <= 7; i++){
+        const d = new Date(); d.setDate(d.getDate() - i);
+        const k = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+        if(!set.has(k)) misses++;
+      }
+      if(misses === 0) el.textContent = '1 skipped day available this week';
+      else if(misses === 1) el.textContent = 'Streak insurance used this week';
+      else el.textContent = '';
+    }catch(e){ el.textContent = ''; }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   BADGES_UI — lightweight achievements strip on Home.
+   ═══════════════════════════════════════════════════════════════════ */
+window.BADGES_UI = {
+  DEFS: [
+    { id:'first_100',   icon:'ph-seedling',  name:'First 100',  need:s => (s.prog.total||0) >= 100 },
+    { id:'half_500',    icon:'ph-books',     name:'500 answered', need:s => (s.prog.total||0) >= 500 },
+    { id:'streak_7',    icon:'ph-fire',      name:'7-day streak', need:() => STREAK.currentStreak() >= 7 },
+    { id:'streak_30',   icon:'ph-mountains', name:'30-day streak', need:() => STREAK.currentStreak() >= 30 },
+    { id:'perfect_exam',icon:'ph-medal',     name:'Perfect paper', need:s => (s.prog.sessions||[]).some(x => x.mode==='exam' && x.pct===100) },
+    { id:'bookmark_50', icon:'ph-star',      name:'50 saved',     need:s => (s.bk||[]).length >= 50 },
+    { id:'due_clear',   icon:'ph-target',    name:'Caught up',    need:() => S.wr && S.wr.length > 20 && REV.dueCount() === 0 }
+  ],
+  render(){
+    const slot = $('badges-strip');
+    if(!slot) return;
+    if(!S.prog.badges) S.prog.badges = {};
+    let changed = false;
+    this.DEFS.forEach(d => {
+      try{
+        if(!S.prog.badges[d.id] && d.need(S)){
+          S.prog.badges[d.id] = new Date().toISOString().slice(0,10);
+          changed = true;
+        }
+      }catch(e){}
+    });
+    if(changed) _save(LS.PROG, S.prog);
+    const earned = this.DEFS.filter(d => S.prog.badges[d.id]).length;
+    if(!earned && this.DEFS.length === 0){ slot.innerHTML = ''; return; }
+    slot.innerHTML =
+      '<div class="card"><div class="card-hd"><h3><i class="ph ph-medal"></i> Achievements</h3>' +
+        '<span class="t-cap">' + earned + ' / ' + this.DEFS.length + '</span></div>' +
+        '<div style="display:flex;gap:var(--sp-3);overflow-x:auto;padding-bottom:var(--sp-2)">' +
+          this.DEFS.map(d => {
+            const got = !!S.prog.badges[d.id];
+            return '<div style="flex-shrink:0;width:82px;text-align:center;opacity:' + (got ? 1 : 0.32) + '">' +
+              '<div style="font-size:1.5rem;color:' + (got ? 'var(--accent)' : 'var(--ink-3)') + '">' +
+                '<i class="ph ' + d.icon + '"></i></div>' +
+              '<div class="t-cap" style="margin-top:2px;line-height:1.25">' + esc(d.name) + '</div>' +
+            '</div>';
+          }).join('') +
+        '</div></div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR_SEARCH — filter the sidebar items with a small input.
+   ═══════════════════════════════════════════════════════════════════ */
+window.SIDEBAR_SEARCH = {
+  init(){
+    const sb = document.getElementById('sb');
+    if(!sb || document.getElementById('sb-filter')) return;
+    const input = document.createElement('input');
+    input.id = 'sb-filter';
+    input.type = 'search';
+    input.className = 'input';
+    input.placeholder = 'Find a screen…';
+    input.style.cssText = 'margin:0 var(--sp-2) var(--sp-3);min-height:32px;font-size:var(--fs-foot)';
+    input.addEventListener('input', () => SIDEBAR_SEARCH.filter(input.value));
+    const anchor = sb.querySelector('#sb-admin-promo') || sb.querySelector('.sb-you');
+    if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(input, anchor.nextSibling);
+    else sb.insertBefore(input, sb.firstChild);
+  },
+  filter(q){
+    const term = String(q || '').toLowerCase().trim();
+    document.querySelectorAll('#sb .sb-item').forEach(el => {
+      const text = el.textContent.toLowerCase();
+      el.style.display = (!term || text.indexOf(term) !== -1) ? '' : 'none';
+    });
+    document.querySelectorAll('#sb .sb-sec').forEach(sec => {
+      const items = sec.querySelectorAll('.sb-item');
+      const any = Array.from(items).some(i => i.style.display !== 'none');
+      sec.style.display = any ? '' : 'none';
+    });
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    READINESS — predicted exam score, right on the Home screen.
    ═══════════════════════════════════════════════════════════════════ */
 window.READINESS = {
@@ -4230,6 +4458,8 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
       else { try { _setAdminVisible(!!(S.user && S.user.adminCapable)); } catch(e){} }
       _refreshHints();
       if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load(true);
+      if (typeof SIDEBAR_SEARCH !== 'undefined') SIDEBAR_SEARCH.init();
+      if (typeof BADGES_UI !== 'undefined') BADGES_UI.render();
     }, 300);
     /* Warm the written-answer bank in the background so the sidebar can say
        whether today's question is waiting without the student opening the tab. */

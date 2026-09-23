@@ -72,7 +72,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.19";
+const APP_VERSION = "1.20";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -5064,6 +5064,55 @@ function adminUpdateQuestion(p) {
     logAction_(actor, "Edit Question", fileId + "#" + index, "Question text, options, answer or explanation changed (backup kept)");
     return { success: true };
   });
+}
+
+/* Nudge users who were active 2-7 days ago but have since gone quiet.
+   Installed as a daily trigger by setup.gs. Sends at most one nudge per
+   user per day. Only fires for accounts on trial or paid access. */
+function nudgeInactiveUsers() {
+  const users = _cachedSheetData_(USERS_SHEET, getUsersSheet_).data;
+  const progress = _cachedSheetData_(PROGRESS_SHEET, getProgressSheet_).data;
+  const props = PropertiesService.getScriptProperties();
+  const now = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+
+  /* Last-active timestamp per username (from Progress.updatedAt). */
+  const lastActive = {};
+  for (let i = 1; i < progress.length; i++) {
+    const u = String(progress[i][0] || "").toLowerCase().trim();
+    if (!u) continue;
+    const t = new Date(progress[i][2]).getTime();
+    if (!isNaN(t) && (!lastActive[u] || t > lastActive[u])) lastActive[u] = t;
+  }
+
+  let sent = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  for (let i = 1; i < users.length; i++) {
+    const username = String(users[i][0] || "");
+    const status = String(users[i][7] || "");
+    if (!username) continue;
+    if (status !== "trial" && status !== "active") continue;
+
+    const fallback = new Date(users[i][8]).getTime();   /* createdAt */
+    const last = lastActive[username.toLowerCase()] || fallback;
+    const daysAgo = (now - last) / DAY;
+    if (daysAgo < 2 || daysAgo > 7) continue;
+
+    const sentKey = "nudged_" + username.toLowerCase() + "_" + today;
+    if (props.getProperty(sentKey)) continue;
+
+    try {
+      const result = sendPushNotification_(username,
+        "Your review queue is ready",
+        "A few questions are waiting for you. Open Abhyas and take 5 minutes.");
+      if (result.success) {
+        props.setProperty(sentKey, "1");
+        sent++;
+      }
+    } catch (e) { /* best effort */ }
+  }
+  console.log("nudgeInactiveUsers: sent " + sent + " nudge(s).");
+  return "Sent " + sent + " nudge(s).";
 }
 
 function getOrCreateFolder_(name) {

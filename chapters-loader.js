@@ -105,25 +105,46 @@ if(!hasGlobals()){
   return;
 }
 
-/* ── 3. Warm path is complete. Background-refresh if stale. ───────── */
-const age = Date.now() - (cache.savedAt || 0);
-if(age < TTL_MS) return;
+/* ── 3. Warm path complete — refresh fresh data in the background ────
+   Cache-first makes every cold boot instant. But a stale chapter list is
+   worse than a slower one: when you rename a chapter in Drive, students
+   should see it the next time they open the app, not 24 hours later. So:
+   fetch on every launch, every 'online', every tab-visible, and every 15
+   minutes. Never auto-reload — a student might be mid-quiz. Offer a toast. */
+let _inFlight = false;
 
-fetch(URL + '&_=' + Date.now(), { cache:'no-store' })
-  .then(r => r.ok ? r.text() : null)
-  .then(src => {
-    if(!src) return;
-    if(src === cache.source){
-      writeCache(cache.source);
-      return;
-    }
-    if(!writeCache(src)) return;
-    const lastReload = Number(sessionStorage.getItem('abhyas_chapters_last_reload') || 0);
-    if(Date.now() - lastReload > 30000){
-      sessionStorage.setItem('abhyas_chapters_last_reload', String(Date.now()));
-      location.reload();
-    }
-  })
-  .catch(() => {});
+function fetchFresh(reason){
+  if(_inFlight) return;
+  if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  _inFlight = true;
+
+  fetch(URL + '&_=' + Date.now(), { cache: 'no-store' })
+    .then(r => r.ok ? r.text() : null)
+    .then(src => {
+      if(!src) return;
+      if(src === cache.source){
+        writeCache(src);
+        return;
+      }
+      if(!writeCache(src)) return;
+      try{
+        window.dispatchEvent(new CustomEvent('abhyas:chapters-updated', {
+          detail: { reason: reason || 'background' }
+        }));
+        if(typeof window.toast === 'function'){
+          window.toast('Chapters updated — reload to see the change', 8000);
+        }
+      }catch(e){}
+    })
+    .catch(() => {})
+    .finally(() => { _inFlight = false; });
+}
+
+setTimeout(() => fetchFresh('boot'), 2000);
+window.addEventListener('online', () => fetchFresh('online'));
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') fetchFresh('visible');
+});
+setInterval(() => fetchFresh('interval'), 15 * 60 * 1000);
 
 })();

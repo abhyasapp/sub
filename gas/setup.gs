@@ -166,6 +166,10 @@ function ensurePushTriggers_() {
   if (!triggers.some(t => t.getHandlerFunction() === "backupSpreadsheet")) {
     ScriptApp.newTrigger("backupSpreadsheet").timeBased().everyDays(1).atHour(2).create();
   }
+  /* v1.20: daily nudge for inactive students. */
+  if (!triggers.some(t => t.getHandlerFunction() === "nudgeInactiveUsers")) {
+    ScriptApp.newTrigger("nudgeInactiveUsers").timeBased().everyDays(1).atHour(19).create();
+  }
   /* v1.11: daily housekeeping for Script Properties. */
   if (!triggers.some(t => t.getHandlerFunction() === "cleanupExpiredProperties")) {
     ScriptApp.newTrigger("cleanupExpiredProperties").timeBased().everyDays(1).atHour(3).create();

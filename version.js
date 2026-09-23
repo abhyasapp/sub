@@ -65,4 +65,6 @@
           button, fast-guess flag on results. */
 /* 1.19 - confidence rating (Sure / Not sure / Guessed), misconceptions card,
           recovery mode after 3+ days away, read-aloud button. */
-const APP_VERSION = '1.19';
+/* 1.20 - chapters refresh when you're online; weekly leaderboard; badges;
+          wrong-first results; streak insurance; sidebar search; push nudge. */
+const APP_VERSION = '1.20';

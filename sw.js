@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SW.JS — Abhyas Service Worker  (v1.14)
+   SW.JS — Abhyas Service Worker  (v1.20)
 
    Strategy
    • API (script.google.com)  → never touched. POSTs and question files go
