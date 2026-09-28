@@ -178,6 +178,19 @@ node tests/check.js catches drift on most of these.
 
 ## Status
 
+v1.26   Sidebar simplified: search / heatmap / share / export moved to the
+        Progress page. Small topbar search icon. More tools section removed.
+        Sidebar finder searches both screens and questions in one input.
+v1.25   Loksewa paper 75 questions at 60-minute timer, focus mode removed,
+        sidebar trimmed under More tools, Daily 10 auto-hides, practice resume
+v1.24   Daily 10, study calendar, chapter forecast, weekly digest, hardest-20
+        drill, syllabus progress, daily 75-mark Loksewa paper (25 GK + 50 L7),
+        compact sidebar with More tools
+v1.23   Note shown only after the question is answered; weakest-question
+        flag, note sync, "practice 5 more like this", question history,
+        global search, keyboard sheet, focus mode, export notes
+v1.22   Personal notes on any question
+v1.21   Hard-question badge renders, note on missed questions, answer-changed tracking
 v1.20   Missed questions by chapter, syllabus heatmap, Loksewa-format mock paper,
         hard-question badge, hourly grading tab, rich Google AI prompt,
         skipped-exam-answer fix, careless / concept-gap tagging

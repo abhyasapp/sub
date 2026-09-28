@@ -670,15 +670,23 @@ const REV = {
          already carried by WRONGBY.start when it rehydrates a review set,
          so this just needs an input to write into it. */
       const notePicker = kind==='wr' ? (() => {
-        const n = String(q._note || '');
+        /* v1.22: the note is now read from QNOTE (the per-question map)
+           so a note typed here also appears on the flashcard. Falls back
+           to the legacy _note field if QNOTE is not yet loaded. */
+        const n = (typeof QNOTE !== 'undefined') ? QNOTE.get(q.uid) : String(q._note || '');
         return `<div style="margin-top:.4rem">` +
-          `<input class="input" type="text" maxlength="160" ` +
-          `placeholder="Why did I miss this? (optional)" ` +
+          `<input class="input" type="text" maxlength="500" ` +
+          `placeholder="Your note on this question (optional)" ` +
           `value="${escAttrJs(n)}" ` +
           `onchange='WRONGBY.setNote(${uidJson}, this.value)' ` +
           `style="font-size:var(--fs-foot)">` +
         `</div>`;
       })() : '';
+      let missBadge = '';
+      if(kind==='wr' && typeof WRONGBY !== 'undefined'){
+        const mc = WRONGBY.missCount(q.uid);
+        if (mc >= 3) missBadge = `<span class="ctag tr" style="margin-left:.3rem" title="You have missed this question ${mc} times"><i class="ph ph-warning"></i> missed ${mc}\u00d7</span>`;
+      }
       let srBadge = '';
       if(kind==='wr'){
         const isDue = (q._nextDue==null) || q._nextDue<=Date.now();
@@ -694,6 +702,7 @@ const REV = {
         <div class="qm"><span class="qn mono">#${i+1}</span>
           ${q.tag ? `<span class="ctag ta" style="margin-left:.3rem"><i class="ph ph-tag"></i> ${esc(q.tag)}</span>` : ''}
           ${srBadge}
+          ${missBadge}
           ${qSearchHtml(q)}
           <button class="ib" onclick='REV._removeOne(${kindJson},${uidJson})' title="Remove from review" aria-label="Remove from review"><i class="ph ph-trash"></i></button>
         </div>
@@ -1423,6 +1432,41 @@ const QUIZ = {
       } catch(e){}
 
       renderMath(document.getElementById('fc-wrap'));
+
+      /* v1.23: the note UI appears only AFTER the student has answered.
+         Showing "Add a note" before answering invites scribbling before
+         thinking. */
+      try {
+        if (typeof QNOTE !== 'undefined'){
+          if (answered) QNOTE.render('fc-note', q.uid);
+          else { const b = document.getElementById('fc-note'); if (b) b.innerHTML = ''; }
+        }
+      } catch(e){}
+
+      /* v1.23: question history — "Seen Nx · M correct" */
+      try {
+        if (typeof QHIST !== 'undefined') QHIST.render('fc-hist', q.uid);
+      } catch(e){}
+
+      /* v1.23: after a wrong answer, offer a mini-session of 5 questions
+         from the same file that share a keyword with this one. */
+      try {
+        const wrap = document.getElementById('fc-similar');
+        if (wrap){
+          const wrong = S.quiz.ans[S.quiz.idx] !== null &&
+                        S.quiz.ans[S.quiz.idx] !== undefined &&
+                        !isOk(S.quiz.ans[S.quiz.idx], q.correct);
+          if (wrong && !S.quiz.reviewOnly && S.quiz.scope && S.quiz.scope.fid){
+            wrap.innerHTML =
+              '<button type="button" class="qnote-add" style="border-color:var(--accent-line);color:var(--accent)" ' +
+              'onclick="WRONGBY.practiceSimilar(\'' + escAttrJs(q.uid) + '\')">' +
+              '<i class="ph ph-target"></i> Practice 5 more like this' +
+              '</button>';
+          } else {
+            wrap.innerHTML = '';
+          }
+        }
+      } catch(e){}
     } catch(err){
       console.error('[QUIZ._renderFlashcard] question at idx', S.quiz.idx, 'failed to render:', err, q);
       toast('⚠️ Skipped a malformed question', 2000);
@@ -1673,7 +1717,25 @@ const QUIZ = {
       negEl.style.marginTop = '.3rem';
       document.getElementById('res-grade').after(negEl);
     }
-    negEl.textContent = total ? `Loksewa-style score: ${Math.max(0, correct - wrong * 0.2).toFixed(1)} / ${total} (each wrong answer costs 0.2)` : '';
+    /* v1.24: on the Loksewa mock, show the score plainly with rules and
+       the pass verdict. Other quizzes keep the old one-liner. */
+    if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock){
+      const score = correct - wrong * 0.2;
+      const pctLok = total ? Math.round((score / total) * 1000) / 10 : 0;
+      const verdict = score >= total * 0.4
+        ? '<span style="color:var(--success);font-weight:700">above the usual 40% cut-off</span>'
+        : '<span style="color:var(--danger);font-weight:700">below the usual 40% cut-off</span>';
+      negEl.innerHTML =
+        'Loksewa score: <b>' + score.toFixed(1) + ' / ' + total + '</b> (' + pctLok + '%) \u2014 ' + verdict +
+        '<br><span class="t-cap">+1 correct \u00b7 \u22120.2 wrong \u00b7 0 skipped</span>';
+      negEl.style.fontSize = 'var(--fs-foot)';
+      negEl.style.lineHeight = '1.55';
+      negEl.style.textAlign = 'center';
+    } else {
+      negEl.textContent = total
+        ? `Loksewa-style score: ${Math.max(0, correct - wrong * 0.2).toFixed(1)} / ${total} (each wrong answer costs 0.2)`
+        : '';
+    }
 
     document.getElementById('res-stats').innerHTML = `
       <div class="sc"><div class="sv tcy">${total}</div><div class="stat-lbl">Total</div></div>
@@ -1725,6 +1787,7 @@ const QUIZ = {
           return `<div class="${cls}" style="cursor:default;pointer-events:none"><div class="ok">${String.fromCharCode(65+oi)}</div><div>${esc(opt)}</div></div>`;
         }).join('')}
         ${q.explanation?`<div class="expl show">${esc(q.explanation)}</div>`:''}
+        ${(typeof QNOTE !== 'undefined' && QNOTE.get(q.uid)) ? `<div class="qnote-box" style="margin-top:.5rem"><div class="qnote-hd"><i class="ph ph-note"></i> Your note</div><div class="qnote-text">${esc(QNOTE.get(q.uid))}</div></div>` : ''}
       </div>`;
     }).join('');
     renderMath(document.getElementById('res-review'));

@@ -1468,6 +1468,212 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .chg-name{font-size:var(--fs-callout);font-weight:650;line-height:1.3;color:var(--ink)}
 .chg-meta{font-size:var(--fs-cap);color:var(--ink-3);margin-top:auto}
 </style>
+<style id="patch-122">
+/* v1.22: personal notes on any question */
+.qnote-box{
+  margin-top:var(--sp-3);padding:var(--sp-3);
+  background:var(--violet-soft);border:1px solid var(--violet-line);
+  border-radius:var(--r-control);
+  animation:view-in var(--dur-base) var(--ease-out)
+}
+.qnote-hd{
+  display:flex;align-items:center;gap:.4rem;
+  font-size:var(--fs-cap);font-weight:700;color:var(--violet);
+  margin-bottom:.35rem
+}
+.qnote-hd .qnote-act:first-of-type{margin-left:auto}
+.qnote-act{
+  width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;
+  border-radius:var(--r-control);background:transparent;color:var(--violet);
+  font-size:.8rem;cursor:pointer;border:none;
+  transition:background var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
+}
+.qnote-act:hover{background:rgba(90,74,138,.10)}
+.qnote-act.danger:hover{color:var(--danger)}
+.qnote-text{
+  font-size:var(--fs-callout);line-height:1.55;color:var(--ink);
+  white-space:pre-wrap;word-break:break-word
+}
+.qnote-input{
+  width:100%;min-height:80px;padding:var(--sp-2) var(--sp-3);
+  font-family:var(--font);font-size:var(--fs-callout);line-height:1.5;
+  background:var(--surface);border:1px solid var(--violet-line);
+  border-radius:var(--r-control);color:var(--ink);resize:vertical;outline:none;
+  transition:border-color var(--dur-fast) var(--ease),box-shadow var(--dur-fast) var(--ease)
+}
+.qnote-input:focus{border-color:var(--violet);box-shadow:0 0 0 3px rgba(90,74,138,.15)}
+.qnote-actions{display:flex;gap:var(--sp-2);justify-content:flex-end;margin-top:var(--sp-2)}
+.qnote-add{
+  display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;
+  padding:var(--sp-2) var(--sp-3);margin-top:var(--sp-3);
+  background:transparent;border:1px dashed var(--sep-strong);
+  border-radius:var(--r-control);color:var(--ink-3);
+  font-family:var(--font);font-size:var(--fs-foot);font-weight:600;cursor:pointer;
+  transition:border-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--ease)
+}
+.qnote-add:hover{border-color:var(--violet);color:var(--violet)}
+@media (pointer:coarse){
+  .qnote-input{font-size:16px}
+}
+</style>
+<style id="patch-123">
+/* v1.23: per-question history line */
+.qhist-line{
+  display:flex;align-items:center;gap:.3rem;justify-content:center;
+  margin-top:var(--sp-3);font-size:var(--fs-cap);color:var(--ink-3);font-weight:600
+}
+.qhist-line b.ok{color:var(--success)}
+.qhist-line b.mid{color:var(--warning)}
+.qhist-line b.low{color:var(--danger)}
+/* v1.23: search modal */
+.qs-input{font-size:var(--fs-body)!important;min-height:44px;margin-top:var(--sp-3);margin-bottom:var(--sp-1)}
+.qs-item{
+  display:flex;align-items:flex-start;gap:var(--sp-3);width:100%;text-align:left;
+  padding:var(--sp-3);border-radius:var(--r-card);background:var(--surface-alt);
+  border:1px solid var(--sep);font-family:var(--font);color:var(--ink);
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
+}
+.qs-item:hover{border-color:var(--accent);background:var(--surface)}
+.qs-badge{
+  flex-shrink:0;width:30px;height:30px;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:var(--fs-foot);font-family:var(--mono)
+}
+.qs-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.qs-stem{font-size:var(--fs-callout);line-height:1.45;color:var(--ink)}
+.qs-stem mark{background:rgba(30,122,76,.18);color:inherit;padding:0 2px;border-radius:3px}
+.qs-meta{font-size:var(--fs-cap);color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* v1.23: keyboard sheet */
+.ks-section{
+  font-size:var(--fs-cap);font-weight:700;color:var(--ink-3);
+  text-transform:uppercase;letter-spacing:.5px;
+  margin:var(--sp-3) 0 var(--sp-1);padding-bottom:.2rem;
+  border-bottom:1px solid var(--sep)
+}
+.ks-section:first-child{margin-top:0}
+.ks-row{display:flex;align-items:center;gap:var(--sp-3);padding:.35rem 0}
+.ks-keys{min-width:110px;flex-shrink:0}
+.ks-keys kbd{
+  background:var(--bg-sunken);border:1px solid var(--sep-strong);border-radius:5px;
+  padding:2px 7px;font-size:var(--fs-cap);color:var(--ink);font-family:var(--mono);
+  margin-right:3px;font-weight:600
+}
+.ks-desc{font-size:var(--fs-callout);color:var(--ink-2);flex:1}
+/* v1.23: focus mode */
+html.focus-mode .streak-card,
+html.focus-mode .readiness,
+html.focus-mode #badges-strip,
+html.focus-mode #weekly-board-slot,
+html.focus-mode #misconception-slot,
+html.focus-mode #recovery-slot,
+html.focus-mode .marquee-bar{display:none!important}
+.focus-banner{
+  display:flex;align-items:center;gap:var(--sp-2);
+  margin-bottom:var(--sp-3);padding:var(--sp-2) var(--sp-3);
+  background:var(--accent-soft);border:1px solid var(--accent-line);
+  border-radius:var(--r-card);font-size:var(--fs-foot);color:var(--ink-2)
+}
+.focus-banner b{color:var(--accent)}
+.focus-banner span{flex:1}
+</style>
+<style id="patch-124">
+/* v1.24: study calendar */
+.cal-grid{display:flex;gap:3px;overflow-x:auto;padding-bottom:var(--sp-2)}
+.cal-week{display:flex;flex-direction:column;gap:3px}
+.cal-cell{display:block;width:11px;height:11px;border-radius:2px;background:var(--bg-sunken);flex-shrink:0}
+.cal-cell.cal-1{background:rgba(30,122,76,.28)}
+.cal-cell.cal-2{background:rgba(30,122,76,.48)}
+.cal-cell.cal-3{background:rgba(30,122,76,.72)}
+.cal-cell.cal-4{background:var(--accent)}
+.cal-legend{display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:var(--sp-2)}
+.cal-legend .cal-cell{margin:0 1px}
+/* v1.24: syllabus progress rows */
+.sp-item{padding:var(--sp-2) 0;border-top:1px solid var(--hairline)}
+.sp-item:first-of-type{border-top:none;padding-top:0}
+.sp-l{display:flex;justify-content:space-between;margin-bottom:var(--sp-1);font-size:var(--fs-callout);font-weight:600}
+/* v1.24: forecast lines */
+.fc-line{padding:var(--sp-2) 0;border-top:1px solid var(--hairline);font-size:var(--fs-callout);line-height:1.55}
+.fc-line:first-of-type{border-top:none;padding-top:0}
+/* v1.24: syllabus mock rows */
+.syl-row{display:flex;justify-content:space-between;gap:var(--sp-2);padding:.3rem 0;font-size:var(--fs-foot);border-bottom:1px solid var(--hairline);align-items:center}
+.syl-row:last-of-type{border-bottom:none}
+.syl-label{flex:1;color:var(--ink-2)}
+.syl-marks{font-family:var(--mono);font-weight:700;color:var(--ink);min-width:2rem;text-align:right}
+/* v1.24: More tools section */
+#sb-more-items .sb-item{padding-left:calc(var(--sp-2) + 26px);font-size:var(--fs-foot);color:var(--ink-3)}
+#sb-more-items .sb-item.active{color:var(--accent)}
+#sb-more-sec{margin-top:var(--sp-2);border-top:1px solid var(--sep);padding-top:var(--sp-1)}
+</style>
+<style id="patch-126">
+/* v1.27: combined sidebar finder */
+.sb-filter-wrap{position:relative;padding:0 var(--sp-2) var(--sp-3);margin-top:var(--sp-2)}
+.sb-filter-input{position:relative;display:flex;align-items:center}
+.sb-filter-input i{
+  position:absolute;left:var(--sp-3);font-size:.85rem;
+  color:var(--ink-3);pointer-events:none
+}
+.sb-filter-input input{
+  width:100%;min-height:34px;padding:0 var(--sp-2) 0 calc(var(--sp-3) + 20px);
+  font-family:var(--font);font-size:var(--fs-foot);
+  background:var(--bg-sunken);border:1px solid transparent;
+  border-radius:var(--r-input);color:var(--ink);outline:none;
+  transition:border-color var(--dur-fast) var(--ease),background var(--dur-fast) var(--ease)
+}
+.sb-filter-input input::placeholder{color:var(--ink-4)}
+.sb-filter-input input:focus{
+  border-color:var(--accent);background:var(--surface);
+  box-shadow:0 0 0 3px var(--accent-soft)
+}
+.sb-filter-results{
+  position:absolute;left:var(--sp-2);right:var(--sp-2);top:100%;
+  z-index:60;margin-top:var(--sp-1);
+  background:var(--surface-2);border:1px solid var(--sep);
+  border-radius:var(--r-card);box-shadow:var(--sh-2);
+  max-height:60vh;overflow-y:auto;
+  animation:view-in var(--dur-fast) var(--ease-out)
+}
+.sb-filter-head{
+  font-size:var(--fs-cap);font-weight:700;color:var(--ink-4);
+  text-transform:uppercase;letter-spacing:.4px;
+  padding:var(--sp-2) var(--sp-3) var(--sp-1)
+}
+.sb-filter-item{
+  display:flex;align-items:center;gap:var(--sp-2);width:100%;text-align:left;
+  padding:var(--sp-2) var(--sp-3);
+  background:transparent;border:none;color:var(--ink);
+  font-family:var(--font);font-size:var(--fs-foot);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease)
+}
+.sb-filter-item:hover{background:var(--bg-sunken)}
+.sb-filter-badge{
+  flex-shrink:0;width:20px;height:20px;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;font-weight:700;font-family:var(--mono)
+}
+.sb-filter-stem{
+  flex:1;min-width:0;line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical
+}
+.sb-filter-all{
+  display:block;width:100%;text-align:center;
+  padding:var(--sp-2);margin-top:var(--sp-1);
+  background:transparent;border:none;border-top:1px solid var(--sep);
+  color:var(--accent);font-family:var(--font);
+  font-size:var(--fs-cap);font-weight:700;cursor:pointer
+}
+.sb-filter-all:hover{background:var(--accent-soft)}
+.sb-filter-empty{
+  padding:var(--sp-4) var(--sp-3);text-align:center;
+  color:var(--ink-3);font-size:var(--fs-cap)
+}
+.sb-filter-empty i{display:block;font-size:1.2rem;margin-bottom:var(--sp-1);color:var(--ink-4)}
+@media (pointer:coarse){
+  .sb-filter-input input{font-size:16px}
+}
+</style>
 </head>
 <body>
 
@@ -1499,6 +1705,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
       </button>
       <button class="tb-btn" id="net-mode-btn" onclick="NET.toggle()" title="Online — tap to work offline" aria-label="Online — tap to work offline" aria-pressed="false"><i class="ph ph-wifi-high"></i></button>
       <button class="tb-btn" id="tb-sync-btn" onclick="UI.go('progress')" title="Sync status" aria-label="Sync status" style="position:relative"><i class="ph ph-cloud-check"></i><span id="tb-sync-dot"></span></button>
+      <button class="tb-btn" onclick="QSEARCH.open()" title="Search questions (press /)" aria-label="Search questions"><i class="ph ph-magnifying-glass"></i></button>
       <button class="tb-btn" onclick="FONT.cycle()" title="Text size" aria-label="Change text size"><i class="ph ph-text-aa"></i></button>
       <button class="tb-btn" onclick="UI.theme()" title="Switch theme" aria-label="Switch theme"><i class="ph ph-circle-half"></i></button>
       <button class="tb-btn" onclick="PWA.toggleFullscreen()" title="Fullscreen" aria-label="Fullscreen"><i class="ph ph-corners-out"></i></button>
@@ -1602,9 +1809,6 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         <button type="button" class="sb-item" id="nav-server-progress" onclick="UI.go('server-progress')">
           <span class="sb-ic"><i class="ph ph-list-checks"></i></span>Coverage by file
         </button>
-        <button type="button" class="sb-item" id="nav-heatmap" onclick="UI.go('heatmap')">
-          <span class="sb-ic"><i class="ph ph-squares-four"></i></span>Syllabus heatmap
-        </button>
         <button type="button" class="sb-item" id="nav-timetable" onclick="UI.go('timetable')">
           <span class="sb-ic"><i class="ph ph-calendar-blank"></i></span>Study plan
         </button>
@@ -1657,6 +1861,9 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         <div id="misconception-slot"></div>
         <div id="resume-slot"></div>
 
+        <div id="practice-resume-slot"></div>
+        <div id="daily10-slot"></div>
+
         <section class="today-card" id="today-card">
           <h3><i class="ph ph-list-checks"></i> Today's plan</h3>
           <div id="today-body"></div>
@@ -1669,6 +1876,8 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             </button>
           </div>
         </section>
+
+        <div id="digest-slot"></div>
 
         <section class="readiness" id="readiness-card" hidden>
           <div class="readiness-top">
@@ -1810,6 +2019,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <h2><i class="ph ph-sun-horizon"></i> Question of the day</h2>
           <p>Everyone gets the same question. Write it on paper against the clock, then photograph your answer and upload it as one PDF.</p>
         </div>
+        <div id="syllabus-mock-slot"></div>
         <div id="subj-qotd-body">
           <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading today's question…</p></div></div>
         </div>
@@ -2056,6 +2266,36 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         <div id="predict-card" style="margin-bottom:var(--sp-4)"></div>
 
         <div class="card">
+          <div class="card-hd"><h3><i class="ph ph-wrench"></i> Your tools</h3></div>
+          <div class="bg">
+            <button class="btn btn-secondary" onclick="UI.go('heatmap')">
+              <i class="ph ph-squares-four"></i> Syllabus heatmap
+            </button>
+            <button class="btn btn-secondary" onclick="SHARECARD.run()">
+              <i class="ph ph-share-network"></i> Share my progress
+            </button>
+            <button class="btn btn-secondary" onclick="EXPORTNOTES.run()">
+              <i class="ph ph-download-simple"></i> Export my notes
+            </button>
+            <button class="btn btn-secondary" onclick="QSEARCH.open()">
+              <i class="ph ph-magnifying-glass"></i> Search questions
+            </button>
+          </div>
+        </div>
+
+        <div class="card" style="border-color:var(--accent-line)">
+          <div class="card-hd"><h3><i class="ph ph-target"></i> Focused drills</h3></div>
+          <p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55">One tap builds a session from your own history \u2014 no setup.</p>
+          <button class="btn btn-solid btn-blk" onclick="HARDEST20.start()">
+            <i class="ph ph-target"></i> Drill my 20 hardest questions
+          </button>
+        </div>
+
+        <div id="forecast-slot"></div>
+        <div id="syllabus-slot"></div>
+        <div id="calendar-slot"></div>
+
+        <div class="card">
           <div class="card-hd"><h3>Accuracy by chapter</h3></div>
           <div id="chap-acc"></div>
         </div>
@@ -2161,6 +2401,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div class="bg">
             <button class="btn btn-a" onclick="DATA.exportAll()"><i class="ph ph-download-simple"></i> Export a backup</button>
             <button class="btn btn-quiet" onclick="DATA.imp()"><i class="ph ph-upload-simple"></i> Load a backup</button>
+            <button class="btn btn-quiet" onclick="EXPORTNOTES.run()"><i class="ph ph-note"></i> Export my notes</button>
           </div>
         </div>
         <div class="card">
@@ -2285,6 +2526,9 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
             <div id="fc-opts"></div>
             <div id="fc-conf"></div>
             <div class="expl" id="fc-expl"></div>
+            <div id="fc-hist"></div>
+            <div id="fc-note"></div>
+            <div id="fc-similar"></div>
             <div class="kbd-hint">
               <kbd>A</kbd>–<kbd>D</kbd> or <kbd>1</kbd>–<kbd>5</kbd> to answer · <kbd>←</kbd><kbd>→</kbd> to move · <kbd>Esc</kbd> to quit
             </div>
@@ -2500,7 +2744,9 @@ if (typeof QUIZ !== 'undefined') {
     if (S.quiz && !S.quiz.reviewOnly && S.quiz.ans[S.quiz.idx] === null) {
       if (typeof FAST_GUESS !== 'undefined') FAST_GUESS.markAnswered(S.quiz.idx);
     }
-    return _fcAnswer(i);
+    const r = _fcAnswer(i);
+    try { if (typeof PRACTICE_RESUME !== 'undefined') PRACTICE_RESUME.snapshot(); } catch(e){}
+    return r;
   };
 
   /* Results screen: sort wrong-first, surface marked count, and persist
@@ -2508,6 +2754,13 @@ if (typeof QUIZ !== 'undefined') {
   const _origShowResults = QUIZ._showResults.bind(QUIZ);
   QUIZ._showResults = function(){
     _origShowResults();
+    try {
+      if (S.quiz && S.quiz.scope && S.quiz.scope.daily10 && typeof DAILY10 !== 'undefined') {
+        DAILY10.markDone();
+        DAILY10.render();
+      }
+      if (typeof PRACTICE_RESUME !== 'undefined'){ PRACTICE_RESUME.clear(); PRACTICE_RESUME.render(); }
+    } catch(e){}
     try {
       const stats = document.getElementById('res-stats');
 
@@ -2590,6 +2843,7 @@ if (typeof QUIZ !== 'undefined') {
     if (now - _navAt < 200) return;
     _navAt = now;
     _fcNav(dir);
+    try { if (typeof PRACTICE_RESUME !== 'undefined') PRACTICE_RESUME.snapshot(); } catch(e){}
   };
 
   /* Nor may a double tap submit a paper twice. */
@@ -2701,6 +2955,18 @@ document.addEventListener('touchend', e => {
 }, { passive:true });
 
 document.addEventListener('keydown', e => {
+  /* v1.23: "/" opens search, "?" opens the shortcut sheet — only when the
+     student is not typing into a field and not inside another modal. */
+  try {
+    const tag = (e.target && e.target.tagName) || '';
+    const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target.isContentEditable;
+    const modOpen = document.querySelector('.mbg.show');
+    if (!typing && !modOpen && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === '/') { e.preventDefault(); if (typeof QSEARCH !== 'undefined') QSEARCH.open(); return; }
+      if (e.key === '?') { e.preventDefault(); if (typeof KEYSHEET !== 'undefined') KEYSHEET.open(); return; }
+    }
+  } catch(err){}
+
   if (e.key === 'Escape') {
     if (typeof BN !== 'undefined' && BN._activeKey) { BN.close(); return; }
     const mb = $('mbg');
@@ -3936,7 +4202,24 @@ window.HARDQ = {
   forUid(uid){ return (this._map && this._map[uid]) || 0; }
 };
 
-function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} try { ANNOUNCE.load(); } catch(e){} try { _renderHomeExtras(); } catch(e){} try { HARDQ.load(); } catch(e){} }
+function _refreshHints(){
+  /* v1.25: focus mode removed — clear any leftover class. */
+  try { document.documentElement.classList.remove('focus-mode'); } catch(e){}
+  try { if (typeof SIDEBAR   !== 'undefined') SIDEBAR.init(); } catch(e){}
+  try { SB_HINTS.refresh(); } catch(e){}
+  try { TRIAL_PILL.render(); } catch(e){}
+  try { EXAM_DATE.render(); } catch(e){}
+  try { ANNOUNCE.load(); } catch(e){}
+  try { _renderHomeExtras(); } catch(e){}
+  try { HARDQ.load(); } catch(e){}
+  try { if (typeof SYLLABUS_MOCK     !== 'undefined') SYLLABUS_MOCK.render(); } catch(e){}
+  try { if (typeof PRACTICE_RESUME   !== 'undefined') PRACTICE_RESUME.render(); } catch(e){}
+  try { if (typeof DAILY10           !== 'undefined') DAILY10.render(); } catch(e){}
+  try { if (typeof DIGEST            !== 'undefined') DIGEST.render(); } catch(e){}
+  try { if (typeof CALENDAR          !== 'undefined') CALENDAR.render(); } catch(e){}
+  try { if (typeof FORECAST          !== 'undefined') FORECAST.render(); } catch(e){}
+  try { if (typeof SYLLABUS_PROGRESS !== 'undefined') SYLLABUS_PROGRESS.render(); } catch(e){}
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    TODAY_PLAN — what should I do right now?
@@ -4268,20 +4551,67 @@ window.BADGES_UI = {
    SIDEBAR_SEARCH — filter the sidebar items with a small input.
    ═══════════════════════════════════════════════════════════════════ */
 window.SIDEBAR_SEARCH = {
+  _debounceTimer: null,
+  _qResults: [],
+  _input: null,
+  _results: null,
+
   init(){
     const sb = document.getElementById('sb');
-    if(!sb || document.getElementById('sb-filter')) return;
-    const input = document.createElement('input');
-    input.id = 'sb-filter';
-    input.type = 'search';
-    input.className = 'input';
-    input.placeholder = 'Find a screen…';
-    input.style.cssText = 'margin:0 var(--sp-2) var(--sp-3);min-height:32px;font-size:var(--fs-foot)';
-    input.addEventListener('input', () => SIDEBAR_SEARCH.filter(input.value));
+    if (!sb) return;
+    if (document.getElementById('sb-filter')) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'sb-filter-wrap';
+    wrap.className = 'sb-filter-wrap';
+    wrap.innerHTML =
+      '<div class="sb-filter-input">' +
+        '<i class="ph ph-magnifying-glass"></i>' +
+        '<input id="sb-filter" type="search" placeholder="Find a screen or question\u2026" autocomplete="off" spellcheck="false" enterkeyhint="search">' +
+      '</div>' +
+      '<div id="sb-filter-results" class="sb-filter-results" style="display:none"></div>';
+
     const anchor = sb.querySelector('#sb-admin-promo') || sb.querySelector('.sb-you');
-    if(anchor && anchor.parentNode) anchor.parentNode.insertBefore(input, anchor.nextSibling);
-    else sb.insertBefore(input, sb.firstChild);
+    if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(wrap, anchor.nextSibling);
+    else sb.insertBefore(wrap, sb.firstChild);
+
+    const input = wrap.querySelector('#sb-filter');
+    const results = wrap.querySelector('#sb-filter-results');
+
+    input.addEventListener('input', () => {
+      clearTimeout(this._debounceTimer);
+      const term = input.value;
+      this.filter(term);
+      this._debounceTimer = setTimeout(() => this._searchQuestions(term), 200);
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        input.value = '';
+        this.filter('');
+        this._hideResults();
+        input.blur();
+        e.stopPropagation();
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        this._openAll();
+      }
+    });
+
+    input.addEventListener('focus', () => {
+      if (input.value && input.value.trim().length >= 2) this._searchQuestions(input.value);
+    });
+
+    document.addEventListener('click', e => {
+      if (!wrap.contains(e.target)) this._hideResults();
+    });
+
+    this._input = input;
+    this._results = results;
   },
+
   filter(q){
     const term = String(q || '').toLowerCase().trim();
     document.querySelectorAll('#sb .sb-item').forEach(el => {
@@ -4293,6 +4623,88 @@ window.SIDEBAR_SEARCH = {
       const any = Array.from(items).some(i => i.style.display !== 'none');
       sec.style.display = any ? '' : 'none';
     });
+  },
+
+  _hideResults(){
+    if (this._results) this._results.style.display = 'none';
+  },
+
+  async _searchQuestions(term){
+    term = String(term || '').trim();
+    if (term.length < 2){ this._hideResults(); this._qResults = []; return; }
+    if (typeof QSEARCH === 'undefined') return;
+
+    let hits = [];
+    try { hits = await QSEARCH.search(term); } catch(e){}
+    if (!this._input || !this._results) return;
+    if (this._input.value.trim().length < 2) return;
+
+    this._qResults = hits.slice(0, 5);
+    const termLc = term.toLowerCase();
+
+    if (!this._qResults.length) {
+      this._results.innerHTML =
+        '<div class="sb-filter-empty">' +
+          '<i class="ph ph-magnifying-glass"></i> No questions match' +
+        '</div>';
+      this._results.style.display = '';
+      return;
+    }
+
+    const rows = this._qResults.map((q, i) => {
+      const stem = String(q.q || '');
+      const pos = stem.toLowerCase().indexOf(termLc);
+      const snip = pos < 0
+        ? stem.slice(0, 100)
+        : stem.slice(Math.max(0, pos - 25), pos + 75);
+      const correct = q.correct != null ? String.fromCharCode(65 + Number(q.correct)) : '?';
+      return '<button type="button" class="sb-filter-item" ' +
+        'onmousedown="SIDEBAR_SEARCH._pick(' + i + ');return false" ' +
+        'onclick="return false">' +
+          '<span class="sb-filter-badge">' + esc(correct) + '</span>' +
+          '<span class="sb-filter-stem">' + esc(snip) + '</span>' +
+        '</button>';
+    }).join('');
+
+    this._results.innerHTML =
+      '<div class="sb-filter-head">Questions \u00b7 ' + hits.length + '</div>' +
+      rows +
+      '<button type="button" class="sb-filter-all" onmousedown="SIDEBAR_SEARCH._openAll();return false" onclick="return false">' +
+        'See all ' + hits.length + ' in full view' +
+      '</button>';
+    this._results.style.display = '';
+  },
+
+  _pick(i){
+    const q = (this._qResults || [])[i];
+    if (!q) return;
+    this._close();
+    if (typeof QSEARCH === 'undefined') return;
+    QSEARCH._last = [q];
+    QSEARCH.pick(0);
+  },
+
+  _openAll(){
+    const term = this._input ? this._input.value.trim() : '';
+    this._close();
+    if (typeof QSEARCH === 'undefined') return;
+    QSEARCH.open();
+    if (term) {
+      setTimeout(() => {
+        const inp = document.getElementById('qs-input');
+        if (inp) {
+          inp.value = term;
+          inp.dispatchEvent(new Event('input'));
+        }
+      }, 90);
+    }
+  },
+
+  _close(){
+    if (this._input) this._input.value = '';
+    this.filter('');
+    this._hideResults();
+    if (typeof UI !== 'undefined' && UI.sidebarClose) UI.sidebarClose();
   }
 };
 
@@ -4615,6 +5027,908 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
 
 /* ═══════════════════════════════════════════════════════════════════════
    WRONGBY — missed questions grouped by chapter and by file. */
+/* ═══════════════════════════════════════════════════════════════════════
+   QNOTE — personal notes attached to any question.
+
+   A student can add a short note ("remember: this is asking for ULTIMATE
+   and not working stress") to any question, right or wrong. The note is
+   shown on the flashcard below the explanation, on the results review,
+   and inside the wrong-bank card.
+
+   Stored in localStorage as a uid → text map. Deliberately NOT synced to
+   the server: notes are scratchpad, not graded progress, and keeping them
+   local means the sync payload stays small.
+
+   The v1.21 "why did I miss this" field in the wrong bank writes to the
+   same store, so a note typed there appears on the flashcard too.
+   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   QHIST — "seen Nx · M correct" line under a flashcard.
+   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   DAILY10 — a fixed set of 10 questions for today.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.DAILY10 = {
+  COUNT: 10,
+  _dateKey(){
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+  },
+  _seed(){ return parseInt(this._dateKey().replace(/-/g, ''), 10) || 20250101; },
+  _rng(seed){
+    let a = seed >>> 0;
+    return function(){ a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  },
+  _openedFids(){
+    const cov = S.cov || {};
+    return Object.keys(cov).filter(f => cov[f] && (cov[f].a || 0) > 0);
+  },
+  /* v1.25: hide the card once today's set has been completed. */
+  _doneKey(){ return 'abhyas_daily10_done'; },
+  isDone(){ try { return localStorage.getItem(this._doneKey()) === this._dateKey(); } catch(e){ return false; } },
+  markDone(){ try { localStorage.setItem(this._doneKey(), this._dateKey()); } catch(e){} },
+  async build(){
+    const fids = this._openedFids();
+    if (!fids.length) return [];
+    const rng = this._rng(this._seed());
+    const all = [];
+    const shuffled = fids.slice();
+    for (let i = shuffled.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); const t = shuffled[i]; shuffled[i] = shuffled[j]; shuffled[j] = t; }
+    for (const fid of shuffled){
+      const ref = (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs().find(r => r.fid === fid) : null;
+      if (!ref) continue;
+      try {
+        const raw = await QUIZ._fetch(ref.fid, ref.key);
+        const qs = normQ(raw, ref.fid);
+        for (const q of qs){
+          const hist = (typeof QHIST !== 'undefined') ? QHIST.forUid(q.uid) : null;
+          if (hist && hist.seen > 0 && hist.correct === hist.seen) continue;
+          all.push(q);
+        }
+      } catch(e){}
+      if (all.length >= 200) break;
+    }
+    for (let i = all.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); const t = all[i]; all[i] = all[j]; all[j] = t; }
+    return all.slice(0, this.COUNT);
+  },
+  async start(){
+    QUIZ._showLoader('Building today\u2019s 10\u2026');
+    let picked = [];
+    try { picked = await this.build(); } catch(e){}
+    QUIZ._hideLoader();
+    if (!picked.length){ toast('Open a chapter once and the daily set begins tomorrow.', 5000); return; }
+    QUIZ.startWith(picked, 'flashcard', '\u2600\ufe0f Daily 10 \u2014 ' + this._dateKey(),
+      { daily10: true, daily10Date: this._dateKey() });
+  },
+  render(){
+    const box = document.getElementById('daily10-slot');
+    if (!box) return;
+    if (this.isDone()){ box.innerHTML = ''; return; }
+    const fids = this._openedFids();
+    if (!fids.length){ box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<section class="card" style="border-color:var(--accent-line)">' +
+        '<div class="card-hd"><h3><i class="ph ph-sun"></i> Daily 10</h3>' +
+          '<span class="ctag ta">' + this.COUNT + ' questions</span></div>' +
+        '<p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.5">A fresh set of ' + this.COUNT + ' questions from your opened chapters. Same for you all day, new one tomorrow.</p>' +
+        '<button class="btn btn-solid btn-blk" onclick="DAILY10.start()">' +
+          '<i class="ph ph-play-circle"></i> Start today\u2019s ' + this.COUNT + '</button>' +
+      '</section>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CALENDAR — 90-day study grid, GitHub-contribution style.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.CALENDAR = {
+  DAYS: 91,
+  _byDay(){
+    const map = {};
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    sessions.forEach(s => {
+      if (!s || !s.at) return;
+      const d = new Date(s.at), p = n => String(n).padStart(2, '0');
+      const k = d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+      map[k] = (map[k] || 0) + (s.total || 0);
+    });
+    return map;
+  },
+  render(){
+    const box = document.getElementById('calendar-slot');
+    if (!box) return;
+    const byDay = this._byDay();
+    if (!Object.keys(byDay).length){ box.innerHTML = ''; return; }
+    const now = new Date();
+    const cells = [];
+    for (let i = this.DAYS - 1; i >= 0; i--){
+      const d = new Date(now); d.setDate(d.getDate() - i);
+      const p = n => String(n).padStart(2, '0');
+      const k = d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+      const n = byDay[k] || 0;
+      const level = n === 0 ? 0 : n <= 5 ? 1 : n <= 15 ? 2 : n <= 30 ? 3 : 4;
+      cells.push('<span class="cal-cell cal-' + level + '" title="' + esc(k) + ': ' + n + ' question' + (n === 1 ? '' : 's') + '"></span>');
+    }
+    let html = '';
+    for (let i = 0; i < cells.length; i += 7){ html += '<div class="cal-week">' + cells.slice(i, i + 7).join('') + '</div>'; }
+    const activeDays = Object.keys(byDay).length;
+    box.innerHTML =
+      '<div class="card">' +
+        '<div class="card-hd"><h3><i class="ph ph-calendar-check"></i> Study calendar</h3>' +
+          '<span class="t-cap">' + activeDays + ' day' + (activeDays === 1 ? '' : 's') + ' studied</span></div>' +
+        '<div class="cal-grid">' + html + '</div>' +
+        '<div class="cal-legend"><span class="t-cap">Less</span>' +
+          '<span class="cal-cell cal-0"></span><span class="cal-cell cal-1"></span>' +
+          '<span class="cal-cell cal-2"></span><span class="cal-cell cal-3"></span>' +
+          '<span class="cal-cell cal-4"></span><span class="t-cap">More</span></div>' +
+      '</div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FORECAST — days-to-finish at the current pace, per level.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.FORECAST = {
+  render(){
+    const box = document.getElementById('forecast-slot');
+    if (!box) return;
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    const since = Date.now() - 14 * 86400000;
+    const recent = sessions.filter(s => (s.at || 0) >= since);
+    if (recent.length < 3){ box.innerHTML = ''; return; }
+    const total = recent.reduce((n, s) => n + (s.total || 0), 0);
+    const perDay = total / 14;
+    if (perDay < 1){ box.innerHTML = ''; return; }
+    const allRefs = (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : [];
+    const cov = S.cov || {}, fcount = S.fcount || {};
+    const levels = [['level7','Level 7'], ['level5','Level 5'], ['gk','GK']];
+    const lines = [];
+    for (const entry of levels){
+      const lv = entry[0], label = entry[1];
+      const refs = allRefs.filter(r => r.lv === lv);
+      if (!refs.length) continue;
+      let totalQ = 0, seen = 0, missing = 0;
+      refs.forEach(r => {
+        const n = fcount[r.fid];
+        if (n == null){ missing++; return; }
+        totalQ += n;
+        const c = cov[r.fid];
+        if (c && c.p) for (let i = 0; i < c.p.length; i++) if (c.p[i] !== '0') seen++;
+      });
+      if (missing > 0 || totalQ === 0) continue;
+      const remaining = Math.max(0, totalQ - seen);
+      const days = Math.ceil(remaining / perDay);
+      lines.push({ label: label, seen: seen, totalQ: totalQ, remaining: remaining, days: days, target: new Date(Date.now() + days * 86400000) });
+    }
+    if (!lines.length){ box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="card">' +
+        '<div class="card-hd"><h3><i class="ph ph-trend-up"></i> At this pace</h3></div>' +
+        '<p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55">Based on the last 14 days \u2014 about <b>' + perDay.toFixed(1) + ' questions a day</b>.</p>' +
+        lines.map(function(l){
+          return '<div class="fc-line"><b>' + esc(l.label) + '</b> \u2014 ' + l.seen + ' of ' + l.totalQ + ' seen. ' +
+            (l.remaining === 0
+              ? '<span style="color:var(--success);font-weight:700">Complete</span>'
+              : 'Finish in <b>' + l.days + ' day' + (l.days === 1 ? '' : 's') + '</b> <span class="t-foot">(' + l.target.toLocaleDateString() + ')</span>') + '</div>';
+        }).join('') +
+      '</div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DIGEST — last-7-days summary on Home.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.DIGEST = {
+  render(){
+    const box = document.getElementById('digest-slot');
+    if (!box) return;
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    const since = Date.now() - 7 * 86400000;
+    const recent = sessions.filter(s => (s.at || 0) >= since);
+    if (recent.length < 2){ box.innerHTML = ''; return; }
+    let answered = 0, correct = 0;
+    const dayCount = {}, chapMiss = {};
+    recent.forEach(function(s){
+      answered += s.total || 0; correct += s.correct || 0;
+      const k = new Date(s.at).toDateString();
+      dayCount[k] = (dayCount[k] || 0) + (s.total || 0);
+      const c = s.chapter || 'Other';
+      chapMiss[c] = (chapMiss[c] || 0) + ((s.total || 0) - (s.correct || 0));
+    });
+    const pct = answered ? Math.round((correct / answered) * 100) : 0;
+    const bestDay = Object.entries(dayCount).sort((a, b) => b[1] - a[1])[0];
+    const worstChapter = Object.entries(chapMiss).sort((a, b) => b[1] - a[1])[0];
+    box.innerHTML =
+      '<div class="card">' +
+        '<div class="card-hd"><h3><i class="ph ph-chart-bar"></i> This week</h3>' +
+          '<span class="ctag ta">last 7 days</span></div>' +
+        '<div class="g4" style="margin-bottom:var(--sp-3)">' +
+          '<div class="sc"><div class="sv tcy">' + answered + '</div><div class="stat-lbl">Answered</div></div>' +
+          '<div class="sc"><div class="sv ' + (pct >= 70 ? 'tc2' : pct >= 50 ? 'ta2' : 'tb2') + '">' + pct + '%</div><div class="stat-lbl">Accuracy</div></div>' +
+          '<div class="sc"><div class="sv">' + recent.length + '</div><div class="stat-lbl">Sessions</div></div>' +
+          '<div class="sc"><div class="sv">' + Object.keys(dayCount).length + '</div><div class="stat-lbl">Active days</div></div>' +
+        '</div>' +
+        (bestDay ? '<div class="t-foot">Best day: <b>' + esc(bestDay[0]) + '</b> (' + bestDay[1] + ' answered)</div>' : '') +
+        (worstChapter && worstChapter[1] > 0 ? '<div class="t-foot" style="margin-top:2px">Needs work: <b>' + esc(worstChapter[0]) + '</b> (' + worstChapter[1] + ' missed)</div>' : '') +
+      '</div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HARDEST20 — one-tap session of the student's 20 hardest questions.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.HARDEST20 = {
+  COUNT: 20,
+  async build(){
+    if (!QSEARCH._index) await QSEARCH._build();
+    const list = QSEARCH._index || [];
+    if (!list.length) return [];
+    const scored = [];
+    for (let i = 0; i < list.length; i++){
+      const q = list[i];
+      const hist = QHIST.forUid(q.uid);
+      if (!hist || hist.seen < 2) continue;
+      const rate = hist.correct / hist.seen;
+      if (rate >= 0.7) continue;
+      scored.push({ q: q, miss: WRONGBY.missCount(q.uid), rate: rate });
+    }
+    scored.sort(function(a, b){
+      if (b.miss !== a.miss) return b.miss - a.miss;
+      return a.rate - b.rate;
+    });
+    return scored.slice(0, this.COUNT).map(function(x){ return x.q; });
+  },
+  async start(){
+    QUIZ._showLoader('Finding your hardest questions\u2026');
+    let picked = [];
+    try { picked = await this.build(); } catch(e){}
+    QUIZ._hideLoader();
+    if (!picked.length){ toast('Practice a few chapters first \u2014 then this drills the ones you keep missing.', 5000); return; }
+    QUIZ.startWith(picked, 'flashcard', '\ud83c\udfaf Your hardest ' + picked.length, null);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SYLLABUS_PROGRESS — % complete per level.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.SYLLABUS_PROGRESS = {
+  render(){
+    const box = document.getElementById('syllabus-slot');
+    if (!box) return;
+    const allRefs = (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : [];
+    if (!allRefs.length){ box.innerHTML = ''; return; }
+    const cov = S.cov || {}, fcount = S.fcount || {};
+    const levels = [['level7','Level 7'], ['level5','Level 5'], ['gk','GK']];
+    const rows = [];
+    for (const entry of levels){
+      const lv = entry[0], label = entry[1];
+      const refs = allRefs.filter(r => r.lv === lv);
+      if (!refs.length) continue;
+      let total = 0, seen = 0;
+      refs.forEach(r => {
+        const n = fcount[r.fid];
+        if (n != null) total += n;
+        const c = cov[r.fid];
+        if (c && c.p) for (let i = 0; i < c.p.length; i++) if (c.p[i] !== '0') seen++;
+      });
+      rows.push({ label: label, seen: seen, total: total, pct: total ? Math.min(100, Math.round((seen / total) * 100)) : 0 });
+    }
+    if (!rows.length){ box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<div class="card">' +
+        '<div class="card-hd"><h3><i class="ph ph-books"></i> Syllabus progress</h3></div>' +
+        rows.map(function(r){
+          return '<div class="sp-item"><div class="sp-l"><span>' + esc(r.label) + '</span>' +
+            '<span class="t-cap mono">' + r.seen + ' / ' + (r.total || '?') + ' \u00b7 ' + r.pct + '%</span></div>' +
+            '<div class="pb"><div class="pb-f" style="width:' + r.pct + '%"></div></div></div>';
+        }).join('') +
+      '</div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SYLLABUS_MOCK — daily 75-mark paper: 25 GK + 50 Level 7.
+
+   Two pools, straight sample. Deterministic per day. Loksewa scoring:
+   +1 correct, −0.2 wrong, 0 skipped.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.SYLLABUS_MOCK = {
+  GENERAL_COUNT: 25,
+  TECH_COUNT: 50,
+  TOTAL: 75,
+  TIME_LIMIT_SEC: 60 * 60,
+
+  _dateKey(){
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+  },
+  _seed(){ return parseInt(this._dateKey().replace(/-/g, ''), 10) || 20250101; },
+  _rng(seed){
+    let a = seed >>> 0;
+    return function(){ a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  },
+  _shuffle(arr, rng){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  },
+  _allRefs(){ return (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : []; },
+  async _pool(refs){
+    const all = [];
+    for (const ref of refs){
+      try {
+        const raw = await QUIZ._fetch(ref.fid, ref.key);
+        const qs = normQ(raw, ref.fid);
+        for (const q of qs) all.push(q);
+      } catch(e){}
+    }
+    return all;
+  },
+  async build(){
+    const rng = this._rng(this._seed());
+    const refs = this._allRefs();
+    const gkRefs = refs.filter(r => r.lv === 'gk');
+    const l7Refs = refs.filter(r => r.lv === 'level7');
+    if (!gkRefs.length && !l7Refs.length) return { papers: [] };
+    const gkPool = await this._pool(gkRefs);
+    const l7Pool = await this._pool(l7Refs);
+    const general = this._shuffle(gkPool, rng).slice(0, this.GENERAL_COUNT);
+    const tech    = this._shuffle(l7Pool, rng).slice(0, this.TECH_COUNT);
+    return { papers: general.concat(tech) };
+  },
+  async start(){
+    QUIZ._showLoader('Building today\u2019s 75-mark paper\u2026');
+    let built = { papers: [] };
+    try { built = await this.build(); } catch(e){}
+    QUIZ._hideLoader();
+    if (built.papers.length < 10){ toast('Not enough chapters cached yet. Open a few chapters in Chapters first.', 6000); return; }
+    if (built.papers.length < this.TOTAL){ toast('Running a ' + built.papers.length + '-question paper \u2014 the full 75 aren\'t available yet.', 6000); }
+    QUIZ.startWith(
+      built.papers, 'exam',
+      '\ud83d\udcdd Daily 75-mark Loksewa paper \u2014 ' + this._dateKey(),
+      { loksewaMock: true, timeLimitSec: this.TIME_LIMIT_SEC }
+    );
+  },
+  render(){
+    const box = document.getElementById('syllabus-mock-slot');
+    if (!box) return;
+    const refs = this._allRefs();
+    const gkCount = refs.filter(r => r.lv === 'gk').length;
+    const l7Count = refs.filter(r => r.lv === 'level7').length;
+    if (!gkCount && !l7Count){ box.innerHTML = ''; return; }
+    box.innerHTML =
+      '<section class="card" style="border-color:var(--accent-line)">' +
+        '<div class="card-hd"><h3><i class="ph ph-note-pencil"></i> Today\u2019s 75-mark Loksewa paper</h3>' +
+          '<span class="ctag ta">75 marks \u00b7 60 min</span></div>' +
+        '<p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55">' +
+          '25 marks General Knowledge, 50 marks Level 7 Civil Engineering. ' +
+          'Same paper all day; new one tomorrow. ' +
+          'Loksewa scoring: <b>+1</b> correct, <b>\u22120.2</b> wrong, <b>0</b> skipped.</p>' +
+        '<div class="syl-row"><span class="syl-label">General Knowledge</span><span class="syl-marks">25</span></div>' +
+        '<div class="syl-row"><span class="syl-label">Level 7 Civil Engineering</span><span class="syl-marks">50</span></div>' +
+        '<button class="btn btn-solid btn-blk" style="margin-top:var(--sp-3)" onclick="SYLLABUS_MOCK.start()">' +
+          '<i class="ph ph-play-circle"></i> Start today\u2019s paper</button>' +
+      '</section>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PRACTICE_RESUME — an unfinished practice session survives a tab close.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.PRACTICE_RESUME = {
+  KEY: 'abhyas_practice_snap',
+  MAX_AGE_MS: 30 * 24 * 60 * 60 * 1000,
+  SIZE_CEILING: 500 * 1024,
+  get(){ try { const r = localStorage.getItem(this.KEY); return r ? JSON.parse(r) : null; } catch(e){ return null; } },
+  clear(){ try { localStorage.removeItem(this.KEY); } catch(e){} },
+  snapshot(){
+    try {
+      if (!S.quiz || !S.quiz.active) return;
+      if (S.quiz.mode !== 'flashcard') return;
+      if (S.quiz.reviewOnly) return;
+      if (!S.user || !S.user.username) return;
+      if (S.quiz.scope && (S.quiz.scope.daily10 || S.quiz.scope.weeklyId)) return;
+      const answered = (S.quiz.ans || []).filter(a => a !== null && a !== undefined).length;
+      if (answered === 0) return;
+      let snap = { username: S.user.username, ch: S.quiz.ch || 'Practice', qs: S.quiz.qs,
+        ans: S.quiz.ans.slice ? S.quiz.ans.slice() : [], idx: S.quiz.idx || 0,
+        scope: S.quiz.scope || null, startedAt: S.quiz.startedAt || Date.now(), savedAt: Date.now() };
+      let json = JSON.stringify(snap);
+      if (json.length > this.SIZE_CEILING){
+        snap.qs = snap.qs.map(q => { const { img, imgCaption, ...rest } = q; return rest; });
+        json = JSON.stringify(snap);
+      }
+      if (json.length > this.SIZE_CEILING) return;
+      localStorage.setItem(this.KEY, json);
+    } catch(e){}
+  },
+  valid(){
+    const s = this.get();
+    if (!s || !s.username || !Array.isArray(s.qs) || !s.qs.length) return null;
+    if (!S.user || S.user.username !== s.username) return null;
+    if (Date.now() - (s.savedAt||0) > this.MAX_AGE_MS) return null;
+    if ((s.ans || []).filter(a => a !== null && a !== undefined).length === 0) return null;
+    return s;
+  },
+  render(){
+    const box = document.getElementById('practice-resume-slot');
+    if (!box) return;
+    const s = this.valid();
+    if (!s){ box.innerHTML = ''; return; }
+    const answered = (s.ans || []).filter(a => a !== null && a !== undefined).length;
+    const mins = Math.max(1, Math.round((Date.now() - (s.savedAt||0)) / 60000));
+    const when = mins < 60 ? mins + ' min ago' : Math.round(mins/60) + ' h ago';
+    box.innerHTML =
+      '<section class="card" style="border-color:var(--accent-line);background:var(--accent-soft)">' +
+        '<div class="card-hd"><h3><i class="ph ph-arrow-clockwise"></i> Unfinished practice</h3></div>' +
+        '<p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55;color:var(--ink-2)">' +
+          'You were ' + answered + ' of ' + s.qs.length + ' through <b>' + esc(s.ch || 'a practice session') + '</b>, last touched ' + when + '.' +
+        '</p>' +
+        '<div class="bg"><button class="btn btn-solid grow" onclick="PRACTICE_RESUME.start()"><i class="ph ph-play"></i> Continue</button>' +
+          '<button class="btn btn-quiet" onclick="PRACTICE_RESUME.discard()">Discard</button></div>' +
+      '</section>';
+  },
+  start(){
+    const s = this.valid();
+    if (!s){ toast('That session is no longer available.'); this.render(); return; }
+    while (s.ans.length < s.qs.length) s.ans.push(null);
+    if (s.ans.length > s.qs.length) s.ans = s.ans.slice(0, s.qs.length);
+    S.quiz = { qs: s.qs.slice(), ans: s.ans.slice(), mode: 'flashcard',
+      idx: Math.max(0, Math.min(s.idx | 0, s.qs.length-1)),
+      timer: null, elapsed: 0, left: 0, active: true, ch: s.ch || 'Practice',
+      skipped: new Set(), shown: new Set(), scope: s.scope || null,
+      startedAt: s.startedAt || Date.now(), reviewOnly: false };
+    document.getElementById('quiz-wrap').style.display = '';
+    document.querySelectorAll('.view').forEach(e => e.classList.remove('on'));
+    document.getElementById('ex-wrap').style.display = 'none';
+    document.getElementById('fc-wrap').style.display = '';
+    document.getElementById('res-wrap').style.display = 'none';
+    try { QUIZ._renderFlashcard(); QUIZ._startTimer(); } catch(e){}
+    window.scrollTo(0, 0);
+    this.clear();
+    this.render();
+    toast('Resumed where you left off', 3000);
+  },
+  discard(){ this.clear(); this.render(); toast('Practice session discarded'); }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SIDEBAR — moves lower-priority items into a "More tools" section.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.SIDEBAR = {
+  /* v1.26: nothing to relocate — the More tools section was removed and
+     the utilities moved onto the Progress page. Kept as an empty list so
+     the module stays a safe no-op. */
+  SECONDARY: [],
+  _expanded: false,
+  init(){
+    const target = document.getElementById('sb-more-items');
+    if (!target || target.dataset.init === '1') return;
+    target.dataset.init = '1';
+    /* v1.25: purge any leftover Focus-mode button from a device that
+       still had one. */
+    const focusBtn = document.getElementById('nav-focus');
+    if (focusBtn && focusBtn.parentNode) focusBtn.parentNode.removeChild(focusBtn);
+    this.SECONDARY.forEach(id => {
+      const el = document.getElementById(id);
+      if (!el || !el.parentNode) return;
+      const clone = el.cloneNode(true);
+      clone.classList.add('sb-secondary-item');
+      target.appendChild(clone);
+      el.style.display = 'none';
+    });
+    /* Hide any section whose items all moved to More tools. */
+    document.querySelectorAll('#sb .sb-sec').forEach(sec => {
+      const items = sec.querySelectorAll('.sb-item');
+      if (!items.length) return;
+      const visible = Array.prototype.filter.call(items, el => el.style.display !== 'none');
+      if (!visible.length) sec.style.display = 'none';
+    });
+    this._applyState();
+  },
+  toggle(){ this._expanded = !this._expanded; this._applyState(); },
+  _applyState(){
+    const items = document.getElementById('sb-more-items');
+    const chev  = document.getElementById('sb-more-chev');
+    if (items) items.style.display = this._expanded ? '' : 'none';
+    if (chev)  chev.className = 'ph ' + (this._expanded ? 'ph-caret-up' : 'ph-caret-down');
+    try { localStorage.setItem('abhyas_sb_expanded', this._expanded ? '1' : '0'); } catch(e){}
+  },
+  restore(){
+    try { if (localStorage.getItem('abhyas_sb_expanded') === '1'){ this._expanded = true; this._applyState(); } } catch(e){}
+  }
+};
+
+window.QHIST = {
+  _cache: null,
+  _index(){
+    if (this._cache) return this._cache;
+    const map = {};
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    for (let i = 0; i < sessions.length; i++){
+      const qres = sessions[i] && sessions[i].qres;
+      if (!Array.isArray(qres)) continue;
+      for (let j = 0; j < qres.length; j++){
+        const r = qres[j];
+        if (!r || !r.uid) continue;
+        const rec = map[r.uid] || (map[r.uid] = { seen: 0, correct: 0 });
+        rec.seen++;
+        if (r.ok) rec.correct++;
+      }
+    }
+    this._cache = map;
+    return map;
+  },
+  forUid(uid){ return this._index()[uid] || null; },
+  render(containerId, uid){
+    const box = document.getElementById(containerId);
+    if (!box) return;
+    if (!uid){ box.innerHTML = ''; return; }
+    const r = this.forUid(uid);
+    if (!r || r.seen < 2){ box.innerHTML = ''; return; }
+    const pct = Math.round((r.correct / r.seen) * 100);
+    const cls = pct >= 70 ? 'ok' : pct >= 40 ? 'mid' : 'low';
+    box.innerHTML =
+      '<div class="qhist-line">' +
+        '<i class="ph ph-clock-counter-clockwise"></i> ' +
+        'Seen ' + r.seen + '\u00d7 \u00b7 ' + r.correct + ' correct ' +
+        '<b class="' + cls + '">(' + pct + '%)</b>' +
+      '</div>';
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QSEARCH — search across every question cached on the device.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.QSEARCH = {
+  _index: null, _loading: false, _last: [],
+  async _build(){
+    if (this._index) return this._index;
+    if (this._loading){ while (this._loading) await new Promise(r => setTimeout(r, 100)); return this._index; }
+    this._loading = true;
+    const out = [];
+    try {
+      const keys = await QDB.keys();
+      for (const key of keys){
+        try {
+          const raw = await QDB.get(key);
+          const valid = raw && !(typeof raw === 'object' && !Array.isArray(raw) && raw.success === false);
+          if (!valid) continue;
+          const qs = normQ(raw, key);
+          for (const q of qs) out.push(q);
+        } catch(e){}
+        if (out.length >= 8000) break;
+      }
+    } catch(e){}
+    this._index = out;
+    this._loading = false;
+    return out;
+  },
+  async search(term){
+    const idx = await this._build();
+    const t = String(term || '').toLowerCase().trim();
+    if (!t || t.length < 2) return [];
+    const hits = [];
+    for (let i = 0; i < idx.length; i++){
+      const q = idx[i];
+      const stem = String(q.q || '').toLowerCase();
+      const opts = (q.options || []).join(' ').toLowerCase();
+      const pos = stem.indexOf(t);
+      if (pos >= 0){ hits.push({ q: q, where: 'stem', pos: pos }); continue; }
+      const opos = opts.indexOf(t);
+      if (opos >= 0) hits.push({ q: q, where: 'option', pos: opos });
+    }
+    hits.sort((a, b) => {
+      if (a.where !== b.where) return a.where === 'stem' ? -1 : 1;
+      return a.pos - b.pos;
+    });
+    return hits.slice(0, 60).map(h => h.q);
+  },
+  open(){
+    let modal = document.getElementById('qsearch-modal');
+    if (!modal){
+      modal = document.createElement('div');
+      modal.id = 'qsearch-modal';
+      modal.className = 'mbg';
+      modal.style.zIndex = '10050';
+      modal.innerHTML =
+        '<div class="mbox wide" onclick="event.stopPropagation()">' +
+          '<div class="mhd"><h3><i class="ph ph-magnifying-glass"></i> Search questions</h3>' +
+            '<button class="mcl" type="button" aria-label="Close" onclick="QSEARCH.close()"><i class="ph ph-x"></i></button></div>' +
+          '<div class="mbody" style="padding-top:0">' +
+            '<input class="input qs-input" id="qs-input" type="search" placeholder="Type any word from the question or options\u2026" autocomplete="off">' +
+            '<div id="qs-status" class="t-foot" style="margin:var(--sp-2) 0"></div>' +
+            '<div id="qs-results" class="stack2"></div>' +
+          '</div>' +
+        '</div>';
+      modal.addEventListener('click', e => { if (e.target === modal) QSEARCH.close(); });
+      document.body.appendChild(modal);
+      const inp = modal.querySelector('#qs-input');
+      let timer = null;
+      inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => QSEARCH._run(inp.value), 220); });
+      inp.addEventListener('keydown', e => { if (e.key === 'Escape'){ e.preventDefault(); QSEARCH.close(); } });
+    }
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => { const inp = document.getElementById('qs-input'); if (inp){ inp.value=''; inp.focus(); } }, 40);
+    this._run('');
+  },
+  close(){
+    const m = document.getElementById('qsearch-modal');
+    if (m) m.classList.remove('show');
+    if (!document.querySelector('.mbg.show')) document.body.style.overflow = '';
+  },
+  async _run(term){
+    const status = document.getElementById('qs-status');
+    const box = document.getElementById('qs-results');
+    if (!box) return;
+    if (!term || term.length < 2){
+      box.innerHTML = '';
+      status.textContent = this._index
+        ? this._index.length + ' questions indexed \u00b7 type at least 2 characters.'
+        : 'Indexing questions\u2026';
+      return;
+    }
+    status.textContent = 'Searching\u2026';
+    const hits = await this.search(term);
+    if (!hits.length){ box.innerHTML = ''; status.textContent = 'No matches.'; return; }
+    status.textContent = hits.length + ' result' + (hits.length === 1 ? '' : 's');
+    const termLc = term.toLowerCase();
+    box.innerHTML = hits.map((q, i) => {
+      const stemRaw = String(q.q || '');
+      const pos = stemRaw.toLowerCase().indexOf(termLc);
+      const snip = pos < 0
+        ? esc(stemRaw.slice(0, 200))
+        : esc(stemRaw.slice(Math.max(0, pos - 40), pos + 160));
+      const hl = pos >= 0
+        ? snip.replace(new RegExp('(' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'i'), '<mark>$1</mark>')
+        : snip;
+      const correct = q.correct != null ? String.fromCharCode(65 + Number(q.correct)) : '?';
+      return '<button type="button" class="qs-item" onclick="QSEARCH.pick(' + i + ')">' +
+        '<span class="qs-badge">' + esc(correct) + '</span>' +
+        '<span class="qs-body"><span class="qs-stem">' + hl + '</span>' +
+        '<span class="qs-meta">' + esc((q.options || []).slice(0, 2).join('  \u00b7  ')) + '</span></span>' +
+      '</button>';
+    }).join('');
+    this._last = hits;
+  },
+  pick(i){
+    const q = (this._last || [])[i];
+    if (!q) return;
+    this.close();
+    if (typeof QUIZ === 'undefined' || typeof QUIZ.startWith !== 'function') return;
+    const fid = fidFromUid(String(q.uid || ''));
+    const ref = (typeof ChapterData !== 'undefined')
+      ? ChapterData.allFileRefs().find(r => r.fid === fid) : null;
+    if (!ref){ QUIZ.startWith([q], 'flashcard', 'Search result', null); return; }
+    (async () => {
+      let pool = [];
+      try { const raw = await QUIZ._fetch(ref.fid, ref.key); pool = normQ(raw, ref.fid); }
+      catch(e){ pool = [q]; }
+      const i = pool.findIndex(x => x.uid === q.uid);
+      const reordered = i >= 0 ? [pool[i]].concat(pool.filter((_, j) => j !== i)) : [q].concat(pool);
+      const chapName = ChapterData.chapterName(ref.lv, ref.ch) + ' \u2014 ' + ref.book;
+      QUIZ.startWith(reordered, 'flashcard', 'Search: ' + chapName,
+        { lv: ref.lv, ch: ref.ch, book: ref.book, sub: ref.subtopic, fid: ref.fid });
+    })();
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   KEYSHEET — press "?" to see every keyboard shortcut.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.KEYSHEET = {
+  ROWS: [
+    ['Any view',  ['/', 'Open question search'],
+                  ['?', 'Show this sheet'],
+                  ['Esc', 'Close any open sheet / leave quiz']],
+    ['In a practice quiz', ['A B C D', 'Answer the current question'],
+                            ['1 to 5', 'Or use number keys'],
+                            ['\u2190 \u2192', 'Previous / next question'],
+                            ['Ctrl + F', 'Search the question on Google (AI)']],
+    ['In a timed test', ['A\u2013D', 'Answer the current question'],
+                        ['Esc', 'Quit the test']],
+    ['In the PDF viewer', ['+ \u2212', 'Zoom in / out'],
+                            ['0', 'Fit page'],
+                            ['F', 'Fullscreen'],
+                            ['Ctrl + F', 'Find in document'],
+                            ['Ctrl + S', 'Save marks']]
+  ],
+  open(){
+    if (document.getElementById('keysheet-modal')) { this._show(); return; }
+    const m = document.createElement('div');
+    m.id = 'keysheet-modal';
+    m.className = 'mbg';
+    m.style.zIndex = '10055';
+    m.innerHTML =
+      '<div class="mbox" onclick="event.stopPropagation()" style="max-width:520px">' +
+        '<div class="mhd"><h3><i class="ph ph-keyboard"></i> Keyboard shortcuts</h3>' +
+          '<button class="mcl" type="button" aria-label="Close" onclick="KEYSHEET.close()"><i class="ph ph-x"></i></button></div>' +
+        '<div class="mbody">' +
+          this.ROWS.map(([section, ...rows]) =>
+            '<div class="ks-section">' + esc(section) + '</div>' +
+            rows.map(([k, d]) =>
+              '<div class="ks-row"><span class="ks-keys">' +
+                k.split(' ').map(x => '<kbd>' + esc(x) + '</kbd>').join(' ') +
+              '</span><span class="ks-desc">' + esc(d) + '</span></div>'
+            ).join('')
+          ).join('') +
+        '</div>' +
+      '</div>';
+    m.addEventListener('click', e => { if (e.target === m) KEYSHEET.close(); });
+    document.body.appendChild(m);
+    this._show();
+  },
+  _show(){ document.getElementById('keysheet-modal').classList.add('show'); document.body.style.overflow = 'hidden'; },
+  close(){ const m = document.getElementById('keysheet-modal'); if (m) m.classList.remove('show'); if (!document.querySelector('.mbg.show')) document.body.style.overflow = ''; }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   FOCUSMODE — hides streaks/badges/leaderboards during exam week.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.FOCUSMODE = {
+  KEY: 'abhyas_focus_mode',
+  on(){ try { return localStorage.getItem(this.KEY) === '1'; } catch(e){ return false; } },
+  toggle(){
+    const next = !this.on();
+    try { localStorage.setItem(this.KEY, next ? '1' : '0'); } catch(e){}
+    this.apply();
+    toast(next ? 'Focus mode on \u2014 streaks and badges hidden' : 'Focus mode off', 3000);
+  },
+  apply(){
+    const on = this.on();
+    document.documentElement.classList.toggle('focus-mode', on);
+    const banner = document.getElementById('focus-banner');
+    if (banner) banner.hidden = !on;
+    const btn = document.getElementById('nav-focus');
+    if (btn) btn.classList.toggle('active', on);
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   EXPORTNOTES — download every personal note as a text file.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.EXPORTNOTES = {
+  run(){
+    if (typeof QNOTE === 'undefined'){ toast('No notes to export.'); return; }
+    const store = QNOTE._load();
+    const uids = Object.keys(store);
+    if (!uids.length){ toast('You have no personal notes yet.'); return; }
+    const idxMap = {};
+    if (typeof QSEARCH !== 'undefined' && QSEARCH._index){
+      QSEARCH._index.forEach(q => { if (q.uid) idxMap[q.uid] = q.q; });
+    }
+    const lines = ['Abhyas \u2014 your notes', 'Exported ' + new Date().toLocaleString(), ''];
+    uids.sort().forEach(uid => {
+      lines.push('─'.repeat(50));
+      const stem = idxMap[uid];
+      lines.push('Question: ' + (stem ? stem.slice(0, 200) : uid));
+      lines.push('');
+      lines.push('Your note:');
+      lines.push(store[uid]);
+      lines.push('');
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'abhyas-notes-' + new Date().toISOString().slice(0, 10) + '.txt';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    toast('Exported ' + uids.length + ' note' + (uids.length === 1 ? '' : 's'));
+  }
+};
+
+window.QNOTE = {
+  KEY: 'abhyas_qnotes',
+  MAX: 500,
+  _cache: null,
+
+  _load(){
+    if (this._cache) return this._cache;
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      const o = raw ? JSON.parse(raw) : {};
+      this._cache = (o && typeof o === 'object' && !Array.isArray(o)) ? o : {};
+    } catch(e){ this._cache = {}; }
+    return this._cache;
+  },
+  _save(){
+    try { localStorage.setItem(this.KEY, JSON.stringify(this._cache || {})); } catch(e){}
+  },
+
+  get(uid){
+    if (!uid) return '';
+    const m = this._load();
+    return String(m[uid] || '');
+  },
+  set(uid, text){
+    if (!uid) return;
+    const m = this._load();
+    const t = String(text == null ? '' : text).slice(0, this.MAX).trim();
+    if (t) m[uid] = t; else delete m[uid];
+    this._save();
+  },
+  remove(uid){ this.set(uid, ''); },
+  has(uid){ return !!this.get(uid); },
+  count(){ return Object.keys(this._load()).length; },
+
+  /* Renders a container. Three states:
+       – note exists           → read-only box with edit/delete buttons
+       – opts.editing          → textarea + Save/Cancel
+       – no note, not editing  → "+ Add a personal note" button           */
+  render(containerId, uid, opts){
+    const box = document.getElementById(containerId);
+    if (!box) return;
+    box.dataset.uid = uid || '';
+    if (!uid) { box.innerHTML = ''; return; }
+
+    const note = this.get(uid);
+    const readOnly = !!(opts && opts.readOnly);
+    const editing  = !!(opts && opts.editing);
+    const safeUid  = escAttrJs(uid);
+    const safeBox  = escAttrJs(containerId);
+    const inputId  = 'qnote-input-' + String(uid).replace(/[^a-zA-Z0-9]/g, '_');
+
+    if (editing) {
+      box.innerHTML =
+        '<div class="qnote-box editing">' +
+          '<div class="qnote-hd"><i class="ph ph-note"></i> Your note</div>' +
+          '<textarea class="qnote-input" id="' + inputId + '" maxlength="' + this.MAX + '" ' +
+            'placeholder="Write something you want to remember about this question\u2026">' +
+            esc(note) +
+          '</textarea>' +
+          '<div class="qnote-actions">' +
+            '<button type="button" class="btn btn-sm btn-quiet" onclick="QNOTE.cancel(\'' + safeBox + '\')">Cancel</button>' +
+            '<button type="button" class="btn btn-sm btn-solid" onclick="QNOTE.commit(\'' + safeUid + '\',\'' + safeBox + '\')">Save note</button>' +
+          '</div>' +
+        '</div>';
+      setTimeout(() => { const t = document.getElementById(inputId); if (t) { t.focus(); t.selectionStart = t.value.length; } }, 30);
+      return;
+    }
+
+    if (note) {
+      box.innerHTML =
+        '<div class="qnote-box">' +
+          '<div class="qnote-hd">' +
+            '<i class="ph ph-note"></i> Your note' +
+            (readOnly ? '' :
+              '<button type="button" class="qnote-act" onclick="QNOTE.edit(\'' + safeUid + '\',\'' + safeBox + '\')" aria-label="Edit your note"><i class="ph ph-pencil-simple"></i></button>' +
+              '<button type="button" class="qnote-act danger" onclick="QNOTE.remove(\'' + safeUid + '\',\'' + safeBox + '\')" aria-label="Delete your note"><i class="ph ph-trash"></i></button>') +
+          '</div>' +
+          '<div class="qnote-text">' + esc(note) + '</div>' +
+        '</div>';
+      return;
+    }
+
+    if (readOnly) { box.innerHTML = ''; return; }
+
+    box.innerHTML =
+      '<button type="button" class="qnote-add" onclick="QNOTE.edit(\'' + safeUid + '\',\'' + safeBox + '\')">' +
+        '<i class="ph ph-plus"></i> Add a personal note' +
+      '</button>';
+  },
+
+  edit(uid, containerId){ this.render(containerId, uid, { editing: true }); },
+  cancel(containerId){
+    const box = document.getElementById(containerId);
+    const uid = box && box.dataset ? box.dataset.uid : '';
+    this.render(containerId, uid);
+  },
+  commit(uid, containerId){
+    const inputId = 'qnote-input-' + String(uid).replace(/[^a-zA-Z0-9]/g, '_');
+    const ta = document.getElementById(inputId);
+    const txt = ta ? ta.value : '';
+    this.set(uid, txt);
+    toast(this.get(uid) ? 'Note saved' : 'Note cleared');
+    this.render(containerId, uid);
+  },
+  removeById(uid, containerId){
+    this.remove(uid);
+    toast('Note deleted');
+    this.render(containerId, uid);
+  }
+};
+
 window.WRONGBY = {
   _open: {},
   _last: [],
@@ -4704,7 +6018,72 @@ window.WRONGBY = {
   startFile(fid, dueOnly, mode){ this.start([fid], dueOnly, mode); },
   toggle(i){ const c = this._last[i]; if (!c) return; this._open[c.key] = !this._open[c.key]; this.render(); },
 
+  /* v1.23: how many times has this exact question been missed across the
+     last 50 sessions? Surfaces the specific question that keeps beating
+     the student, not just its category. */
+  missCount(uid){
+    if (!uid) return 0;
+    if (!this._missCache) this._missCache = {};
+    if (this._missCache[uid] != null) return this._missCache[uid];
+    let n = 0;
+    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
+    for (let i = 0; i < sessions.length; i++){
+      const qres = sessions[i] && sessions[i].qres;
+      if (!Array.isArray(qres)) continue;
+      for (let j = 0; j < qres.length; j++){
+        const r = qres[j];
+        if (r && r.uid === uid && r.ok === false) n++;
+      }
+    }
+    this._missCache[uid] = n;
+    return n;
+  },
+
+  /* v1.23: start a mini-session of 5 questions from the same file that
+     share a significant keyword with the current question. */
+  async practiceSimilar(uid){
+    if (!uid) return;
+    const fid = fidFromUid(String(uid));
+    const ref = this._ref(fid);
+    if (!ref){ toast('That chapter is not available.'); return; }
+    QUIZ._showLoader('Finding similar questions\u2026');
+    let pool = [];
+    try {
+      const raw = await QUIZ._fetch(ref.fid, ref.key);
+      pool = normQ(raw, ref.fid);
+    } catch(e){ QUIZ._hideLoader(); toast('Could not load the chapter.'); return; }
+    QUIZ._hideLoader();
+    if (pool.length < 2){ toast('Not enough questions in this file.'); return; }
+    const current = pool.find(q => q.uid === uid);
+    if (!current){ toast('Could not find this question.'); return; }
+    const STOP = new Set(['which','whose','what','where','when','there',
+      'their','these','those','about','following','correct','choose',
+      'select','given','below','above','value','values','calculate',
+      'determine','find','state','explain','describe','consider','shall',
+      'will','would','could','should','might','must','been','being',
+      'while','other','another','first','second','third']);
+    const tok = s => String(s||'').toLowerCase().split(/[^a-z0-9]+/)
+      .filter(w => w.length >= 5 && !STOP.has(w));
+    const curTok = new Set(tok(current.q));
+    const scored = pool.filter(q => q.uid !== uid).map(q => {
+      const t = tok(q.q);
+      let hits = 0;
+      for (const w of t) if (curTok.has(w)) hits++;
+      return { q: q, score: hits };
+    });
+    scored.sort((a,b) => b.score - a.score);
+    const picked = scored.filter(x => x.score > 0).slice(0, 5).map(x => x.q);
+    if (!picked.length){ toast('No similar questions found in this file.'); return; }
+    const chapName = ChapterData.chapterName(ref.lv, ref.ch) + ' \u2014 ' + ref.book;
+    QUIZ.startWith(picked, 'flashcard', 'Similar \u2014 ' + chapName,
+      { lv: ref.lv, ch: ref.ch, book: ref.book, sub: ref.subtopic, fid: ref.fid });
+  },
+
   setNote(uid, note){
+    /* v1.22: the note lives in QNOTE (a per-question map) rather than on
+       the wrong-bank item, so the same note is visible on the flashcard
+       and the results review, not just inside the wrong bank. */
+    if (typeof QNOTE !== 'undefined') { QNOTE.set(uid, note); return; }
     const q = (S.wr || []).find(x => x.uid === uid);
     if (!q) return;
     q._note = String(note || '').slice(0, 160).trim();
@@ -4784,6 +6163,12 @@ WRONGBY._plain = REV.renderList.bind(REV);
 REV.renderList = function(kind){
   return kind === 'wr' ? WRONGBY.render() : WRONGBY._plain(kind);
 };
+
+(function bootstrapSidebar(){
+  function go(){ try { if (typeof SIDEBAR !== 'undefined'){ SIDEBAR.init(); SIDEBAR.restore(); } } catch(e){} }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(go, 400));
+  else setTimeout(go, 400);
+})();
 
 (function bootstrapAdmin(){
   let tries = 0;

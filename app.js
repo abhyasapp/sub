@@ -852,7 +852,15 @@ const PSYNC = {
       bk: this._capList(S.bk, lim.bk),
       fl: this._capList(S.fl, lim.fl),
       wr: this._capList(S.wr, lim.wr),
-      stk: S.stk
+      stk: S.stk,
+      /* v1.23: personal notes ride along. Read straight from localStorage
+         so no extra state needs threading through S. */
+      qnotes: (function(){
+        try {
+          const raw = localStorage.getItem('abhyas_qnotes');
+          return raw ? JSON.parse(raw) : {};
+        } catch(e){ return {}; }
+      })()
     });
     let json = build();
     // 1) Sessions are newest-first: drop per-question detail from the oldest first.
@@ -951,6 +959,19 @@ const PSYNC = {
         _save(LS.CHAPSTATS, S.chapStats);
       }
       if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
+      /* v1.23: merge personal notes from the cloud. Local wins on
+         conflict — a note typed on this device is never silently
+         overwritten by an older copy from another. */
+      if(data.qnotes && typeof data.qnotes === 'object' && !Array.isArray(data.qnotes)){
+        try {
+          const KEY = 'abhyas_qnotes';
+          const localRaw = localStorage.getItem(KEY);
+          const local = localRaw ? JSON.parse(localRaw) : {};
+          const merged = Object.assign({}, data.qnotes, local);
+          localStorage.setItem(KEY, JSON.stringify(merged));
+          if (typeof QNOTE !== 'undefined') QNOTE._cache = merged;
+        } catch(e){}
+      }
       if(data.bk){ S.bk=data.bk; _save(LS.BK,S.bk); }
       if(data.fl){ S.fl=data.fl; _save(LS.FL,S.fl); }
       if(data.wr){ S.wr=data.wr; _save(LS.WR,S.wr); }
