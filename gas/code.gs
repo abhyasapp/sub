@@ -1,8 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas V1 — Apps Script backend (runtime only)
 
-   VERSION: 1.13
+   VERSION: 1.20
    ─────────────────────────────────────────────────────────────────────
+   v1.20 - Public "hardest questions" feed. Server side adds exactly one
+     endpoint (gethardquestions), consumed by the client-side badge on
+     the flashcard view.
    v1.13 - Self-service data control.
      * deleteMyAccount / resetMyProgress actions (session + typed confirm;
        deleteMyAccount also needs the password).
@@ -315,6 +318,7 @@ function doGet(e) {
       case "getpaymentstatus":     result = getPaymentStatus(e.parameter); break;
 
       case "getpublicinfo":        result = getPublicInfo(); break;
+      case "gethardquestions":     result = { success: true, map: getHardQuestionsCache_() }; break;
       case "getsettings":          result = getSettings(); break;
       case "getfile":              result = handleGetFile(e.parameter); break;
 
@@ -4893,6 +4897,35 @@ function getPublicInfo() {
   const s = getSettings();
   const all = (s && s.settings) || {};
   return { success: true, announcement: String(all.announcement || ""), contentVersion: String(all.contentVersion || "") };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   HARD QUESTIONS — public feed consumed by the client-side badge. */
+function getHardQuestionsCache_() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get("hard_questions");
+  if (hit) { try { return JSON.parse(hit); } catch (e) {} }
+  const data = _cachedSheetData_(PROGRESS_SHEET, getProgressSheet_).data;
+  const tally = {};
+  for (let i = 1; i < data.length; i++) {
+    let parsed;
+    try { parsed = JSON.parse(data[i][1]); } catch (e) { continue; }
+    const sessions = parsed && parsed.prog && Array.isArray(parsed.prog.sessions) ? parsed.prog.sessions : [];
+    for (const s of sessions) {
+      for (const qr of (s.qres || [])) {
+        if (!qr || !qr.uid) continue;
+        const r = tally[qr.uid] || (tally[qr.uid] = { n: 0, w: 0 });
+        r.n++; if (!qr.ok) r.w++;
+      }
+    }
+  }
+  const out = {};
+  Object.keys(tally).forEach(uid => {
+    const r = tally[uid];
+    if (r.n >= 20) out[uid] = Math.round((r.w / r.n) * 100);
+  });
+  try { cache.put("hard_questions", JSON.stringify(out), 6 * 60 * 60); } catch (e) {}
+  return out;
 }
 
 function setSettingValue_(key, value) {

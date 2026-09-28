@@ -76,6 +76,17 @@ function fileStatsMap(leaves){
   });
   return map;
 }
+/* v1.20: how many questions in this file is the student currently getting
+   wrong? Reads the coverage record and counts '2' characters — questions
+   whose LAST answer was wrong. Different from "ever missed". */
+function fileMissedNowCount(fid){
+  const c = (S.cov && S.cov[fid]) || null;
+  if (!c || !c.p) return 0;
+  let n = 0;
+  for (let i = 0; i < c.p.length; i++) if (c.p[i] === '2') n++;
+  return n;
+}
+
 function _fileStatsMapFromSessions(leaves){
   const map = new Map();
   leaves.forEach(ref=>{ if(!map.has(ref.fid)) map.set(ref.fid, {practised:new Set(), attempted:0, correct:0, wrong:0}); });
@@ -251,10 +262,11 @@ const ONPROG = {
     const paint = (info)=>{
       if(mySeq !== ONPROG._seq) return;
       const total = info.total;
-      const vals = {practised:scoped.practised, attempted:scoped.attempted, correct:scoped.correct, wrong:scoped.wrong};
+      const missedNow = leaves.reduce((n, ref) => n + fileMissedNowCount(ref.fid), 0);
+      const vals = {practised:scoped.practised, attempted:scoped.attempted, correct:scoped.correct, wrong:scoped.wrong, missedNow: missedNow};
       const metricVal = vals[ONPROG.metric];
-      const metricLabel = {practised:'Practised', attempted:'Attempted', correct:'Correct', wrong:'Wrong'}[ONPROG.metric];
-      const barColor = ONPROG.metric==='wrong' ? 'var(--ros)'
+      const metricLabel = {practised:'Practised', attempted:'Attempted', correct:'Correct', wrong:'Ever missed', missedNow:'Missed right now'}[ONPROG.metric];
+      const barColor = (ONPROG.metric==='wrong' || ONPROG.metric==='missedNow') ? 'var(--ros)'
                      : ONPROG.metric==='correct' ? 'var(--grn)'
                      : 'var(--amb)';
       const pct = total ? Math.min(100, Math.round((metricVal/total)*100)) : 0;
@@ -270,7 +282,7 @@ const ONPROG = {
         const showBook = !book;
         const rows = leaves.map(ref=>{
           const rec = scoped.fileMap.get(ref.fid) || {practised:new Set(), attempted:0, correct:0, wrong:0};
-          const fVals = {practised:rec.practised.size, attempted:rec.attempted, correct:rec.correct, wrong:rec.wrong};
+          const fVals = {practised:rec.practised.size, attempted:rec.attempted, correct:rec.correct, wrong:rec.wrong, missedNow: fileMissedNowCount(ref.fid)};
           const fVal = fVals[ONPROG.metric];
           const fTotal = S.fcount[ref.fid];
           const fPct = fTotal ? Math.min(100, Math.round((fVal/fTotal)*100)) : 0;
@@ -646,6 +658,27 @@ const REV = {
           <option value="">🏷 No tag</option>
           ${BK_TAGS.map(t=>`<option value="${t}" ${q.tag===t?'selected':''}>${t}</option>`).join('')}
         </select>` : '';
+      const reasonPicker = kind==='wr' ? (() => {
+        const r = q._reason || (q._misconception ? 'careless' : '');
+        return `<select class="sel-c" style="margin-top:.4rem;font-size:.7rem;padding:.25rem .4rem;width:auto" onchange='WRONGBY.setReason(${uidJson}, this.value)'>
+          <option value="">Why did I miss this?</option>
+          <option value="careless" ${r==='careless'?'selected':''}>Careless</option>
+          <option value="concept"  ${r==='concept' ?'selected':''}>Concept gap</option>
+        </select>`;
+      })() : '';
+      /* v1.21: a one-line "why did I miss this?" note. The _note field is
+         already carried by WRONGBY.start when it rehydrates a review set,
+         so this just needs an input to write into it. */
+      const notePicker = kind==='wr' ? (() => {
+        const n = String(q._note || '');
+        return `<div style="margin-top:.4rem">` +
+          `<input class="input" type="text" maxlength="160" ` +
+          `placeholder="Why did I miss this? (optional)" ` +
+          `value="${escAttrJs(n)}" ` +
+          `onchange='WRONGBY.setNote(${uidJson}, this.value)' ` +
+          `style="font-size:var(--fs-foot)">` +
+        `</div>`;
+      })() : '';
       let srBadge = '';
       if(kind==='wr'){
         const isDue = (q._nextDue==null) || q._nextDue<=Date.now();
@@ -669,6 +702,8 @@ const REV = {
         <div style="margin-top:.3rem">${opts}</div>
         ${q.explanation?`<div class="expl show" style="margin-top:.45rem">${esc(q.explanation)}</div>`:''}
         ${tagPicker}
+        ${reasonPicker}
+        ${notePicker}
       </div>`;
     }).join('');
     renderMath(el);
@@ -1365,6 +1400,28 @@ const QUIZ = {
         : (S.quiz.idx===S.quiz.qs.length-1 ? 'Finish ✔' : 'Next →');
 
       QUIZ._updateFcCounts();
+
+      /* v1.21: hard-question badge. The v1.20 patch added HARDQ (the
+         fetcher) and the load call, but nothing ever rendered the badge.
+         This is what makes it visible. Only shown when the server has at
+         least 20 attempts on this question and >=40% of them missed it. */
+      try {
+        const existing = document.getElementById('fc-hard');
+        if (existing) existing.remove();
+        if (typeof HARDQ !== 'undefined' && q && q.uid) {
+          const hard = HARDQ.forUid(q.uid);
+          if (hard >= 40) {
+            const badge = document.createElement('span');
+            badge.id = 'fc-hard';
+            badge.className = 'ctag tr';
+            badge.style.cssText = 'margin-left:.4rem';
+            badge.innerHTML = '<i class="ph ph-warning"></i> ' + hard + '% of students miss this';
+            const qn = document.getElementById('fc-qn');
+            if (qn && qn.parentElement) qn.parentElement.appendChild(badge);
+          }
+        }
+      } catch(e){}
+
       renderMath(document.getElementById('fc-wrap'));
     } catch(err){
       console.error('[QUIZ._renderFlashcard] question at idx', S.quiz.idx, 'failed to render:', err, q);
@@ -1571,6 +1628,9 @@ const QUIZ = {
         if(correct) e.classList.add('shc');
         else if(oi2===S.quiz.ans[qi]) e.classList.add('bad2');
       });
+      /* A skipped question is neither right nor wrong — it must not be
+         credited to the answered total, and must not enter the wrong bank. */
+      if (S.quiz.ans[qi] === null) return;
       const correctPick = isOk(S.quiz.ans[qi], q.correct);
       PROG.track(correctPick);
       REV.trackAnswer(q, correctPick);
@@ -1621,6 +1681,35 @@ const QUIZ = {
       <div class="sc"><div class="sv tb2">${wrong}</div><div class="stat-lbl">Wrong</div></div>
       <div class="sc"><div class="sv ta2">${skipped}</div><div class="stat-lbl">Skipped</div></div>
     `;
+
+    /* v1.21: answer-changed line. Shown only if the student changed at
+       least one pick during the exam. Tells them how many went right→wrong
+       (overthinking) vs wrong→right (second thoughts that helped). */
+    try {
+      const changed = S.quiz.changed || {};
+      const idxs = Object.keys(changed);
+      const existing = document.getElementById('res-changed');
+      if (existing) existing.remove();
+      if (idxs.length) {
+        let toWrong = 0, toRight = 0;
+        idxs.forEach(i => {
+          const c = changed[i];
+          if (c.wasRight && !c.nowRight) toWrong++;
+          else if (!c.wasRight && c.nowRight) toRight++;
+        });
+        const p = document.createElement('p');
+        p.id = 'res-changed';
+        p.className = 't-foot';
+        p.style.cssText = 'text-align:center;margin-top:.4rem';
+        p.innerHTML =
+          '<i class="ph ph-arrows-clockwise"></i> ' +
+          idxs.length + ' answer' + (idxs.length === 1 ? '' : 's') + ' changed' +
+          (toWrong ? ' \u00b7 <b style="color:var(--danger)">' + toWrong + ' right \u2192 wrong</b>' : '') +
+          (toRight ? ' \u00b7 <b style="color:var(--success)">' + toRight + ' wrong \u2192 right</b>' : '');
+        const stats = document.getElementById('res-stats');
+        if (stats) stats.parentNode.insertBefore(p, stats.nextSibling);
+      }
+    } catch (e) {}
 
     document.getElementById('res-review').innerHTML = S.quiz.qs.map((q,i)=>{
       const a = S.quiz.ans[i];

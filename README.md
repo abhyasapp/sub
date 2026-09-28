@@ -2,8 +2,8 @@
 
 Offline-first study app for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam, plus Level 5 Engineering and General Knowledge. Built as a static PWA on top of Google Apps Script + Google Sheets + Google Drive. No build step, no bundler, no server to run.
 
-Client version: 1.19 (version.js)
-Backend version: 1.19 (gas/code.gs)
+Client version: 1.20 (version.js)
+Backend version: 1.20 (gas/code.gs)
 Both must match. tests/check.js fails if they drift.
 
 ---
@@ -178,6 +178,9 @@ node tests/check.js catches drift on most of these.
 
 ## Status
 
+v1.20   Missed questions by chapter, syllabus heatmap, Loksewa-format mock paper,
+        hard-question badge, hourly grading tab, rich Google AI prompt,
+        skipped-exam-answer fix, careless / concept-gap tagging
 v1.19   Confidence rating, misconceptions, recovery mode, read-aloud
 v1.18   Today's plan, exam readiness, resume, chapter verdicts, streak forgiveness, image zoom, fast-guess flag
 v1.17   Chapters grid, Content-Security-Policy, content index

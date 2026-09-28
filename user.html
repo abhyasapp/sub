@@ -1602,6 +1602,9 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
         <button type="button" class="sb-item" id="nav-server-progress" onclick="UI.go('server-progress')">
           <span class="sb-ic"><i class="ph ph-list-checks"></i></span>Coverage by file
         </button>
+        <button type="button" class="sb-item" id="nav-heatmap" onclick="UI.go('heatmap')">
+          <span class="sb-ic"><i class="ph ph-squares-four"></i></span>Syllabus heatmap
+        </button>
         <button type="button" class="sb-item" id="nav-timetable" onclick="UI.go('timetable')">
           <span class="sb-ic"><i class="ph ph-calendar-blank"></i></span>Study plan
         </button>
@@ -1929,7 +1932,8 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
               <button type="button" class="mtab active" data-m="practised" onclick="ONPROG.setMetric('practised')">Seen</button>
               <button type="button" class="mtab" data-m="attempted" onclick="ONPROG.setMetric('attempted')">Attempts</button>
               <button type="button" class="mtab" data-m="correct" onclick="ONPROG.setMetric('correct')">Correct</button>
-              <button type="button" class="mtab" data-m="wrong" onclick="ONPROG.setMetric('wrong')">Missed</button>
+              <button type="button" class="mtab" data-m="wrong" onclick="ONPROG.setMetric('wrong')">Ever missed</button>
+              <button type="button" class="mtab" data-m="missedNow" onclick="ONPROG.setMetric('missedNow')">Missed now</button>
             </div>
           </div>
           <div id="on-prog-body"></div>
@@ -2112,6 +2116,15 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
           <div id="srv-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-2);margin-bottom:var(--sp-3)"></div>
           <div id="srv-list" class="stack2"></div>
         </div>
+      </div>
+
+      <!-- ─────────────── SYLLABUS HEATMAP ─────────────── -->
+      <div class="view" id="view-heatmap">
+        <div class="pg-head">
+          <h2><i class="ph ph-squares-four"></i> Syllabus heatmap</h2>
+          <p>Every chapter at a glance. Green is strong, amber is workable, red needs attention. Tap a cell to start.</p>
+        </div>
+        <div id="heatmap-body"></div>
       </div>
 
       <!-- ─────────────── DOWNLOADS ─────────────── -->
@@ -2642,6 +2655,19 @@ if (typeof QUIZ !== 'undefined') {
 
   const _ea = QUIZ.exAnswer.bind(QUIZ);
   QUIZ.exAnswer = function(qi, oi){
+    /* v1.21: record pick changes so _showResults can report how many went
+       right→wrong (overthinking) vs wrong→right. Must run BEFORE _ea,
+       because _ea overwrites S.quiz.ans[qi] with the new value. */
+    try {
+      if (S.quiz && S.quiz.ans && S.quiz.ans[qi] !== null && S.quiz.ans[qi] !== undefined && S.quiz.ans[qi] !== oi) {
+        if (!S.quiz.changed) S.quiz.changed = {};
+        const prev = S.quiz.ans[qi];
+        const wasRight = isOk(prev, S.quiz.qs[qi].correct);
+        const nowRight = isOk(oi,   S.quiz.qs[qi].correct);
+        if (!S.quiz.changed[qi]) S.quiz.changed[qi] = { from: prev, to: oi, wasRight: wasRight, nowRight: nowRight };
+        else { S.quiz.changed[qi].to = oi; S.quiz.changed[qi].nowRight = nowRight; }
+      }
+    } catch(e){}
     _ea(qi, oi);
     const ans = S.quiz.ans.filter(a => a !== null).length, tot = S.quiz.qs.length;
     _ctr('ex-ctr', ans, tot);
@@ -2779,7 +2805,7 @@ const TAB_FOR_VIEW = {
   'home':'bn-home',
   'online':'bn-study','local':'bn-study','psycho':'bn-study','weekly':'bn-study',
   'subj-qotd':'bn-subjective','subj-exam':'bn-subjective','subj-list':'bn-subjective','subj-mine':'bn-subjective',
-  'progress':'bn-progress','server-progress':'bn-progress',
+  'progress':'bn-progress','server-progress':'bn-progress','heatmap':'bn-progress',
   'bookmarks':'bn-progress','flagged':'bn-progress','wrong':'bn-progress',
   'timetable':'bn-more','offline':'bn-more','data':'bn-more'
 };
@@ -3210,6 +3236,7 @@ UI._goRaw = function(v){
   }
 
   if (real === 'server-progress' && typeof SERVER_PROG !== 'undefined') SERVER_PROG.load(false);
+  if (real === 'heatmap' && typeof HEATMAP !== 'undefined') HEATMAP.render();
   if (real === 'progress' && typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render) setTimeout(CLOUD_UI.render, 0);
   if ((real === 'home' || real === 'progress') && typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
 
@@ -3470,9 +3497,15 @@ window.CH_GRID = {
       const has = refs.length > 0;
       const st = this._stats(refs);
       const pct = (st.complete && st.total) ? Math.min(100, Math.round(st.seen / st.total * 100)) : null;
+      const missed = (typeof WRONGBY !== 'undefined') ? WRONGBY.countForChapter(this.lv, ch) : 0;
       const meta = !has ? 'Coming soon'
-        : (pct !== null ? pct + '% seen · ' : (st.seen ? st.seen + ' seen · ' : '')) + refs.length + (refs.length === 1 ? ' set' : ' sets');
-      return '<button type="button" class="chg-card"' + (has ? '' : ' disabled') + ' onclick="CH_GRID.open(\'' + this.lv + '\',\'' + ch + '\')">' +
+        : (pct !== null ? pct + '% seen · ' : (st.seen ? st.seen + ' seen · ' : '')) + refs.length + (refs.length === 1 ? ' set' : ' sets') +
+          (missed ? ' · ' + missed + ' missed' : '');
+      const missedBadge = missed
+        ? '<span class="ctag tr" style="position:absolute;top:.4rem;right:.4rem">' + missed + ' missed</span>'
+        : '';
+      return '<button type="button" class="chg-card" style="position:relative"' + (has ? '' : ' disabled') + ' onclick="CH_GRID.open(\'' + this.lv + '\',\'' + ch + '\')">' +
+        missedBadge +
         '<span class="chg-name">' + esc(chs[ch]) + '</span>' +
         (has ? '<span class="pb" style="display:block"><span class="pb-f" style="display:block;width:' + (pct === null ? 0 : pct) + '%"></span></span>' : '') +
         '<span class="chg-meta">' + esc(meta) + '</span></button>';
@@ -3489,15 +3522,19 @@ window.CH_GRID = {
     let keys = new Set();
     try { keys = new Set(await QDB.keys()); } catch(e){}
     const offline = !(S.online && !S.forcedOffline);
+    const missedFor = fid => (typeof WRONGBY !== 'undefined') ? WRONGBY.countFor(fid) : 0;
     const rows = refs.map(r => {
       const st = this._stats([r]);
       const cached = keys.has(r.key);
       const blocked = offline && !cached;
+      const m = missedFor(r.fid);
       return '<div class="row" style="padding:var(--sp-2) 0">' +
         '<div class="row-main"><div class="t-callout" style="color:var(--ink);font-weight:600">' + esc(prettySub(r.subtopic)) + '</div>' +
         '<div class="t-cap">' + (st.total ? st.seen + ' of ' + st.total + ' seen' : (st.seen ? st.seen + ' seen' : 'Not started')) +
-        (cached ? ' · saved on this device' : (blocked ? ' · needs a connection' : '')) + '</div></div>' +
+        (cached ? ' · saved on this device' : (blocked ? ' · needs a connection' : '')) +
+        (m ? ' · ' + m + ' missed' : '') + '</div></div>' +
         '<button class="btn btn-sm btn-a" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'flashcard\')">Practise</button>' +
+        (m ? '<button class="btn btn-sm btn-r" type="button" onclick="closeMod();WRONGBY.startFile(\'' + escAttrJs(r.fid) + '\',false)">Missed (' + m + ')</button>' : '') +
         '<button class="btn btn-sm btn-quiet" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'exam\')">Test</button></div>';
     }).join('');
     const head = refs.length > 1
@@ -3660,13 +3697,20 @@ QUIZ.setConf = function(level){
   S.quiz.conf[idx] = level;
   const q = S.quiz.qs[idx];
   const ans = S.quiz.ans[idx];
-  if (q && ans !== null && level === 'sure' && !isOk(ans, q.correct)) {
-    const item = (S.wr || []).find(x => x.uid === q.uid);
-    if (item) { item._misconception = true; _save(LS.WR, S.wr); }
-  }
-  if (q && ans !== null && level === 'guess' && isOk(ans, q.correct)) {
-    const item = (S.wr || []).find(x => x.uid === q.uid);
-    if (item && item._nextDue) { item._nextDue = Date.now(); _save(LS.WR, S.wr); }
+  if (!q || ans === null || ans === undefined) { CONF.render(); return; }
+  const item = (S.wr || []).find(x => x.uid === q.uid);
+  const wasWrong = !isOk(ans, q.correct);
+  if (item) {
+    if (wasWrong && level === 'sure') {
+      item._misconception = true;
+      item._reason = 'careless';
+    } else if (wasWrong && (level === 'unsure' || level === 'guess')) {
+      item._reason = 'concept';
+      item._misconception = false;
+    } else if (!wasWrong && level === 'guess' && item._nextDue) {
+      item._nextDue = Date.now();
+    }
+    _save(LS.WR, S.wr);
   }
   CONF.render();
 };
@@ -3864,7 +3908,35 @@ window.PACE = {
     return { actual: actualSec, target: targetSec, onTrack: actualSec >= targetSec * 0.85 };
   }
 };
-function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} try { ANNOUNCE.load(); } catch(e){} try { _renderHomeExtras(); } catch(e){} }
+/* ═══════════════════════════════════════════════════════════════════════
+   HARDQ — "X% of students miss this" badge. */
+window.HARDQ = {
+  _map: null,
+  load(){
+    try {
+      const raw = localStorage.getItem('abhyas_hardq');
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (o && o.map && Date.now() - o.at < 24*60*60*1000) { this._map = o.map; return; }
+      }
+    } catch(e){}
+    if (!S.online || S.forcedOffline) return;
+    const url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || '';
+    if (!url) return;
+    fetch(url + '?action=gethardquestions', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => {
+        if (d && d.success && d.map) {
+          this._map = d.map;
+          try { localStorage.setItem('abhyas_hardq', JSON.stringify({ at: Date.now(), map: d.map })); } catch(e){}
+        }
+      })
+      .catch(() => {});
+  },
+  forUid(uid){ return (this._map && this._map[uid]) || 0; }
+};
+
+function _refreshHints(){ try { SB_HINTS.refresh(); } catch(e){} try { TRIAL_PILL.render(); } catch(e){} try { EXAM_DATE.render(); } catch(e){} try { ANNOUNCE.load(); } catch(e){} try { _renderHomeExtras(); } catch(e){} try { HARDQ.load(); } catch(e){} }
 
 /* ═══════════════════════════════════════════════════════════════════
    TODAY_PLAN — what should I do right now?
@@ -4541,6 +4613,178 @@ if (typeof AUTH !== 'undefined' && AUTH._enter) {
   })();
 })();
 
+/* ═══════════════════════════════════════════════════════════════════════
+   WRONGBY — missed questions grouped by chapter and by file. */
+window.WRONGBY = {
+  _open: {},
+  _last: [],
+
+  _ref(fid){ return ChapterData.allFileRefs().find(r => r.fid === fid) || null; },
+  _due(q){ return q._nextDue == null || q._nextDue <= Date.now(); },
+  _fidOf(q){ return fidFromUid(String((q && q.uid) || '')); },
+  _reason(q){
+    if (!q) return '';
+    if (q._reason) return String(q._reason);
+    if (q._misconception) return 'careless';
+    return '';
+  },
+
+  groups(){
+    const byFid = {};
+    (S.wr || []).forEach(q => {
+      const fid = this._fidOf(q);
+      const ref = this._ref(fid);
+      if (!ref) return;
+      const g = byFid[fid] || (byFid[fid] = { fid: fid, ref: ref, items: [], due: 0, careless: 0, concept: 0 });
+      g.items.push(q);
+      if (this._due(q)) g.due++;
+      const r = this._reason(q);
+      if (r === 'careless') g.careless++;
+      else if (r === 'concept') g.concept++;
+    });
+    const byCh = {};
+    Object.values(byFid).forEach(g => {
+      const k = g.ref.lv + '|' + g.ref.ch;
+      const c = byCh[k] || (byCh[k] = {
+        key: k, lv: g.ref.lv, ch: g.ref.ch,
+        name: ChapterData.chapterName(g.ref.lv, g.ref.ch),
+        files: [], n: 0, due: 0, careless: 0, concept: 0
+      });
+      c.files.push(g);
+      c.n += g.items.length;
+      c.due += g.due;
+      c.careless += g.careless;
+      c.concept += g.concept;
+    });
+    return Object.values(byCh).sort((a, b) => b.due - a.due || b.n - a.n);
+  },
+
+  countFor(fid){
+    return (S.wr || []).filter(q => this._fidOf(q) === fid).length;
+  },
+  countForChapter(lv, ch){
+    return (S.wr || []).filter(q => {
+      const ref = this._ref(this._fidOf(q));
+      return ref && ref.lv === lv && ref.ch === ch;
+    }).length;
+  },
+
+  async start(fids, dueOnly, mode){
+    let items = (S.wr || []).filter(q => fids.indexOf(this._fidOf(q)) !== -1);
+    if (dueOnly) items = items.filter(q => this._due(q));
+    if (!items.length) { toast(dueOnly ? 'Nothing due here right now.' : 'No missed questions here.'); return; }
+    QUIZ._showLoader('Getting your missed questions…');
+    const fresh = {};
+    for (const fid of fids) {
+      const ref = this._ref(fid);
+      if (!ref) continue;
+      try {
+        const raw = await QUIZ._fetch(ref.fid, ref.key);
+        normQ(raw, ref.fid).forEach(q => { fresh[q.uid] = q; });
+      } catch(e){}
+    }
+    QUIZ._hideLoader();
+    const merged = items.map(q => {
+      const f = fresh[q.uid];
+      if (!f) return q;
+      return Object.assign({}, f, {
+        _streak: q._streak, _nextDue: q._nextDue,
+        _reason: q._reason, _misconception: q._misconception, _note: q._note
+      });
+    });
+    const ref0 = this._ref(fids[0]);
+    const label = (ref0 ? ChapterData.chapterName(ref0.lv, ref0.ch) : 'Missed') + ' — Missed';
+    QUIZ.startWith(shuf(merged), mode || 'flashcard', label);
+  },
+
+  startChapter(i, dueOnly, mode){
+    const c = this._last[i];
+    if (c) this.start(c.files.map(f => f.fid), dueOnly, mode);
+  },
+  startFile(fid, dueOnly, mode){ this.start([fid], dueOnly, mode); },
+  toggle(i){ const c = this._last[i]; if (!c) return; this._open[c.key] = !this._open[c.key]; this.render(); },
+
+  setNote(uid, note){
+    const q = (S.wr || []).find(x => x.uid === uid);
+    if (!q) return;
+    q._note = String(note || '').slice(0, 160).trim();
+    _save(LS.WR, S.wr);
+  },
+
+  setReason(uid, reason){
+    const q = (S.wr || []).find(x => x.uid === uid);
+    if (!q) return;
+    q._reason = reason || '';
+    if (reason === 'careless') q._misconception = true;
+    else if (reason === 'concept') q._misconception = false;
+    _save(LS.WR, S.wr);
+    this.render();
+  },
+
+  dueAll(){
+    const allFids = this._last.flatMap(c => c.files.map(f => f.fid));
+    if (!allFids.length) { toast('Nothing to review yet.'); return; }
+    this.start(allFids, true);
+  },
+
+  render(){
+    const el = document.getElementById('wr-list');
+    if (!el) return;
+    this._last = this.groups();
+    if (!this._last.length) { WRONGBY._plain('wr'); return; }
+
+    const total = this._last.reduce((n, c) => n + c.n, 0);
+    const dueTotal = this._last.reduce((n, c) => n + c.due, 0);
+    const careless = this._last.reduce((n, c) => n + c.careless, 0);
+    const concept = this._last.reduce((n, c) => n + c.concept, 0);
+
+    const head =
+      '<div class="card" style="margin-bottom:var(--sp-3);background:var(--accent-soft);border-color:var(--accent-line)">' +
+        '<div class="t-callout" style="color:var(--ink)">' + total + ' missed question' + (total === 1 ? '' : 's') +
+        ' across ' + this._last.length + ' chapter' + (this._last.length === 1 ? '' : 's') + '.' +
+        (dueTotal ? ' <b>' + dueTotal + '</b> ready for review now.' : '') + '</div>' +
+        (careless || concept
+          ? '<div class="t-foot mt2" style="color:var(--ink-2)">' +
+              (careless ? '<i class="ph ph-lightning"></i> ' + careless + ' careless' : '') +
+              (careless && concept ? ' · ' : '') +
+              (concept ? '<i class="ph ph-book"></i> ' + concept + ' concept gap' : '') +
+            '</div>'
+          : '') +
+        (dueTotal ? '<button class="btn btn-solid btn-blk mt3" onclick="WRONGBY.dueAll()"><i class="ph ph-repeat"></i> Review all ' + dueTotal + ' due now</button>' : '') +
+      '</div>';
+
+    el.innerHTML = head + this._last.map((c, i) => {
+      const open = this._open[c.key];
+      const files = open ? c.files.map(f =>
+        '<div class="row" style="padding:var(--sp-2) 0">' +
+          '<div class="row-main">' +
+            '<div class="t-callout" style="color:var(--ink);font-weight:600">' + esc(prettySub(f.ref.subtopic)) + '</div>' +
+            '<div class="t-cap">' + f.items.length + ' missed · ' + f.due + ' due' + '</div>' +
+          '</div>' +
+          '<button class="btn btn-sm btn-a" onclick="WRONGBY.startFile(\'' + escAttrJs(f.fid) + '\',false)">Practise</button>' +
+          '<button class="btn btn-sm btn-quiet" onclick="WRONGBY.startFile(\'' + escAttrJs(f.fid) + '\',false,\'exam\')">Test</button>' +
+        '</div>'
+      ).join('') : '';
+      return '<div class="card" style="margin-bottom:var(--sp-2)">' +
+        '<div class="card-hd"><h3>' + esc(c.name) + '</h3>' +
+          '<span class="ctag ' + (c.due ? 'tr' : 'ta') + '">' + c.n + ' missed' + (c.due ? ' · ' + c.due + ' due' : '') + '</span>' +
+        '</div>' +
+        '<div class="bg">' +
+          (c.due ? '<button class="btn btn-sm btn-solid" onclick="WRONGBY.startChapter(' + i + ',true)">Do what\'s due</button>' : '') +
+          '<button class="btn btn-sm btn-a" onclick="WRONGBY.startChapter(' + i + ',false)">All ' + c.n + '</button>' +
+          '<button class="btn btn-sm btn-quiet" onclick="WRONGBY.toggle(' + i + ')">' + (open ? 'Hide files' : 'By file (' + c.files.length + ')') + '</button>' +
+        '</div>' +
+        files +
+      '</div>';
+    }).join('') + '<button class="btn btn-quiet btn-blk" onclick="WRONGBY._plain(\'wr\')">Show the old flat list</button>';
+  }
+};
+
+WRONGBY._plain = REV.renderList.bind(REV);
+REV.renderList = function(kind){
+  return kind === 'wr' ? WRONGBY.render() : WRONGBY._plain(kind);
+};
+
 (function bootstrapAdmin(){
   let tries = 0;
   const check = () => {
@@ -4868,6 +5112,44 @@ const SERVER_PROG = {
         '</div>' +
       '</div>';
     }).join('');
+  }
+};
+window.HEATMAP = {
+  render(){
+    const box = document.getElementById('heatmap-body');
+    if (!box || typeof ChapterData === 'undefined') return;
+    const levels = [['level7','Level 7 — Civil'], ['level5','Level 5 — Diploma'], ['gk','General Knowledge']];
+    const stats = {};
+    (typeof CHAPSTATS !== 'undefined' ? CHAPSTATS.entries() : []).forEach(e => { stats[e.chapter] = e; });
+    box.innerHTML = levels.map(([lv, name]) => {
+      const chs = ChapterData.chapters(lv);
+      const cards = Object.keys(chs).map(ch => {
+        const refs = ChapterData.chapterFileRefs(lv, ch);
+        if (!refs.length) return '';
+        const label = ChapterData.chapterName(lv, ch);
+        const s = stats[label];
+        const acc = s ? s.accuracy : null;
+        let seen = 0;
+        refs.forEach(r => { const c = S.cov && S.cov[r.fid]; if (c && c.a) seen += c.a; });
+        const cls = acc === null ? 'untouched' : acc >= 80 ? 'strong' : acc >= 60 ? 'workable' : 'weak';
+        const missed = (typeof WRONGBY !== 'undefined') ? WRONGBY.countForChapter(lv, ch) : 0;
+        const barColor = cls === 'strong' ? 'var(--success)'
+                       : cls === 'workable' ? 'var(--accent)'
+                       : cls === 'weak' ? 'var(--danger)'
+                       : 'var(--sep-strong)';
+        return '<button type="button" class="chg-card" style="border-left:4px solid ' + barColor + '" onclick="HEATMAP.go(\'' + lv + '\',\'' + ch + '\')">' +
+          '<span class="chg-name">' + esc(chs[ch]) + '</span>' +
+          '<span class="chg-meta">' +
+            (acc === null ? 'Not started' : acc + '% · ' + seen + ' answered') +
+            (missed ? ' · ' + missed + ' missed' : '') +
+          '</span></button>';
+      }).join('');
+      if (!cards) return '';
+      return '<div class="section-head"><h2>' + esc(name) + '</h2></div><div class="chg-grid">' + cards + '</div>';
+    }).join('');
+  },
+  go(lv, ch){
+    if (typeof CH_GRID !== 'undefined') { CH_GRID.lv = lv; CH_GRID.open(lv, ch); }
   }
 };
 window.SERVER_PROG = SERVER_PROG;
@@ -5272,8 +5554,8 @@ window.HOURLY = {
         body: JSON.stringify({
           action: 'submitSubjectiveAnswer',
           username: user.username, token: user.token,
-          kind: 'qotd',
-          questionId: st.questionId,
+          kind: 'hourly',
+          questionId: st.questionId + '_' + st.hourKey,
           questionText: String(st.q || '').slice(0, 2000),
           chapterId: st.chapter || 'hourly',
           marks: st.marks,

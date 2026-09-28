@@ -230,10 +230,40 @@ function qImgHtml(q){
   const alt = q.imgCaption || 'Question figure';
   return `<div style="margin:.4rem 0"><img src="${esc(q.img)}" alt="${esc(alt)}" style="max-width:100%;border-radius:8px;border:1px solid var(--b1);display:block" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
 }
+/* ═══════════════ GOOGLE SEARCH — rich AI prompt ═══════════════
+   Sends Google a full instruction so its AI Overview answers it like a
+   tutor: correct option, why each trap is a trap, the underlying
+   concept, related concepts, common confusions, memory trick. */
+
+const GOOGLE_PROMPT_MAX = 1400;
+
+const GOOGLE_PROMPT_HEAD =
+  'You are a tutor for Nepal Lok Sewa Aayog Level 7 Civil Engineering. ' +
+  'Analyse this exam question and reply with: ' +
+  '(1) the correct option and exactly why, ' +
+  '(2) why each wrong option is a trap, ' +
+  '(3) the full concept it tests — definition, formula, principle, ' +
+  '(4) related concepts a similar exam question could ask, ' +
+  '(5) the common confusions to avoid on this topic, ' +
+  '(6) a one-line memory trick. Keep it exam-focused. ';
+
+function _buildRichQuery(q){
+  if(!q) return '';
+  const opts = (q.options || [])
+    .map((o, i) => String.fromCharCode(65 + i) + ') ' + String(o))
+    .join(' ');
+  const stem = String(q.q || '').trim();
+  const body = 'Question: ' + stem + '  Options: ' + opts + '.';
+  const full = GOOGLE_PROMPT_HEAD + body;
+  return full.slice(0, GOOGLE_PROMPT_MAX).trim();
+}
+
 function qSearchHtml(q){
-  const optsText = (q.options||[]).map((o,i)=>String.fromCharCode(65+i)+') '+o).join('  ');
-  const query = encodeURIComponent(((q.q||'')+'  '+optsText).trim().slice(0,300));
-  return `<a class="ib" href="https://www.google.com/search?q=${query}" target="_blank" rel="noopener" title="Search on Google" aria-label="Search this question on Google"><i class="ph ph-magnifying-glass"></i></a>`;
+  const query = encodeURIComponent(_buildRichQuery(q));
+  return `<a class="ib" href="https://www.google.com/search?q=${query}" target="_blank" rel="noopener" `
+       + `title="Ask Google AI to analyse this question" `
+       + `aria-label="Ask Google AI to analyse this question">`
+       + `<i class="ph ph-magnifying-glass"></i></a>`;
 }
 function normQ(raw,fid){
   if(raw && typeof raw === 'object' && !Array.isArray(raw) && raw.success === false){
@@ -393,9 +423,9 @@ async function netFetch(url, opts, timeoutMs=20000){
 
 /* ── SEARCH — opens a new tab with the current question on Google ── */
 function _buildSearchQuery(){
-  const q = S.quiz?.qs?.[S.quiz.idx]; if(!q) return '';
-  const opts = (q.options||[]).map((o,i)=>String.fromCharCode(65+i)+') '+o).join('  ');
-  return ((q.q||'') + '  ' + opts).trim().slice(0, 400);
+  const q = S.quiz?.qs?.[S.quiz.idx];
+  if(!q) return '';
+  return _buildRichQuery(q);
 }
 const SRCH = {
   quickSearch(){
@@ -1088,6 +1118,16 @@ const WEEKLY = {
   attempts: S.weeklyAttempts || {},
   _tickTimer: null,
 
+  /* Loksewa L7 Civil pattern: 30 / 25 / 25 / 20 by group, 100 questions,
+     90 minutes. Used by WEEKLY.open to build the mock paper. */
+  LOKSEWA_GROUPS: {
+    A: { name: 'Group A — Structure + Geotech',   marks: 30, chapters: ['structure','geotech'] },
+    B: { name: 'Group B — Water Resource',        marks: 25, chapters: ['irrigationAndCo'] },
+    C: { name: 'Group C — Transportation',        marks: 25, chapters: ['transportAndCo'] },
+    D: { name: 'Group D — Public Health & Misc',  marks: 20, chapters: ['publicHealth','miscellaneous'] }
+  },
+  LOKSEWA_SECONDS: 90 * 60,
+
   _saveAttempts(){
     S.weeklyAttempts = this.attempts;
     _save(LS.WK_ATTEMPTS, this.attempts);
@@ -1306,11 +1346,46 @@ const WEEKLY = {
 
     toast(`📝 Graded exam — you get ONE attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left.`, 5000);
     if(await WEEKLY._startOnServer(s) === 'stop') return;
-    QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
-      weeklyId: s.id,
-      weeklyTitle: s.title,
-      weeklyFirstAttempt: true
-    });
+
+    /* v1.20: Loksewa-format mock — fixed section counts (30/25/25/20 = 100
+       questions) and 90 minutes, matching the actual Level 7 Civil paper
+       pattern. Falls back to the original single-file exam if the chapters
+       cannot be loaded (offline, or content not yet cached). */
+    const groups = WEEKLY.LOKSEWA_GROUPS;
+    const picks = [];
+    QUIZ._showLoader('Building the Loksewa-format paper…');
+    try {
+      for (const key of Object.keys(groups)) {
+        const g = groups[key];
+        const refs = ChapterData.allFileRefs().filter(r => g.chapters.indexOf(r.ch) !== -1);
+        const pool = [];
+        for (const r of refs) {
+          try {
+            const raw = await QUIZ._fetch(r.fid, r.key);
+            pool.push(...normQ(raw, r.fid));
+          } catch(e) {}
+        }
+        picks.push(...shuf(pool).slice(0, g.marks));
+      }
+    } finally {
+      QUIZ._hideLoader();
+    }
+
+    if (!picks.length) {
+      toast('Could not build the full Loksewa paper — running the set as a normal exam.', 5000);
+      QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
+        weeklyId: s.id, weeklyTitle: s.title, weeklyFirstAttempt: true
+      });
+      return;
+    }
+
+    QUIZ._doStart(
+      picks.slice(0, 100),
+      'exam',
+      '📝 ' + s.title + ' — Loksewa mock',
+      false,
+      { weeklyId: s.id, weeklyTitle: s.title, timeLimitSec: WEEKLY.LOKSEWA_SECONDS, loksewaMock: true }
+    );
   },
 
   _startReview(s, attempt){

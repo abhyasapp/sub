@@ -1051,6 +1051,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
         </div>
         <div class="tabbar" role="tablist">
           <button class="active" data-tab="qotd" role="tab" aria-selected="true" aria-controls="subj-panel-qotd" onclick="SUBJ_TABS.go('qotd')">Question of the day <span class="tab-count" id="tab-count-qotd" hidden>0</span></button>
+          <button data-tab="hourly" role="tab" aria-selected="false" aria-controls="subj-panel-hourly" onclick="SUBJ_TABS.go('hourly')">Hourly <span class="tab-count" id="tab-count-hourly" hidden>0</span></button>
           <button data-tab="exam" role="tab" aria-selected="false" aria-controls="subj-panel-exam" onclick="SUBJ_TABS.go('exam')">Exam papers <span class="tab-count" id="tab-count-exam" hidden>0</span></button>
           <button data-tab="add" role="tab" aria-selected="false" aria-controls="subj-panel-add" onclick="SUBJ_TABS.go('add')">Add questions</button>
         </div>
@@ -1068,6 +1069,19 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
           </div>
           <div id="qotd-banner"></div>
           <div id="qotd-list" class="stack2"></div>
+        </div>
+
+        <div id="subj-panel-hourly" role="tabpanel" hidden>
+          <div class="toolbar">
+            <input class="input search" type="search" id="hourly-search" placeholder="Search by username" oninput="SUBJ_HOURLY.render()" aria-label="Search hourly submissions">
+            <select class="select" id="hourly-status" onchange="SUBJ_HOURLY.render()" aria-label="Status">
+              <option value="all">All</option>
+              <option value="pending">Ungraded</option>
+              <option value="graded">Graded</option>
+            </select>
+            <button class="btn btn-quiet btn-sm spacer" onclick="SUBJ_HOURLY.load(true)"><i class="ph ph-arrow-clockwise"></i> Reload</button>
+          </div>
+          <div id="hourly-list" class="stack2"></div>
         </div>
 
         <div id="subj-panel-exam" role="tabpanel" hidden>
@@ -2080,6 +2094,7 @@ const BADGES = {
     this.set('badge-qreports', (QREPORTS.all || []).filter(r => r.status === 'open').length);
     this.set('badge-subjective', SUBJ_STORE.all.filter(s => s.status !== 'graded').length);
     this.set('tab-count-qotd', SUBJ_STORE.all.filter(s => (s.kind || 'qotd') === 'qotd' && s.status !== 'graded').length);
+    this.set('tab-count-hourly', SUBJ_STORE.all.filter(s => s.kind === 'hourly' && s.status !== 'graded').length);
     this.set('tab-count-exam', SUBJ_STORE.all.filter(s => s.kind === 'exam' && s.status !== 'graded').length);
   }
 };
@@ -3133,10 +3148,11 @@ const SUBJ_TABS = {
       t.classList.toggle('active', on);
       t.setAttribute('aria-selected', on ? 'true' : 'false');
     });
-    ['qotd','exam','add'].forEach(t => { const p = $('subj-panel-' + t); if (p) p.hidden = (t !== tab); });
-    if (tab === 'qotd') SUBJ_QOTD.load(false);
-    if (tab === 'exam') SUBJ_EXAM.load(false);
-    if (tab === 'add') SUBJADMIN._populateFilters();
+    ['qotd','hourly','exam','add'].forEach(t => { const p = $('subj-panel-' + t); if (p) p.hidden = (t !== tab); });
+    if (tab === 'qotd')   SUBJ_QOTD.load(false);
+    if (tab === 'hourly') SUBJ_HOURLY.load(false);
+    if (tab === 'exam')   SUBJ_EXAM.load(false);
+    if (tab === 'add')    SUBJADMIN._populateFilters();
   }
 };
 
@@ -3365,6 +3381,33 @@ const SUBJ_EXAM = {
   },
   save(id, marks){ saveGrade('SUBJ_EXAM', id, marks, () => this.render()); },
   regrade(id){ regradeSheet('SUBJ_EXAM', id, 100, () => this.render()); }
+};
+
+/* ═══════════════ HOURLY — grading view ═══════════════ */
+const SUBJ_HOURLY = {
+  async load(force){
+    const list = $('hourly-list');
+    if (!list) return;
+    list.innerHTML = '<div class="sk-block"><div class="skeleton sk-60"></div><div class="skeleton sk-80"></div></div>';
+    await SUBJ_STORE.load(force);
+    this.render();
+  },
+  render(){
+    const list = $('hourly-list');
+    if (!list) return;
+    const statusFilter = $('hourly-status').value;
+    const term = ($('hourly-search').value || '').toLowerCase().trim();
+    const items = SUBJ_STORE.all.filter(s => s.kind === 'hourly').filter(s => {
+      if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+      if (term && !(s.username || '').toLowerCase().includes(term)) return false;
+      return true;
+    });
+    list.innerHTML = items.length
+      ? items.map(s => gradeCard(s, 'SUBJ_HOURLY', 10, true)).join('')
+      : '<div class="empty"><i class="ph ph-clock-countdown"></i><div class="t">No hourly submissions</div><div class="d">They arrive as students take each hour\'s question.</div></div>';
+  },
+  save(id, marks){ saveGrade('SUBJ_HOURLY', id, marks, () => this.render()); },
+  regrade(id){ regradeSheet('SUBJ_HOURLY', id, 10, () => this.render()); }
 };
 
 /* ═══════════════ REPLACE PDF — upload and overwrite ═══════════════════
