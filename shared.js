@@ -205,7 +205,7 @@ function togglePwVisibility(btn) {
   });
 })();
 
-async function pingBackend(gasUrl, timeoutMs = 8000) {
+async function pingBackend(gasUrl, timeoutMs = 12000) {
   if (!gasUrl) return false;
   try {
     const ctrl = new AbortController();

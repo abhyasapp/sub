@@ -446,17 +446,43 @@ const SRCH = {
 /* ═══════════════ 3b. NETCHECK ═══════════════ */
 const NETCHECK = {
   _timer: null,
+  _failCount: 0,
+  /* v1.28: a single slow health-check is not enough to declare offline.
+     Apps Script can take several seconds to wake up (cold start) and a
+     brief stall on a mobile connection is normal. Three consecutive
+     failures — about 45 seconds — before we flip to offline. A single
+     success flips back online immediately. */
+  FAILS_BEFORE_OFFLINE: 3,
+
   async ping(){
     if(S.forcedOffline) return S.online;
     const wasOnline = S.online;
-    S.online = await pingBackend(APPS);
+    let ok = false;
+    try { ok = await pingBackend(APPS); } catch(e){ ok = false; }
+
+    if(ok){
+      this._failCount = 0;
+      S.online = true;
+    } else {
+      this._failCount++;
+      /* The browser's own signal is authoritative when it says we are
+         offline. Otherwise we need repeated failures before we agree. */
+      if(!navigator.onLine || this._failCount >= this.FAILS_BEFORE_OFFLINE){
+        S.online = false;
+      }
+      /* else: stay online, retry at next interval */
+    }
+
     if(S.online !== wasOnline){ _updateNetBtn(); _updateOfflineWarn(); }
     return S.online;
   },
+
   start(){
     if(NETCHECK._timer) return;
     NETCHECK._timer = setInterval(()=>NETCHECK.ping(), 15000);
-  }
+  },
+
+  reset(){ this._failCount = 0; }
 };
 
 /* ═══════════════ 3c. CHAPSTATS ═══════════════ */
@@ -2743,6 +2769,7 @@ function _updateNetBtn(){
 }
 
 window.addEventListener('online', async ()=>{
+  if(typeof NETCHECK !== 'undefined' && NETCHECK.reset) NETCHECK.reset();
   const reallyOnline = await NETCHECK.ping();
   if(!reallyOnline) return;
   if(!S.forcedOffline){

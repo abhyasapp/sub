@@ -1744,6 +1744,92 @@ const QUIZ = {
       <div class="sc"><div class="sv ta2">${skipped}</div><div class="stat-lbl">Skipped</div></div>
     `;
 
+    /* v1.29: marks-by-chapter breakdown on the Loksewa mock paper. Groups
+       every question by its chapter (derived from the question uid), scores
+       each chapter with the same +1/−0.2 rule, and flags chapters under
+       40% as needing revision. Runs only for the mock — ordinary quizzes
+       are untouched. */
+    try {
+      if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock) {
+        const groups = {};
+        (S.quiz.qs || []).forEach((q, i) => {
+          let label = 'Other';
+          try {
+            if (typeof fidFromUid === 'function' && typeof ChapterData !== 'undefined') {
+              const fid = fidFromUid(String(q.uid || ''));
+              const ref = ChapterData.allFileRefs().find(r => r.fid === fid);
+              if (ref) label = ChapterData.chapterName(ref.lv, ref.ch) || 'Other';
+            }
+          } catch(e){}
+          const g = groups[label] || (groups[label] = { label, correct: 0, wrong: 0, skipped: 0, total: 0 });
+          const a = S.quiz.ans[i];
+          g.total++;
+          if (a === null || a === undefined) g.skipped++;
+          else if (isOk(a, q.correct)) g.correct++;
+          else g.wrong++;
+        });
+
+        const rows = Object.values(groups).map(g => {
+          const score = g.correct - g.wrong * 0.2;
+          const pct = g.total ? Math.round((score / g.total) * 100) : 0;
+          return Object.assign({}, g, { score, pct });
+        }).sort((a, b) => a.pct - b.pct);   /* worst first */
+
+        const rowsHtml = rows.map(r => {
+          const cls = r.pct >= 60 ? 'color:var(--success)'
+                    : r.pct >= 40 ? 'color:var(--accent)'
+                    : 'color:var(--danger)';
+          return '<tr>' +
+            '<td>' + esc(r.label) + '</td>' +
+            '<td class="num" style="text-align:center">' + r.total + '</td>' +
+            '<td class="num" style="text-align:center;color:var(--success)">' + r.correct + '</td>' +
+            '<td class="num" style="text-align:center;color:var(--danger)">' + r.wrong + '</td>' +
+            '<td class="num" style="text-align:center">' + r.skipped + '</td>' +
+            '<td class="num" style="text-align:right;font-weight:700;' + cls + '">' +
+              r.score.toFixed(1) + ' <span class="t-cap">(' + r.pct + '%)</span>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
+        const weak = rows.filter(r => r.pct < 40 && r.total >= 2);
+
+        const block = document.createElement('div');
+        block.className = 'chapter-breakdown';
+        block.innerHTML =
+          '<h3 class="t-t3" style="margin:var(--sp-4) 0 var(--sp-2)">' +
+            '<i class="ph ph-chart-bar"></i> Marks by chapter' +
+          '</h3>' +
+          '<div class="table-wrap" style="margin-bottom:var(--sp-3)">' +
+            '<table>' +
+              '<thead><tr>' +
+                '<th>Chapter</th>' +
+                '<th style="text-align:center">Q</th>' +
+                '<th style="text-align:center">Right</th>' +
+                '<th style="text-align:center">Wrong</th>' +
+                '<th style="text-align:center">Skipped</th>' +
+                '<th style="text-align:right">Score</th>' +
+              '</tr></thead>' +
+              '<tbody>' + rowsHtml + '</tbody>' +
+            '</table>' +
+          '</div>' +
+          (weak.length
+            ? '<div class="banner banner-danger" style="align-items:flex-start">' +
+                '<i class="ph ph-warning-circle"></i>' +
+                '<div><div style="font-weight:700">Needs work</div>' +
+                '<div style="margin-top:.2rem;line-height:1.55">' +
+                  weak.map(r => esc(r.label) + ' <b>(' + r.pct + '%)</b>').join(' \u00b7 ') +
+                '</div>' +
+                '<div class="t-cap" style="margin-top:.35rem">Under 40% \u2014 revise these before the next paper.</div>' +
+                '</div></div>'
+            : '<div class="banner banner-accent" style="align-items:flex-start">' +
+                '<i class="ph ph-check-circle"></i>' +
+                '<span>No chapter under 40%. Solid, consistent paper.</span></div>');
+
+        const stats = document.getElementById('res-stats');
+        if (stats && stats.parentNode) stats.parentNode.insertBefore(block, stats.nextSibling);
+      }
+    } catch(e){ console.warn('[chapter breakdown] failed:', e); }
+
     /* v1.21: answer-changed line. Shown only if the student changed at
        least one pick during the exam. Tells them how many went right→wrong
        (overthinking) vs wrong→right (second thoughts that helped). */

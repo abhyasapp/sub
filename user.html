@@ -1674,6 +1674,31 @@ html.focus-mode .marquee-bar{display:none!important}
   .sb-filter-input input{font-size:16px}
 }
 </style>
+<style id="patch-129">
+/* v1.29: chapter marks breakdown on the Loksewa mock results */
+.chapter-breakdown .table-wrap{
+  border:1px solid var(--sep);border-radius:var(--r-card);overflow:hidden;
+  background:var(--surface)
+}
+.chapter-breakdown table{width:100%;border-collapse:collapse;font-size:var(--fs-callout)}
+.chapter-breakdown th{
+  position:static;background:var(--bg-sunken);padding:var(--sp-2) var(--sp-3);
+  font-size:var(--fs-cap);font-weight:650;color:var(--ink-3);
+  text-align:left;white-space:nowrap;border-bottom:1px solid var(--sep)
+}
+.chapter-breakdown td{
+  padding:var(--sp-2) var(--sp-3);border-top:1px solid var(--hairline);
+  color:var(--ink);vertical-align:middle
+}
+.chapter-breakdown tbody tr:first-child td{border-top:none}
+.chapter-breakdown tbody tr:hover td{background:var(--bg-sunken)}
+.chapter-breakdown .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@media print{
+  .chapter-breakdown{page-break-inside:avoid}
+  .chapter-breakdown th{background:#eee!important;color:#000!important}
+  .chapter-breakdown td{color:#000!important;border-top:1px solid #ccc!important}
+}
+</style>
 </head>
 <body>
 
