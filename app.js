@@ -1076,9 +1076,17 @@ const PWA = {
   }
 };
 
-/* ═══════════════ 5b. WEEKLY SETS ═══════════════ */
+/* ═══════════════ 5b. WEEKLY SETS ═══════════════
+   Weekly tests are simply the admin's uploaded question file (s.fileId).
+   No Loksewa mock, no chapter pools, no Group A/B/C/D — that machinery
+   belongs to the subjective module, not here.
+   - Sit once for an official, server-recorded attempt.
+   - Retest reuses the same file, scored locally.
+   - Review replays the exact paper the student sat, from the saved copy
+     on the device, falling back to reloading s.fileId. */
 const WEEKLY = {
   LS_RETAKES: 'abhyas_weekly_last_retake',
+  LS_PAPERS:  'abhyas_weekly_papers',
   _retakes: null,
 
   _loadRetakes(){
@@ -1106,19 +1114,44 @@ const WEEKLY = {
     const retake = this._loadRetakes()[id];
     return retake || this.attempts[id] || null;
   },
-  _clearRetakesFor(id){
-    const all = this._loadRetakes();
-    if (all[id]) { delete all[id]; try { localStorage.setItem(this.LS_RETAKES, JSON.stringify(all)); } catch(e){} }
+
+  /* Keep the paper the student actually sat, on this device, so Review
+     and Retest always have questions to work with even if the file can't
+     be re-fetched. Strips images and explanations if the payload grows
+     past the localStorage budget — questions and answer indices are what
+     matter for replay. */
+  _savePaper(id, qs, ans){
+    if(!id || !Array.isArray(qs) || !qs.length) return false;
+    try {
+      const all = _load(this.LS_PAPERS, {}) || {};
+      const paper = { at: Date.now(), qs: qs.map(q => ({...q})), ans: (ans || []).slice() };
+      let json = JSON.stringify(paper);
+      if(json.length > 400000){
+        paper.qs = paper.qs.map(q => { const {img, imgCaption, explanation, ...rest} = q; return rest; });
+        json = JSON.stringify(paper);
+      }
+      if(json.length > 400000){
+        paper.qs = paper.qs.map(q => ({ q: q.q, options: q.options, correct: q.correct, uid: q.uid }));
+        json = JSON.stringify(paper);
+      }
+      if(json.length > 800000) return false;
+      all[id] = paper;
+      localStorage.setItem(this.LS_PAPERS, JSON.stringify(all));
+      return true;
+    } catch(e){ return false; }
+  },
+  _loadPaper(id){
+    if(!id) return null;
+    try {
+      const all = _load(this.LS_PAPERS, {}) || {};
+      const p = all[id];
+      if(!p || !Array.isArray(p.qs) || !p.qs.length) return null;
+      if(Date.now() - (p.at || 0) > 120*24*60*60*1000) return null;
+      return p;
+    } catch(e){ return null; }
   },
 
-  /* ═══════════════════════════════════════════════════════════════════
-     v1.33: Loksewa scoring for EVERY weekly test.
-     +1 per correct, −0.2 per wrong, 0 for skipped. Display-only — the
-     raw correct count is still what the server stores (rankings use it),
-     but every score the student sees is computed here. Works on both
-     shapes of attempt we hold (local retake and server-returned), since
-     `wrong` is always derivable from total − correct − skipped.
-     ═══════════════════════════════════════════════════════════════════ */
+  /* Loksewa marking: +1 correct, −0.2 wrong, 0 skipped. Display only. */
   loksewaScore(attempt){
     if (!attempt) return null;
     const total = Number(attempt.total) || 0;
@@ -1137,50 +1170,6 @@ const WEEKLY = {
   sets: [],
   attempts: S.weeklyAttempts || {},
   _tickTimer: null,
-
-  /* ═══════════════════════════════════════════════════════════════════
-     v1.33: chapter matching for the Loksewa mock.
-     Groups list both exact IDs (matching subjective_chapters.js) AND
-     lowercase keyword fragments. A chapter file is included if its ID
-     matches exactly OR its display name contains any keyword. This is
-     robust to whatever key scheme chapters-data.js uses — the toast
-     "Could not build the full Loksewa paper" only fires when a group
-     truly has zero matching files.
-     ═══════════════════════════════════════════════════════════════════ */
-  LOKSEWA_GROUPS: {
-    A: { name: 'Group A — Structure + Geotech',   marks: 30,
-         chapters: ['structure','geotech'],
-         keywords: ['structur','geotech','soil','foundation','rcc','concrete','steel','masonry'] },
-    B: { name: 'Group B — Water Resource',        marks: 25,
-         chapters: ['irrigationAndCo'],
-         keywords: ['water','irrigat','hydraul','hydrolog','hydropower','canal','dam','reservoir'] },
-    C: { name: 'Group C — Transportation',        marks: 25,
-         chapters: ['transportAndCo'],
-         keywords: ['transport','highway','airport','traffic','pavement','road','bridge'] },
-    D: { name: 'Group D — Public Health & Misc',  marks: 20,
-         chapters: ['publicHealth','miscellaneous'],
-         keywords: ['public health','sanit','environment','water supply','sewer','misc',
-                    'management','survey','estimat','ethic','profession'] }
-  },
-  LOKSEWA_SECONDS: 90 * 60,
-
-  /* Given one LOKSEWA_GROUPS entry, return every registered chapter file
-     that belongs to it. Match by exact ID first, then by keyword fragment
-     against the chapter's display name — whichever lands. */
-  _chapterRefsForGroup(g){
-    if (typeof ChapterData === 'undefined' || !ChapterData.allFileRefs) return [];
-    const all  = ChapterData.allFileRefs();
-    const ids  = new Set((g.chapters || []).map(s => String(s).toLowerCase()));
-    const kws  = (g.keywords || []).map(s => String(s).toLowerCase());
-    return all.filter(r => {
-      if (ids.has(String(r.ch).toLowerCase())) return true;
-      if (!kws.length) return false;
-      let name = '';
-      try { name = String(ChapterData.chapterName(r.lv, r.ch) || '').toLowerCase(); }
-      catch(e){ name = ''; }
-      return kws.some(k => name.indexOf(k) !== -1);
-    });
-  },
 
   _saveAttempts(){
     S.weeklyAttempts = this.attempts;
@@ -1249,17 +1238,14 @@ const WEEKLY = {
         const shown = lastRetake || attempted;
         const isRetake = !!lastRetake;
         const canRetake = s.status !== 'archived';
-
-        /* v1.33: score with Loksewa negative marking — see loksewaScore(). */
         const lkLast = this.loksewaScore(shown);
         const lkOff  = this.loksewaScore(attempted);
         const lastPct = lkLast ? lkLast.pct : (Number(shown.pct) || 0);
         const offPct  = lkOff  ? lkOff.pct  : (Number(attempted.pct) || 0);
-
         const tag = isRetake
           ? '↻ Last practice ' + lastPct + '% · Official ' + offPct + '%'
           : '✓ ' + lastPct + '%' + (attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : '');
-        const hint = canRetake ? ' · Tap to review or retake' : ' · Tap to review';
+        const hint = canRetake ? ' · Tap to review or retest' : ' · Tap to review';
         return `<div class="qb-btn ok" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.92" onclick='WEEKLY.open(${idJson})'>
           <span><i class="ph ph-check-circle"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
           <span class="ctag tg" style="font-size:.62rem;font-weight:700">${tag}${hint}</span>
@@ -1372,9 +1358,12 @@ const WEEKLY = {
     }, 1000);
   },
 
+  /* Entry point from the home card.
+     Loads exactly the admin's uploaded question file. */
   async open(id){
     const s = this.sets.find(x=>x.id===id);
-    if(!s || !s.released || !s.fileId){ toast('Not unlocked yet.'); return; }
+    if(!s || !s.released){ toast('Not unlocked yet.'); return; }
+    if(!s.fileId){ toast('This weekly set has no question file attached. Ask your admin to fix it.', 7000); return; }
 
     let attempt = this.attempts[id];
     if(!attempt && S.online && !S.forcedOffline){
@@ -1407,7 +1396,7 @@ const WEEKLY = {
       const ok = await ASK.confirm({
         title: 'Practice exam — ' + s.title,
         body:  'The ' + WEEKLY_EXAM_WINDOW_HOURS + '-hour window for the official attempt on this set has closed. ' +
-               'You can still sit the paper as a practice run — it will be scored on this device ' +
+               'You can still sit it as a practice run — it will be scored on this device ' +
                'and will not change the record on the server.',
         ok:    'Start practice'
       });
@@ -1416,62 +1405,15 @@ const WEEKLY = {
       return;
     }
 
-    toast(`📝 Graded exam — you get ONE official attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left. Retakes for practice are allowed.`, 5000);
+    toast(`📝 Graded exam — one official attempt. Retests are practice only.`, 5000);
     if(await WEEKLY._startOnServer(s) === 'stop') return;
-    /* v1.33: awaited with a catch so a rejection inside the builder does
-       not leave the student staring at the home screen with the loader
-       stuck on and no explanation. Mirrors the retake path's guard. */
-    try {
-      await this._buildLoksewaPaper(s);
-    } catch (e) {
-      try { QUIZ._hideLoader(); } catch (ignored) {}
-      console.error('[weekly] build failed:', e);
-      toast('Could not build the paper — check your connection and try again.', 6000);
-    }
-  },
-
-  async _buildLoksewaPaper(s){
-    const groups = WEEKLY.LOKSEWA_GROUPS;
-    const picks = [];
-    QUIZ._showLoader('Building the Loksewa-format paper…');
-    try {
-      for (const key of Object.keys(groups)) {
-        const g = groups[key];
-        const refs = this._chapterRefsForGroup(g);
-        const pool = [];
-        for (const r of refs) {
-          try {
-            const raw = await QUIZ._fetch(r.fid, r.key);
-            pool.push(...normQ(raw, r.fid));
-          } catch(e) {}
-        }
-        picks.push(...shuf(pool).slice(0, g.marks));
-      }
-    } finally {
-      QUIZ._hideLoader();
-    }
-
-    if (!picks.length) {
-      toast('Could not build the full Loksewa paper — running the set as a normal exam.', 5000);
-      QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
-        weeklyId: s.id, weeklyTitle: s.title, weeklyFirstAttempt: true
-      });
-      return;
-    }
-
-    QUIZ._doStart(
-      picks.slice(0, 100),
-      'exam',
-      '📝 ' + s.title + ' — Loksewa mock',
-      false,
-      { weeklyId: s.id, weeklyTitle: s.title, timeLimitSec: WEEKLY.LOKSEWA_SECONDS, loksewaMock: true }
-    );
+    QUIZ.load(s.fileId, `weekly_${s.id}`, 'exam', s.title, {
+      weeklyId: s.id, weeklyTitle: s.title, weeklyFirstAttempt: true
+    });
   },
 
   _showRetakeModal(s, attempt){
     const last = this._lastAttemptFor(s.id) || attempt;
-    /* v1.33: Loksewa scoring — the big number is the exam score, the
-       stats row underneath still shows the raw counts. */
     const lk = this.loksewaScore(last) || { correct:0, wrong:0, skipped:0, total:0, pct:0 };
     const correct = lk.correct;
     const total   = lk.total;
@@ -1500,97 +1442,59 @@ const WEEKLY = {
       '</div>' +
       '<p class="t-cap text-center" style="margin-bottom:var(--sp-3)">Loksewa marking: +1 per correct, −0.2 per wrong, 0 for skipped.</p>' +
       (isRetake
-        ? '<div class="banner banner-info" style="margin-bottom:var(--sp-3)"><i class="ph ph-info"></i><span>Your <b>official score</b> for this set is <b>' + officialPct + '%</b> — the first attempt. Retakes are practice only and are never recorded for the admin.</span></div>'
+        ? '<div class="banner banner-info" style="margin-bottom:var(--sp-3)"><i class="ph ph-info"></i><span>Your <b>official score</b> for this set is <b>' + officialPct + '%</b> — the first attempt. Retests are practice only and are never recorded for the admin.</span></div>'
         : '') +
-      '<p class="t-callout mb4" style="text-align:center">Review your answers, or try the exam again?</p>' +
+      '<p class="t-callout mb4" style="text-align:center">Review your answers, or sit the exam again?</p>' +
       '<div class="flex g2 mt4">' +
         '<button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\');WEEKLY._startReview(WEEKLY.sets.find(function(x){return x.id===\'' + escAttrJs(s.id) + '\'}), WEEKLY.attempts[\'' + escAttrJs(s.id) + '\'] || null)">' +
           '<i class="ph ph-eye"></i> Review' +
         '</button>' +
         '<button class="btn btn-solid" style="flex:1" onclick="MODAL.close(\'sheet\');WEEKLY._startRetake(\'' + escAttrJs(s.id) + '\')">' +
-          '<i class="ph ph-note-pencil"></i> Retake Exam' +
+          '<i class="ph ph-repeat"></i> Retest' +
         '</button>' +
       '</div>',
       { wide:false }
     );
   },
 
+  /* Retest — same questions as the admin uploaded, fresh attempt.
+     Scored locally, never touches the server. */
   async _startRetake(id){
     const s = this.sets.find(x=>x.id===id);
     if(!s){ toast('Not available.'); return; }
-    toast('🎯 Retake — for practice. Your official score will not change.', 4000);
-    try {
-      await this._buildLoksewaPaperRetake(s);
-    } catch (e) {
-      try { QUIZ._hideLoader(); } catch (ignored) {}
-      console.error('[retake] build failed:', e);
-      toast('Could not build the retake — opening review instead.', 5000);
-      this._startReview(s, this.attempts[id] || null);
+    if(!s.fileId){
+      toast('This weekly set has no question file attached. Ask your admin to fix it.', 7000);
+      return;
     }
+    toast('🎯 Retest — for practice. Your official score will not change.', 4000);
+    QUIZ.load(s.fileId, `weekly_${s.id}_retake`, 'exam', s.title, {
+      weeklyId: s.id, weeklyTitle: s.title, weeklyRetake: true
+    });
   },
 
-  async _buildLoksewaPaperRetake(s){
-    const groups = WEEKLY.LOKSEWA_GROUPS;
-    const picks = [];
-    QUIZ._showLoader('Building the Loksewa-format paper…');
-    try {
-      for (const key of Object.keys(groups)) {
-        const g = groups[key];
-        const refs = this._chapterRefsForGroup(g);
-        const pool = [];
-        for (const r of refs) {
-          try {
-            const raw = await QUIZ._fetch(r.fid, r.key);
-            pool.push(...normQ(raw, r.fid));
-          } catch(e) {}
-        }
-        picks.push(...shuf(pool).slice(0, g.marks));
-      }
-    } finally {
-      QUIZ._hideLoader();
-    }
+  /* Review — replays the exact paper the student sat, with their recorded
+     answers already marked. Prefers the paper saved on this device;
+     falls back to loading s.fileId if the saved copy is gone. */
+  async _startReview(s, attempt){
+    if(!s){ toast('Weekly set not found.', 5000); return; }
 
-    if (!picks.length) {
-      if (!s || !s.fileId){
-        toast('Could not build the paper — download this chapter or go online and try again.', 6000);
-        return;
-      }
-      toast('Could not build the full Loksewa paper — running the set as a normal retake.', 5000);
-      QUIZ.load(s.fileId, `weekly_${s.id}_retake`, 'exam', s.title, {
-        weeklyId: s.id,
-        weeklyTitle: s.title,
-        weeklyRetake: true
+    const paper = this._loadPaper(s.id);
+    if(paper && paper.qs.length){
+      const qs = paper.qs.slice();
+      const ans = (paper.ans && paper.ans.length === qs.length)
+        ? paper.ans.slice()
+        : new Array(qs.length).fill(null);
+      QUIZ._doStart(qs, 'flashcard', s.title, false, {
+        weeklyId: s.id, weeklyTitle: s.title,
+        weeklyReviewMode: true,
+        weeklyAttempt: Object.assign({}, attempt || {}, { answers: ans })
       });
       return;
     }
 
-    QUIZ._doStart(
-      picks.slice(0, 100), 'exam', '🎯 ' + s.title + ' — Retake', false,
-      { weeklyId: s.id, weeklyTitle: s.title, weeklyRetake: true,
-        timeLimitSec: WEEKLY.LOKSEWA_SECONDS, loksewaMock: true }
-    );
-  },
-
-  async _startReview(s, attempt){
-    if (!s || !s.fileId){
-      toast('This weekly set has no attached question file to review.', 6000);
+    if(!s.fileId){
+      toast('No saved paper on this device and no attached file to review.', 7000);
       return;
-    }
-    if (attempt && Array.isArray(attempt.answers) && attempt.answers.length){
-      let fileQCount = null;
-      try {
-        const raw = await QUIZ._fetch(s.fileId, `weekly_${s.id}`);
-        fileQCount = normQ(raw, s.fileId).length;
-      } catch(e){ }
-      if (fileQCount !== null && fileQCount !== attempt.answers.length){
-        toast(
-          'This was a Loksewa-format paper — your score is saved, but the ' +
-          'individual answers can\'t be replayed. Start a retake to see the ' +
-          'same format again.',
-          7000
-        );
-        return;
-      }
     }
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'flashcard', s.title, {
       weeklyId: s.id, weeklyTitle: s.title,
@@ -1603,6 +1507,7 @@ const WEEKLY = {
     if(!weeklyId) return;
 
     if(quiz.scope && quiz.scope.weeklyRetake){
+      try { this._savePaper(weeklyId, quiz.qs, quiz.ans); } catch(e){}
       this._saveRetakeScore(weeklyId, stats);
       return;
     }
@@ -1621,6 +1526,7 @@ const WEEKLY = {
     };
     this.attempts[weeklyId] = attempt;
     this._saveAttempts();
+    try { this._savePaper(weeklyId, quiz.qs, quiz.ans); } catch(e){}
     this._renderHomeCard();
     await this._syncAttempt(attempt);
   },
@@ -2891,6 +2797,17 @@ const APP = {
       S.profile.id = 'ha-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2,9);
       _save(LS.PROFILE, S.profile);
     }
+
+    /* Prune stale saved weekly papers (older than 60 days). */
+    try {
+      const all = _load(WEEKLY.LS_PAPERS, {}) || {};
+      const cutoff = Date.now() - 60*24*60*60*1000;
+      let changed = false;
+      Object.keys(all).forEach(id => {
+        if (!all[id] || !all[id].at || all[id].at < cutoff) { delete all[id]; changed = true; }
+      });
+      if (changed) localStorage.setItem(WEEKLY.LS_PAPERS, JSON.stringify(all));
+    } catch(e){}
 
     UI.go('home');
     CACHE.render();

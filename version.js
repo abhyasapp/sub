@@ -77,4 +77,38 @@
           copy protection, live Loksewa negative-marking score in the
           exam bar, boot error boundary, search inside Saved/Flagged/
           Missed lists, faster progress flush, weekly admin summary. */
-const APP_VERSION = '1.31';
+/* 1.32 - weekly test hardening. Fixed the entire weekly feature:
+            • objective.js — removed a duplicate `const isWeekly`
+              declaration in _showResults that was a parse-time syntax
+              error. The whole file was being rejected by the browser,
+              so QUIZ/REV/ON/LOC/PSY/CNT/ONPROG were all undefined and
+              every quiz-related feature silently failed.
+            • app.js — Review button on the retake modal no longer
+              throws ReferenceError (uses escAttrJs(s.id) instead of a
+              bare `id`).
+            • app.js — _startRetake no longer requires s.fileId before
+              attempting a fresh chapter-pool build.
+            • app.js — _buildLoksewaPaperRetake falls back to the
+              weekly set's own file when the pools are empty, so the
+              retake always opens.
+            • app.js — _buildLoksewaPaper is now awaited with a
+              try/catch, so a rejected build surfaces a toast instead
+              of leaving the student on the home screen.
+            • app.js — _startReview is async and refuses a Loksewa-
+              format attempt whose saved paper is missing, showing a
+              clear message rather than every question blank.
+            • app.js — Loksewa chapter matching now falls back to
+              keyword fragments against chapter names, so the "Could
+              not build the full Loksewa paper" toast stops firing
+              when chapter IDs don't match the expected scheme.
+            • app.js — every weekly score shown to the student now
+              uses Loksewa negative marking (+1 correct, −0.2 wrong,
+              0 skipped). Applies to the home card, retake modal, and
+              the results ring. Non-weekly quizzes keep the plain
+              percentage.
+            • app.js — added WEEKLY._savePaper/_loadPaper: the paper
+              the student actually sat is now saved on the device, so
+              Review and Retake always have questions to work with
+              even when the chapter pools and the weekly set's Drive
+              file are both unreachable. */
+const APP_VERSION = '1.32';

@@ -17,25 +17,13 @@
      migrateSessionScopes
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ═══════════════ SCOPE UTILITIES ═══════════════
-   These are used by both the MCQ progress view (ONPROG) and the online
-   study file picker (ON). Kept here because they're conceptually about
-   scoping a quiz to a level/chapter/book/subtopic — MCQ-specific.
-
-   migrateSessionScopes() backfills `chapterKey` on old session records
-   so admin analytics that filter by canonical chapter name match them
-   properly. Called (defensively, via typeof) from PROG.render and
-   PSYNC._pull. */
+/* ═══════════════ SCOPE UTILITIES ═══════════════ */
 
 function migrateSessionScopes(){
   if(!Array.isArray(S.prog.sessions)) return;
   let changed = false;
   S.prog.sessions.forEach(s=>{
     if(!s.chapterKey && s.chapter){
-      // Reverse-map from a display label like "Structural Engineering — Abhyas"
-      // to the canonical key "Structural Engineering". If nothing looks
-      // like a scope delimiter, keep the whole string — it's still better
-      // than leaving chapterKey undefined.
       const cleaned = String(s.chapter).split(' — ')[0].trim();
       if(cleaned){ s.chapterKey = cleaned; changed = true; }
     }
@@ -62,8 +50,6 @@ function fidFromUid(uid){
   return i > -1 ? uid.slice(0,i) : uid;
 }
 
-/* v1.14: read coverage from S.cov (per-file record) instead of the rolling
-   50-session history, so Practised / Attempted / Correct no longer decay. */
 function fileStatsMap(leaves){
   const map = new Map();
   leaves.forEach(ref=>{
@@ -76,9 +62,6 @@ function fileStatsMap(leaves){
   });
   return map;
 }
-/* v1.20: how many questions in this file is the student currently getting
-   wrong? Reads the coverage record and counts '2' characters — questions
-   whose LAST answer was wrong. Different from "ever missed". */
 function fileMissedNowCount(fid){
   const c = (S.cov && S.cov[fid]) || null;
   if (!c || !c.p) return 0;
@@ -164,8 +147,6 @@ const ONPROG = {
     if(!fid) return;
     const ref = ONPROG._lastLeaves.find(l=>l.fid===fid);
     const label = ref ? `${ref.book} — ${ref.subtopic}` : 'this file';
-    /* v1.27: was native confirm(), which an installed iOS PWA silently
-       suppresses — the reset ran even if the student tapped Cancel. */
     const ok = await ASK.confirm({
       title: 'Reset practice progress?',
       body:  'Reset progress for <b>' + esc(label) + '</b>? This clears only the Practised / Attempted / Correct / Wrong counts for this one file. Bookmarks, flags and your wrong-answer bank are not touched — the question file itself is never modified.',
@@ -351,8 +332,6 @@ const ONPROG = {
 };
 
 /* ═══════════════ ON — Online Study picker ═══════════════ */
-/* Tidier subtopic labels in the picker (the stored names stay untouched so
-   cache keys and progress keep working). */
 function prettySub(name){
   return String(name)
     .replace(/^UNCLASSIFIED\s+Unclassified questions/i, 'Mixed questions')
@@ -390,7 +369,6 @@ const ON = {
           const o=document.createElement('option');o.value=book;o.textContent=`${book}${fc?'':' (coming soon)'}`;bs.appendChild(o);
         });
         bs.disabled=false;
-        /* Every chapter has one book, so skip that step: pick it and move on. */
         const _bk = Object.keys(books);
         bs.style.display = _bk.length === 1 ? 'none' : '';
         if(_bk.length === 1){ bs.value = _bk[0]; ON.onBook(); return; }
@@ -515,8 +493,6 @@ const PSY = {
   async start(type){
     const cbs=[...document.querySelectorAll('#psy-levels input:checked')];
     if(!cbs.length){toast('Select at least one chapter');return}
-    // Parallel fetch with concurrency 4 — 60+ files fetched serially
-    // turned into minutes of wall time on a slow connection.
     const refs = [];
     for(const cb of cbs){
       const lv = cb.dataset.lv;
@@ -561,13 +537,8 @@ const PSY = {
 
 /* ═══════════════ REV — Review lists ═══════════════ */
 const REV = {
-  /* v1.22: per-list free-text filter. Populated by the search inputs on the
-     Saved / Flagged / Missed views. Empty string means "show everything". */
   _filters: { bk: '', fl: '', wr: '' },
 
-  /* v1.27: persist the filters across view switches (sessionStorage only —
-     a closed tab starts clean). Before this, a search typed in Saved was
-     lost the moment the student hopped to Home. */
   _FILTERS_KEY: 'abhyas_rev_filters',
   _loadFilters(){
     try {
@@ -641,7 +612,7 @@ const REV = {
     if(isCorrect){
       const item = S.wr.find(x=>x.uid===question.uid);
       if(!item) return;
-      if(item._nextDue && item._nextDue > Date.now()) return;   // only counts once it is due again
+      if(item._nextDue && item._nextDue > Date.now()) return;
       item._streak = (item._streak||0) + 1;
       if(item._streak >= SR_INTERVALS.length){ REV.removeWrong(question.uid); }
       else {
@@ -658,13 +629,10 @@ const REV = {
 
   renderList(kind){
     let arr = REV._store(kind);
-    /* v1.27: restore the persisted filter and paint it back into the search
-       box so a returning student sees why the list is short. */
     REV._loadFilters();
     const _inputId = kind === 'bk' ? 'bk-search' : kind === 'fl' ? 'fl-search' : 'wr-search';
     const _input = document.getElementById(_inputId);
     if (_input && _input.value !== REV._filters[kind]) _input.value = REV._filters[kind];
-    /* v1.22: if the student has typed a search, filter before rendering. */
     const filter = this._filters[kind] || '';
     if (filter) arr = arr.filter(q => this._matches(q, filter));
     const el = document.getElementById(REV._listEl(kind));
@@ -701,13 +669,7 @@ const REV = {
           <option value="concept"  ${r==='concept' ?'selected':''}>Concept gap</option>
         </select>`;
       })() : '';
-      /* v1.21: a one-line "why did I miss this?" note. The _note field is
-         already carried by WRONGBY.start when it rehydrates a review set,
-         so this just needs an input to write into it. */
       const notePicker = kind==='wr' ? (() => {
-        /* v1.22: the note is now read from QNOTE (the per-question map)
-           so a note typed here also appears on the flashcard. Falls back
-           to the legacy _note field if QNOTE is not yet loaded. */
         const n = (typeof QNOTE !== 'undefined') ? QNOTE.get(q.uid) : String(q._note || '');
         return `<div style="margin-top:.4rem">` +
           `<input class="input" type="text" maxlength="500" ` +
@@ -793,20 +755,12 @@ const QUIZ = {
       if(cached && !_validCache(cached)) throw new Error('Cached data is invalid (a previous network error was stored). Go online to refresh it.');
       throw new Error('You are offline and this set is not cached yet. Go to the Offline Cache tab to download it while online.');
     }
-    /* Cache-first: a set you already downloaded opens instantly and costs no
-       data. A quiet background refresh (at most once a day per set) picks up
-       any fixes. Before v1.14 every open waited on the server. */
     if(attempt === 1 && kind !== 'bg'){
       const hit = await QDB.get(cacheKey);
       if(_validCache(hit)){ QUIZ._maybeRevalidate(fileId, cacheKey); return hit; }
     }
     try{
       const timeoutMs = attempt === 1 ? 25000 : 15000;
-      /* Backend v1.11 turned on GETFILE_REQUIRES_AUTH: getFile now needs a
-         username + session token, and also checks the account still has
-         trial or paid access. Without them every single question file came
-         back "Session expired", which looked like an empty question bank.
-         GETFILE_GATE paces the calls under the per-account rate limit. */
       if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take(kind);
       const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
       const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId, ...auth})}`, {redirect:'follow'}, timeoutMs);
@@ -817,11 +771,6 @@ const QUIZ = {
       let data;
       try{ data = JSON.parse(text); }
       catch(pe){ throw new Error('Could not parse server response. The file may be corrupted or the server returned an unexpected format.'); }
-      /* The server asked us to slow down — wait it out rather than caching
-         the error object as if it were a question file.
-         v1.22: the server now sends retryAfterSec, so we wait exactly as
-         long as needed (capped at 20s so a student is not left staring at
-         a spinner) and tell them how long it will be. */
       if(data && data.rateLimited && attempt < 4){
         const waitSec = Math.min(20, Math.max(3, Number(data.retryAfterSec) || 6));
         if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(waitSec * 1000 + 500);
@@ -844,8 +793,6 @@ const QUIZ = {
         throw new Error(data.error || 'Server returned an error for this file.');
       }
       if(_validCache(data)){
-        // IndexedDB write is best-effort — a full store should not break
-        // a successful online fetch.
         const ok = await QDB.set(cacheKey, data);
         if(!ok && !QUIZ._cacheWarned){
           QUIZ._cacheWarned = true;
@@ -877,7 +824,6 @@ const QUIZ = {
         .finally(() => { delete QUIZ._reval[cacheKey]; });
     }catch(e){}
   },
-  /* Silent refresh of one cached set: no toasts, no retries, never throws. */
   async _revalidateQuiet(fileId, cacheKey){
     if(!S.online || S.forcedOffline) return false;
     if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take('bg');
@@ -971,10 +917,6 @@ const QUIZ = {
     document.getElementById('quiz-loader-msg').textContent = msg || 'Loading…';
     el.style.display = 'flex';
   },
-  // Removes the loader element rather than just hiding it — the old
-  // "hide but keep in DOM" approach made _anyModalOpen()'s presence check
-  // stick true forever after the first quiz, permanently disabling
-  // every keyboard shortcut.
   _hideLoader(){
     const el = document.getElementById('quiz-loader');
     if(el) el.remove();
@@ -983,8 +925,6 @@ const QUIZ = {
   startWith(qsArr, mode, chapterName, scope=null){
     if(!qsArr || !qsArr.length){ toast('No questions to study'); return; }
     QUIZ._stopTimer();
-    /* Practice moves you forward: questions you have not seen yet come first
-       (stable order), so "20 questions" is the next 20, not the same 20. */
     if(mode !== 'exam' && !(scope && scope.weeklyId) && S.cov){
       const seenQ = q => {
         const uid = String((q && q.uid) || '');
@@ -1013,8 +953,6 @@ const QUIZ = {
     const modal = document.createElement('div');
     modal.id = 'quiz-limit-modal';
     modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:10000;padding:1.5rem;backdrop-filter:blur(4px)';
-    // Shuffle default UNCHECKED, and refused entirely for weekly sets —
-    // see _doStart's shuffle-lock comment.
     const isWeekly = !!(scope && scope.weeklyId);
     modal.innerHTML = `
       <div style="background:var(--c2);border:1px solid var(--bd);border-radius:var(--r3);padding:1.5rem;max-width:340px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true" aria-labelledby="qlm-title">
@@ -1052,14 +990,6 @@ const QUIZ = {
   },
 
   _doStart(qsArr, mode, chapterName, doShuffle=true, scope=null){
-    // Review mode + shuffle-lock:
-    //   Review mode: pre-fill S.quiz.ans from the recorded attempt so the
-    //     existing answered-option rendering lights up the right options.
-    //     reviewOnly makes fcAnswer/fcNav/fcFinish refuse to mutate state.
-    //   Shuffle-lock: any quiz with a weeklyId has shuffle FORCED OFF,
-    //     regardless of the picker. Otherwise the stored answers[] array
-    //     (indices into the shuffled order that was taken) can't stay
-    //     aligned with the freshly-fetched question array on review.
     const isWeekly = !!(scope && scope.weeklyId);
     const reviewMode = !!(scope && scope.weeklyReviewMode);
     const effectiveShuffle = isWeekly ? false : doShuffle;
@@ -1139,7 +1069,6 @@ const QUIZ = {
       if(failed>0) toast(`⚠️ ${failed} file(s) failed — challenge uses ${all.length} questions`);
       const qsArr = shuf(all).slice(0,30);
       QUIZ.startWith(qsArr, 'flashcard', '🌟 Daily Challenge');
-      /* the streak now counts once five answers are given (see PROG.track) */
     })();
   },
 
@@ -1164,8 +1093,6 @@ const QUIZ = {
     }
     toast('⏳ Building your adaptive practice set…');
     const need = TARGET - pool.length;
-    /* Weak-topic mode now actually targets weak chapters: files from chapters
-       where your accuracy is under 60% (with at least 5 answers) come first. */
     const _acc = ref => {
       const rec = S.chapStats[`${ChapterData.chapterName(ref.lv, ref.ch)} — ${ref.book}`];
       return (rec && rec.attempted >= 5) ? (rec.correct / rec.attempted) * 100 : null;
@@ -1208,8 +1135,6 @@ const QUIZ = {
   },
   _stopTimer(){ if(S.quiz.timer){ clearInterval(S.quiz.timer); S.quiz.timer=null; } },
 
-  /* Question grid for timed tests: jump anywhere, and see answered / blank /
-     marked-for-review at a glance. */
   toggleMark(qi){
     if(!S.quiz.marked) S.quiz.marked = new Set();
     if(S.quiz.marked.has(qi)) S.quiz.marked.delete(qi); else S.quiz.marked.add(qi);
@@ -1274,10 +1199,6 @@ const QUIZ = {
       if(snap) QUIZ._clearExamSnapshot();
       return;
     }
-    // Weekly sets are one-attempt-only — discard the snapshot silently,
-    // since resuming would bypass the one-shot rule.
-    /* v1.15: the start of a weekly test is recorded on the server, so a saved
-       test on this device may be resumed. Only drop it once already submitted. */
     if(snap.scope && snap.scope.weeklyId){
       const done = (typeof WEEKLY !== 'undefined' && WEEKLY.attempts && WEEKLY.attempts[snap.scope.weeklyId]);
       if(done){ QUIZ._clearExamSnapshot(); return; }
@@ -1312,7 +1233,6 @@ const QUIZ = {
       QUIZ._resumeSnapshot(snap, adjustedLeft);
     };
     document.getElementById('exam-discard-btn').onclick = async ()=>{
-      /* v1.27: native confirm() is unreliable inside an installed iOS PWA. */
       const ok = await ASK.confirm({
         title: 'Discard this exam?',
         body:  'You\u2019ll lose ' + answered + '/' + snap.qs.length + ' answered question' + (answered !== 1 ? 's' : '') + '. This cannot be undone.',
@@ -1396,7 +1316,6 @@ const QUIZ = {
     modal.addEventListener('click', e=>{ if(e.target===modal) close(); });
   },
 
-  /* ── FLASHCARD MODE ── */
   _renderFlashcard(){
     const q = S.quiz.qs[S.quiz.idx];
     if(!q)return;
@@ -1412,8 +1331,6 @@ const QUIZ = {
       else if(fcImgWrap){ fcImgWrap.style.display = 'none'; }
 
       const isStarred = REV.has('bk', q.uid), isFlagged = REV.has('fl', q.uid);
-      // In review mode, bookmark/flag/tag controls are hidden entirely —
-      // the student is viewing a locked attempt, not studying it.
       const reviewControls = S.quiz.reviewOnly ? '' : `
         <button class="ib ${isStarred?'bk-on':''}" onclick="QUIZ._star()" title="Bookmark" aria-label="Bookmark this question" aria-pressed="${isStarred?'true':'false'}"><i class="ph ph-star"></i></button>
         <button class="ib ${isFlagged?'fl-on':''}" onclick="QUIZ._flag()" title="Flag" aria-label="Flag this question" aria-pressed="${isFlagged?'true':'false'}"><i class="ph ph-flag"></i></button>
@@ -1460,10 +1377,6 @@ const QUIZ = {
 
       QUIZ._updateFcCounts();
 
-      /* v1.21: hard-question badge. The v1.20 patch added HARDQ (the
-         fetcher) and the load call, but nothing ever rendered the badge.
-         This is what makes it visible. Only shown when the server has at
-         least 20 attempts on this question and >=40% of them missed it. */
       try {
         const existing = document.getElementById('fc-hard');
         if (existing) existing.remove();
@@ -1483,9 +1396,6 @@ const QUIZ = {
 
       renderMath(document.getElementById('fc-wrap'));
 
-      /* v1.23: the note UI appears only AFTER the student has answered.
-         Showing "Add a note" before answering invites scribbling before
-         thinking. */
       try {
         if (typeof QNOTE !== 'undefined'){
           if (answered) QNOTE.render('fc-note', q.uid);
@@ -1493,13 +1403,10 @@ const QUIZ = {
         }
       } catch(e){}
 
-      /* v1.23: question history — "Seen Nx · M correct" */
       try {
         if (typeof QHIST !== 'undefined') QHIST.render('fc-hist', q.uid);
       } catch(e){}
 
-      /* v1.23: after a wrong answer, offer a mini-session of 5 questions
-         from the same file that share a keyword with this one. */
       try {
         const wrap = document.getElementById('fc-similar');
         if (wrap){
@@ -1535,8 +1442,6 @@ const QUIZ = {
     document.getElementById('fc-skip').textContent=skip;
   },
   fcAnswer(i){
-    // Review mode is read-only — never overwrite a recorded answer.
-    // Primary guard; the click handler above is defence in depth.
     if(S.quiz.reviewOnly) return;
     if(S.quiz.ans[S.quiz.idx]!==null)return;
     S.quiz.ans[S.quiz.idx]=i;
@@ -1547,8 +1452,6 @@ const QUIZ = {
     QUIZ._renderFlashcard();
   },
   fcNav(dir){
-    // Review mode: don't track shown state — there's no "skipped" concept
-    // when every answer is pre-filled from the recorded attempt.
     if(!S.quiz.reviewOnly){
       if(!S.quiz.shown) S.quiz.shown=new Set();
       S.quiz.shown.add(S.quiz.idx);
@@ -1562,8 +1465,6 @@ const QUIZ = {
   _star(){
     if(S.quiz.reviewOnly) return;
     const q=S.quiz.qs[S.quiz.idx];
-    /* v1.27: undo. A mis-tap on the star used to mean leaving the quiz to
-       find the bookmark in the review list. */
     const added = REV.toggle('bk', q);
     QUIZ._renderFlashcard();
     if(added && typeof toastUndo === 'function'){
@@ -1629,8 +1530,6 @@ const QUIZ = {
   fcFinish(){
     QUIZ._stopTimer();
     S.quiz.active=false;
-    // Review mode exits silently — no session recorded, no streak
-    // advanced, no results card.
     if(S.quiz.reviewOnly){
       document.getElementById('quiz-wrap').style.display = 'none';
       UI._goRaw('home');
@@ -1640,7 +1539,6 @@ const QUIZ = {
     QUIZ._showResults();
   },
 
-  /* ── EXAM MODE ── */
   _renderExam(){
     document.getElementById('ex-chip').textContent = '📝 ' + S.quiz.ch;
     document.getElementById('ex-tmr').textContent = fmt(S.quiz.left);
@@ -1709,15 +1607,12 @@ const QUIZ = {
   },
   async submitExam(){
     if (!S.quiz.active) return;
-    if (S.quiz._submitting) return;   // guard the confirm window itself
+    if (S.quiz._submitting) return;
     S.quiz._submitting = true;
     try {
       const unanswered = S.quiz.ans.filter(a => a === null).length;
       const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
 
-      /* v1.27: ASK.confirm, not confirm(). Inside an installed iOS PWA the
-         native dialog is silently suppressed, so the paper used to submit
-         even when the student tapped Cancel. */
       if (isWeekly) {
         const ok = await ASK.confirm({
           title: 'Submit your weekly set?',
@@ -1747,8 +1642,6 @@ const QUIZ = {
           if (correct) e.classList.add('shc');
           else if (oi2 === S.quiz.ans[qi]) e.classList.add('bad2');
         });
-        /* A skipped question is neither right nor wrong — it must not be
-           credited to the answered total, and must not enter the wrong bank. */
         if (S.quiz.ans[qi] === null) return;
         const correctPick = isOk(S.quiz.ans[qi], q.correct);
         PROG.track(correctPick);
@@ -1760,7 +1653,6 @@ const QUIZ = {
     }
   },
 
-  /* ── RETRY ── */
   retryWrong(){
     if(S.quiz.scope && S.quiz.scope.weeklyId){ toast('🔒 Weekly sets are one attempt only'); return; }
     const wrongIdx = S.quiz.qs.map((q,i)=>({q,i})).filter(({i})=>!isOk(S.quiz.ans[i], S.quiz.qs[i].correct));
@@ -1778,10 +1670,13 @@ const QUIZ = {
     S.quiz.qs.forEach((q,i)=>{ if(isOk(S.quiz.ans[i], q.correct)) correct++; });
     const wrong = S.quiz.ans.filter((a,i)=> a!==null && !isOk(a,S.quiz.qs[i].correct)).length;
     const skipped = S.quiz.ans.filter(a=>a===null).length;
-        const rawPct = total ? Math.round((correct/total)*100) : 0;
+
     /* v1.33: weekly tests use Loksewa negative marking. Every other quiz
        type (chapter practice, daily, mock, review) keeps the plain
-       percentage, so this check is scoped to weeklyId only. */
+       percentage, so this check is scoped to weeklyId only. The single
+       `isWeekly` here is reused further down when recording the attempt,
+       to avoid a duplicate-const syntax error. */
+    const rawPct = total ? Math.round((correct/total)*100) : 0;
     const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
     const loksewa = (isWeekly && total)
       ? Math.round(((correct - wrong * 0.2) / total) * 1000) / 10
@@ -1793,8 +1688,6 @@ const QUIZ = {
     document.getElementById('res-chap').textContent = S.quiz.ch;
     const grade = pct>=90?'🏆 Outstanding!':pct>=75?'🎯 Great job!':pct>=50?'👍 Keep practicing':'📚 Needs more review';
     document.getElementById('res-grade').textContent = grade;
-    /* Loksewa-style score: each wrong answer costs 0.2 of a mark. Shown as an
-       extra line; the main percentage above is unchanged. */
     let negEl = document.getElementById('res-neg');
     if(!negEl){
       negEl = document.createElement('div');
@@ -1803,8 +1696,6 @@ const QUIZ = {
       negEl.style.marginTop = '.3rem';
       document.getElementById('res-grade').after(negEl);
     }
-    /* v1.24: on the Loksewa mock, show the score plainly with rules and
-       the pass verdict. Other quizzes keep the old one-liner. */
     if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock){
       const score = correct - wrong * 0.2;
       const pctLok = total ? Math.round((score / total) * 1000) / 10 : 0;
@@ -1830,11 +1721,6 @@ const QUIZ = {
       <div class="sc"><div class="sv ta2">${skipped}</div><div class="stat-lbl">Skipped</div></div>
     `;
 
-    /* v1.29: marks-by-chapter breakdown on the Loksewa mock paper. Groups
-       every question by its chapter (derived from the question uid), scores
-       each chapter with the same +1/−0.2 rule, and flags chapters under
-       40% as needing revision. Runs only for the mock — ordinary quizzes
-       are untouched. */
     try {
       if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock) {
         const groups = {};
@@ -1859,7 +1745,7 @@ const QUIZ = {
           const score = g.correct - g.wrong * 0.2;
           const pct = g.total ? Math.round((score / g.total) * 100) : 0;
           return Object.assign({}, g, { score, pct });
-        }).sort((a, b) => a.pct - b.pct);   /* worst first */
+        }).sort((a, b) => a.pct - b.pct);
 
         const rowsHtml = rows.map(r => {
           const cls = r.pct >= 60 ? 'color:var(--success)'
@@ -1879,9 +1765,6 @@ const QUIZ = {
 
         const weak = rows.filter(r => r.pct < 40 && r.total >= 2);
 
-        /* v1.28: Loksewa grades by group — A/B/C/D, 30/25/25/20. Add a
-           group-marks table above the chapter table so the student sees
-           the paper the way the commission will. */
         const groupMap = (window.WEEKLY && window.WEEKLY.LOKSEWA_GROUPS) || {};
         const byGroup = {};
         (S.quiz.qs || []).forEach((q, i) => {
@@ -1978,9 +1861,6 @@ const QUIZ = {
       }
     } catch(e){ console.warn('[chapter breakdown] failed:', e); }
 
-    /* v1.21: answer-changed line. Shown only if the student changed at
-       least one pick during the exam. Tells them how many went right→wrong
-       (overthinking) vs wrong→right (second thoughts that helped). */
     try {
       const changed = S.quiz.changed || {};
       const idxs = Object.keys(changed);
@@ -2049,10 +1929,12 @@ const QUIZ = {
     PROG.recordSession(sessionObj);
     CHAPSTATS.record(sessionObj);
 
-    // Weekly set: capture the score. Only the FIRST attempt is synced to
-    // the server; retakes stay on this device for the "last time you got
-    // X" prompt. The retry button always offers "Practice again".
-    const isWeekly = !!(scope.weeklyId);
+    /* Weekly set: capture the score. Only the FIRST attempt is synced to
+       the server; retakes stay on this device for the "last time you got
+       X" prompt. The retry button always offers "Practice again".
+       v1.34: `isWeekly` is already declared above (Loksewa scoring
+       section) — reused here. Declaring it a second time with `const`
+       is a syntax error that stops the entire file from loading. */
     const isRetake = !!(scope.weeklyRetake);
     if(isWeekly){
       WEEKLY._recordAttempt(S.quiz, { total, correct, wrong, skipped, pct });
@@ -2085,11 +1967,7 @@ const QUIZ = {
   }
 };
 
-/* ═══════════════ KEYBOARD — quiz controls ═══════════════
-   Handles A/B/C/D, 1-5, ←/→, and Escape while a quiz is active.
-   Escape opens the exit-guard modal (via QUIZ.quit()) — the patch
-   layer in user.html also handles Escape for the sidebar and any open
-   shared modal, and both listeners running is harmless. */
+/* ═══════════════ KEYBOARD — quiz controls ═══════════════ */
 document.addEventListener('keydown', e=>{
   if(!S.quiz.active) return;
   if(document.getElementById('quiz-wrap').style.display==='none') return;
@@ -2097,8 +1975,8 @@ document.addEventListener('keydown', e=>{
   const tag = (e.target && e.target.tagName) || '';
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   if(e.key==='Escape'){ if(S.quiz.active) QUIZ.quit(); return; }
-  if(e.ctrlKey || e.metaKey || e.altKey) return;   // Ctrl+C / Ctrl+A must never answer a question
-  if(S.quiz.reviewOnly) return;   // review mode has no keyboard answering
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  if(S.quiz.reviewOnly) return;
   if(S.quiz.mode!=='exam'){
     if(e.key==='ArrowRight') QUIZ.fcNav(1);
     if(e.key==='ArrowLeft') QUIZ.fcNav(-1);
@@ -2114,9 +1992,7 @@ document.addEventListener('keydown', e=>{
   }
 });
 
-/* ═══════════════ GLOBAL EXPOSURE ═══════════════
-   These are the entry points referenced from HTML onclick handlers
-   and from other modules loaded after this one. */
+/* ═══════════════ GLOBAL EXPOSURE ═══════════════ */
 window.QUIZ = QUIZ;
 window.ON = ON;
 window.LOC = LOC;
