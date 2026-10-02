@@ -1901,6 +1901,17 @@ const APP = {
     this.toast('Logged out.');
   },
 
+  /* v1.28: on boot, if a queued payment exists for the signed-in user,
+     try to flush it, then update the payment screen banner. */
+  _bootQueue(){
+    try {
+      PAY_QUEUE.paint();
+      if (this.session && this.session.username){
+        setTimeout(() => PAY_QUEUE.process().catch(() => {}), 800);
+      }
+    } catch(e){}
+  },
+
   /* ── Chrome ─────────────────────────────────────────────────────── */
   LABELS: {
     'btn-login':'Sign in',
