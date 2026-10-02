@@ -104,7 +104,8 @@ function initDefaultSettings_() {
     ["paymentAmount", "100"],
     ["paymentInstructions", "Scan the QR code and submit your transaction ID for verification."],
     ["trialHours", "24"],
-    ["appName", "Abhyas"]
+    ["appName", "Abhyas"],
+    ["adminEmail", ""]
   ];
   const toAdd = defaults.filter(([k]) => !have.has(k));
   if (!toAdd.length) return;
@@ -173,5 +174,13 @@ function ensurePushTriggers_() {
   /* v1.11: daily housekeeping for Script Properties. */
   if (!triggers.some(t => t.getHandlerFunction() === "cleanupExpiredProperties")) {
     ScriptApp.newTrigger("cleanupExpiredProperties").timeBased().everyDays(1).atHour(3).create();
+  }
+  /* v1.22: weekly admin summary email, Sundays at 08:00. */
+  if (!triggers.some(t => t.getHandlerFunction() === "sendWeeklyAdminSummary")) {
+    ScriptApp.newTrigger("sendWeeklyAdminSummary")
+      .timeBased()
+      .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+      .atHour(8)
+      .create();
   }
 }

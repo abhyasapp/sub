@@ -102,7 +102,11 @@ const TIMERS = {
   solveSecondsFor10: 20 * 60,
   solveSecondsFallback: 15 * 60,
   uploadSeconds: 10 * 60,
-  examSeconds:  3 * 60 * 60
+  examSeconds:  3 * 60 * 60,
+  /* v1.32: after the 3-hour write window, students get a fixed window to
+     photograph/scan their answers and upload the PDF. Mirrors the QOTD
+     two-phase model. */
+  examUploadSeconds: 20 * 60
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1066,9 +1070,12 @@ function _generateExam(){
     }
     sections.push({ group: key, name: meta.name, targetMarks: meta.marks, questions: picked });
   }
+  const now = Date.now();
   return {
-    generatedAt: Date.now(),
-    deadlineAt: Date.now() + TIMERS.examSeconds * 1000,
+    generatedAt: now,
+    deadlineAt: now + TIMERS.examSeconds * 1000,
+    /* v1.32: the upload window opens when the write timer hits zero. */
+    uploadEndsAt: now + (TIMERS.examSeconds + TIMERS.examUploadSeconds) * 1000,
     sections,
     submitted: false,
     submittedAt: 0
@@ -1088,6 +1095,12 @@ function _renderExam(){
       BANK.error || 'No written questions have been added yet.',
       BANK.error ? _retryBtn : '');
     return;
+  }
+
+  /* v1.32: migrate an EXAM saved before uploadEndsAt existed. */
+  if(EXAM && EXAM.deadlineAt && !EXAM.uploadEndsAt){
+    EXAM.uploadEndsAt = EXAM.deadlineAt + TIMERS.examUploadSeconds * 1000;
+    _persistExam();
   }
 
   if(EXAM && EXAM.submitted){
@@ -1122,7 +1135,8 @@ function _renderExam(){
         <p style="font-size:.78rem;color:var(--t3);line-height:1.6;margin-bottom:.85rem">
           A full paper: 30 marks Structure+Geotech, 25 Water Resource, 25 Transportation,
           20 Public Health &amp; Misc — matching the Loksewa L7 Civil pattern. You get
-          <b>3 hours</b>; upload the scanned answer as a single PDF when done.
+          <b>3 hours</b> to write, then <b>20 minutes</b> to photograph your answers and
+          upload a single PDF. Submit before the upload window closes.
         </p>
         <button class="btn btn-solid btn-lg btn-blk" onclick="SUBJ._examGenerate()">
           <i class="ph ph-dice-five"></i> Generate a Random Paper
@@ -1132,19 +1146,32 @@ function _renderExam(){
     return;
   }
 
-  const leftSec = Math.max(0, Math.round((EXAM.deadlineAt - Date.now()) / 1000));
+  const _now = Date.now();
+  const _writing = _now < EXAM.deadlineAt;
+  const _uploading = !_writing && _now < EXAM.uploadEndsAt;
+  const _expired = !_writing && !_uploading;
+  const writeLeftSec  = Math.max(0, Math.round((EXAM.deadlineAt  - _now) / 1000));
+  const uploadLeftSec = Math.max(0, Math.round((EXAM.uploadEndsAt - _now) / 1000));
+
+  const _phaseLabel = _writing ? 'Total exam time left'
+                    : _uploading ? 'Upload window closes in'
+                    : 'Time is up';
+  const _phaseClass = _uploading ? ' upload' : '';
+  const _timerText  = _writing ? _fmtHMS(writeLeftSec) : _fmtHMS(uploadLeftSec);
+  const _urgent = (_writing && writeLeftSec < 300) || (_uploading && uploadLeftSec < 120);
+
   const parts = [];
   parts.push(`
     <div class="card">
       <div class="qotd-head">
         <div>
-          <div class="qotd-meta">Proper Exam — In Progress</div>
+          <div class="qotd-meta">Proper Exam — ${_writing ? 'In Progress' : _uploading ? 'Upload Phase' : 'Time is Up'}</div>
           <div style="font-size:1rem;font-weight:800;color:var(--t1);margin-top:.15rem">Full 100-Mark Paper</div>
         </div>
         <div class="qotd-marks">100</div>
       </div>
-      <div class="qotd-timer ${leftSec < 300 ? 'urgent' : ''}" id="exam-tmr">${_fmtHMS(leftSec)}</div>
-      <div class="qotd-timer-lbl">Total exam time left</div>
+      <div class="qotd-timer${_phaseClass}${_urgent ? ' urgent' : ''}" id="exam-tmr">${_timerText}</div>
+      <div class="qotd-timer-lbl" id="exam-tmr-lbl">${_phaseLabel}</div>
     </div>`);
 
   EXAM.sections.forEach(sec => {
@@ -1162,23 +1189,38 @@ function _renderExam(){
       </div>`);
   });
 
-  parts.push(`
-    <div class="card">
-      <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload Answer PDF</h3></div>
-      <label class="qotd-drop" for="exam-pdf">
-        <input type="file" id="exam-pdf" accept="application/pdf,.pdf,image/*" multiple onchange="SUBJ._examFile(this)">
-        <span class="ii"><i class="ph ph-file-pdf"></i></span>
-        <span class="dn">Choose photos or a PDF of your paper</span>
-        <span class="ds">Select all page photos at once (or one PDF), under 8 MB</span>
-      </label>
-      <div id="exam-file-slot"></div>
-      <button class="btn btn-solid btn-lg btn-blk" id="exam-submit" style="margin-top:.7rem" ${_pendingExamFile ? '' : 'disabled'} onclick="SUBJ._examSubmit()">
-        <i class="ph ph-paper-plane-tilt"></i> Submit Paper for Grading
-      </button>
-      <button class="btn btn-r btn-blk" style="margin-top:.5rem" onclick="SUBJ._examReset()">
-        <i class="ph ph-arrow-counter-clockwise"></i> Discard &amp; Start Over
-      </button>
-    </div>`);
+  if(_expired){
+    parts.push(`
+      <div class="card">
+        <div class="card-hd"><h3><i class="ph ph-clock-countdown"></i> Time is up</h3></div>
+        <div class="banner banner-danger" style="margin:0 0 var(--sp-3)">
+          <i class="ph ph-clock-countdown"></i>
+          <span>The 3-hour writing window and the ${Math.round(TIMERS.examUploadSeconds/60)}-minute upload window for this paper have both closed. Start a fresh paper to try again.</span>
+        </div>
+        <button class="btn btn-r btn-blk" onclick="SUBJ._examReset()">
+          <i class="ph ph-arrow-counter-clockwise"></i> Start a Fresh Paper
+        </button>
+      </div>`);
+  } else {
+    parts.push(`
+      <div class="card">
+        <div class="card-hd"><h3><i class="ph ph-file-arrow-up"></i> Upload Answer PDF</h3></div>
+        ${_uploading ? '<div class="banner banner-warning" style="margin-bottom:var(--sp-3)"><i class="ph ph-hourglass"></i><span><b>Writing time is over.</b> Upload your paper \u2014 the window closes in ' + _fmtHMS(uploadLeftSec) + '.</span></div>' : ''}
+        <label class="qotd-drop" for="exam-pdf">
+          <input type="file" id="exam-pdf" accept="application/pdf,.pdf,image/*" multiple onchange="SUBJ._examFile(this)">
+          <span class="ii"><i class="ph ph-file-pdf"></i></span>
+          <span class="dn">Choose photos or a PDF of your paper</span>
+          <span class="ds">Select all page photos at once (or one PDF), under 8 MB</span>
+        </label>
+        <div id="exam-file-slot"></div>
+        <button class="btn btn-solid btn-lg btn-blk" id="exam-submit" style="margin-top:.7rem" ${_pendingExamFile ? '' : 'disabled'} onclick="SUBJ._examSubmit()">
+          <i class="ph ph-paper-plane-tilt"></i> Submit Paper for Grading
+        </button>
+        <button class="btn btn-r btn-blk" style="margin-top:.5rem" onclick="SUBJ._examReset()">
+          <i class="ph ph-arrow-counter-clockwise"></i> Discard &amp; Start Over
+        </button>
+      </div>`);
+  }
 
   body.innerHTML = parts.join('');
   if(_pendingExamFile){
@@ -1193,18 +1235,57 @@ function _renderExam(){
   _startExamTick();
 }
 
+/* v1.32: phase-aware countdown. The timer first counts the 3-hour write
+   window, then the 20-minute upload window, then stops. Phase changes
+   trigger a single re-render each, so the card header and labels swap
+   correctly without a full-page refresh. */
 function _startExamTick(){
   _stopExamTick();
   _examTick = setInterval(() => {
     if(!EXAM || EXAM.submitted){ _stopExamTick(); return; }
-    const el = $('exam-tmr');
+    const el  = $('exam-tmr');
+    const lbl = $('exam-tmr-lbl');
     if(!el){ _stopExamTick(); return; }
-    const left = Math.max(0, Math.round((EXAM.deadlineAt - Date.now()) / 1000));
-    el.textContent = _fmtHMS(left);
-    el.classList.toggle('urgent', left < 300);
-    if(left <= 0){
-      _stopExamTick();
-      toast('⏰ Exam time up — upload your PDF now.', 6000);
+
+    const now = Date.now();
+    const writing   = now < EXAM.deadlineAt;
+    const uploading = !writing && now < EXAM.uploadEndsAt;
+    const expired   = !writing && !uploading;
+
+    if(writing){
+      const left = Math.max(0, Math.round((EXAM.deadlineAt - now) / 1000));
+      el.textContent = _fmtHMS(left);
+      el.classList.remove('upload');
+      el.classList.toggle('urgent', left < 300);
+      if(lbl) lbl.textContent = 'Total exam time left';
+      if(left <= 0 && !EXAM._enteredUpload){
+        EXAM._enteredUpload = true;
+        _persistExam();
+        toast('⏰ Writing time is up — upload your PDF now. You have ' + Math.round(TIMERS.examUploadSeconds/60) + ' minutes.', 8000);
+        _renderExam();
+      }
+    } else if(uploading){
+      const left = Math.max(0, Math.round((EXAM.uploadEndsAt - now) / 1000));
+      el.textContent = _fmtHMS(left);
+      el.classList.add('upload');
+      el.classList.toggle('urgent', left < 120);
+      if(lbl) lbl.textContent = 'Upload window closes in';
+      if(!EXAM._enteredUpload){
+        EXAM._enteredUpload = true;
+        _persistExam();
+        _renderExam();
+      }
+    } else if(expired){
+      el.textContent = '00:00:00';
+      el.classList.remove('urgent', 'upload');
+      if(lbl) lbl.textContent = 'Time is up';
+      if(!EXAM._enteredExpired){
+        EXAM._enteredExpired = true;
+        _persistExam();
+        toast('⏰ Upload window closed. This paper cannot be submitted.', 8000);
+        _stopExamTick();
+        _renderExam();
+      }
     }
   }, 1000);
 }
@@ -1296,6 +1377,12 @@ function _examClearFile(){
 
 async function _examSubmit(){
   if(!EXAM || !_pendingExamFile){ toast('Attach the PDF first'); return; }
+  /* v1.32: the exam now has two windows — 3 hours to write, then 20 minutes
+     to upload. Submitting past the upload window is refused. */
+  if(EXAM.uploadEndsAt && Date.now() > EXAM.uploadEndsAt){
+    toast('❌ The upload window for this paper has closed. Start a fresh paper from the Full paper tab.', 7000);
+    return;
+  }
   const btn = $('exam-submit');
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Uploading…'; }
 

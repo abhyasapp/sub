@@ -564,8 +564,27 @@ const REV = {
   /* v1.22: per-list free-text filter. Populated by the search inputs on the
      Saved / Flagged / Missed views. Empty string means "show everything". */
   _filters: { bk: '', fl: '', wr: '' },
+
+  /* v1.27: persist the filters across view switches (sessionStorage only —
+     a closed tab starts clean). Before this, a search typed in Saved was
+     lost the moment the student hopped to Home. */
+  _FILTERS_KEY: 'abhyas_rev_filters',
+  _loadFilters(){
+    try {
+      const raw = sessionStorage.getItem(this._FILTERS_KEY);
+      if (!raw) return;
+      const o = JSON.parse(raw);
+      if (!o || typeof o !== 'object') return;
+      ['bk','fl','wr'].forEach(k => { if (typeof o[k] === 'string') this._filters[k] = o[k]; });
+    } catch(e){}
+  },
+  _saveFilters(){
+    try { sessionStorage.setItem(this._FILTERS_KEY, JSON.stringify(this._filters)); } catch(e){}
+  },
+
   filterList(kind, term){
     this._filters[kind] = String(term || '').toLowerCase().trim();
+    this._saveFilters();
     if (kind === 'wr' && typeof WRONGBY !== 'undefined' && WRONGBY.render) WRONGBY.render();
     else this.renderList(kind);
   },
@@ -639,6 +658,12 @@ const REV = {
 
   renderList(kind){
     let arr = REV._store(kind);
+    /* v1.27: restore the persisted filter and paint it back into the search
+       box so a returning student sees why the list is short. */
+    REV._loadFilters();
+    const _inputId = kind === 'bk' ? 'bk-search' : kind === 'fl' ? 'fl-search' : 'wr-search';
+    const _input = document.getElementById(_inputId);
+    if (_input && _input.value !== REV._filters[kind]) _input.value = REV._filters[kind];
     /* v1.22: if the student has typed a search, filter before rendering. */
     const filter = this._filters[kind] || '';
     if (filter) arr = arr.filter(q => this._matches(q, filter));
@@ -1682,37 +1707,57 @@ const QUIZ = {
     }
     toast('🎉 Nothing left unanswered');
   },
-  submitExam(){
-    if(!S.quiz.active)return;
-    const unanswered = S.quiz.ans.filter(a=>a===null).length;
-    const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
-    // Weekly exams get a much sterner confirmation — once submitted, the
-    // attempt is final and the student can only review.
-    if(isWeekly && !confirm(
-      `Submit your WEEKLY SET attempt?\n\n` +
-      `You only get one attempt — after this you can only review your answers.\n` +
-      `${unanswered} question${unanswered===1?'':'s'} left unanswered.`
-    )) return;
-    if(!isWeekly && unanswered>0 && S.quiz.left>0 && !confirm(`${unanswered} question(s) unanswered. Submit anyway?`))return;
-    QUIZ._stopTimer();
-    QUIZ._clearExamSnapshot();
-    S.quiz.active=false;
-    STREAK.markToday();
-    S.quiz.qs.forEach((q,qi)=>{
-      document.querySelectorAll(`#eqc-${qi} .eo`).forEach((e,oi2)=>{
-        e.style.pointerEvents='none';
-        const correct = isOk(oi2,q.correct);
-        if(correct) e.classList.add('shc');
-        else if(oi2===S.quiz.ans[qi]) e.classList.add('bad2');
+  async submitExam(){
+    if (!S.quiz.active) return;
+    if (S.quiz._submitting) return;   // guard the confirm window itself
+    S.quiz._submitting = true;
+    try {
+      const unanswered = S.quiz.ans.filter(a => a === null).length;
+      const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
+
+      /* v1.27: ASK.confirm, not confirm(). Inside an installed iOS PWA the
+         native dialog is silently suppressed, so the paper used to submit
+         even when the student tapped Cancel. */
+      if (isWeekly) {
+        const ok = await ASK.confirm({
+          title: 'Submit your weekly set?',
+          body: 'You only get ONE attempt at this weekly set. After you submit you can only review your answers. ' +
+                (unanswered > 0 ? unanswered + ' question' + (unanswered === 1 ? '' : 's') + ' still unanswered.' : 'Every question is answered.'),
+          ok: 'Submit paper',
+          danger: true
+        });
+        if (!ok) return;
+      } else if (unanswered > 0 && S.quiz.left > 0) {
+        const ok = await ASK.confirm({
+          title: 'Submit with blanks?',
+          body: unanswered + ' question' + (unanswered === 1 ? '' : 's') + ' left unanswered. Submit anyway?',
+          ok: 'Submit'
+        });
+        if (!ok) return;
+      }
+
+      QUIZ._stopTimer();
+      QUIZ._clearExamSnapshot();
+      S.quiz.active = false;
+      STREAK.markToday();
+      S.quiz.qs.forEach((q, qi) => {
+        document.querySelectorAll(`#eqc-${qi} .eo`).forEach((e, oi2) => {
+          e.style.pointerEvents = 'none';
+          const correct = isOk(oi2, q.correct);
+          if (correct) e.classList.add('shc');
+          else if (oi2 === S.quiz.ans[qi]) e.classList.add('bad2');
+        });
+        /* A skipped question is neither right nor wrong — it must not be
+           credited to the answered total, and must not enter the wrong bank. */
+        if (S.quiz.ans[qi] === null) return;
+        const correctPick = isOk(S.quiz.ans[qi], q.correct);
+        PROG.track(correctPick);
+        REV.trackAnswer(q, correctPick);
       });
-      /* A skipped question is neither right nor wrong — it must not be
-         credited to the answered total, and must not enter the wrong bank. */
-      if (S.quiz.ans[qi] === null) return;
-      const correctPick = isOk(S.quiz.ans[qi], q.correct);
-      PROG.track(correctPick);
-      REV.trackAnswer(q, correctPick);
-    });
-    QUIZ._showResults();
+      QUIZ._showResults();
+    } finally {
+      S.quiz._submitting = false;
+    }
   },
 
   /* ── RETRY ── */

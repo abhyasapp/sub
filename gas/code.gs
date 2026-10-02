@@ -75,7 +75,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.20";
+const APP_VERSION = "1.31";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -188,6 +188,45 @@ const MAX_REPORT_MIN_ATTEMPTS = 1000000;
 
 const TRIAL_WARNING_WINDOW_MS = 2 * 60 * 60 * 1000;
 
+/* ── v1.21: every system folder lives under one parent ──
+   Before this, PaymentScreenshots / SubjectiveAnswers / WeeklySets / … were
+   created at the Drive root. New folders go under "Abhyas System Data".
+   Existing flat folders are adopted transparently the first time they are
+   touched, so nothing is orphaned. */
+const SYSTEM_FOLDER_NAME = "Abhyas System Data";
+
+function getOrCreateSystemFolder_(name) {
+  const props = PropertiesService.getScriptProperties();
+  let parentId = props.getProperty("SYSTEM_FOLDER_ID");
+  let parent = null;
+  if (parentId) { try { parent = DriveApp.getFolderById(parentId); } catch (e) { parent = null; } }
+  if (!parent) {
+    const it = DriveApp.getFoldersByName(SYSTEM_FOLDER_NAME);
+    parent = it.hasNext() ? it.next() : DriveApp.createFolder(SYSTEM_FOLDER_NAME);
+    props.setProperty("SYSTEM_FOLDER_ID", parent.getId());
+  }
+  const sub = parent.getFoldersByName(name);
+  if (sub.hasNext()) return sub.next();
+  const flat = DriveApp.getFoldersByName(name);
+  if (flat.hasNext()) {
+    const legacy = flat.next();
+    try { legacy.moveTo(parent); } catch (e) { /* read-only or already moved */ }
+    return legacy;
+  }
+  return parent.createFolder(name);
+}
+
+/* v1.21: YYYY-MM-DD_HHmmss_username_kind.ext — sortable, stable across devices. */
+function _uploadFilename_(username, kind, ext) {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const stamp = d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate())
+              + "_" + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + pad(d.getUTCSeconds());
+  const safeUser = String(username || "user").replace(/[^\w.\-]+/g, "_").slice(0, 40);
+  const safeKind = String(kind || "file").replace(/[^\w.\-]+/g, "_").slice(0, 24);
+  return stamp + "_" + safeUser + "_" + safeKind + "." + String(ext || "bin").replace(/^\./, "");
+}
+
 /* Input length caps */
 const MAX_USERNAME_LEN = 64;
 const MAX_PASSWORD_LEN = 256;
@@ -245,6 +284,7 @@ const POST_ONLY_ACTIONS = {
 const _sheetRefCache = {};
 const _sheetDataCache = {};
 const _migratedSheets = {};
+let _adminStatsCache = null;    /* v1.27: 30-second cache for the dashboard */
 
 function _invalidateSheet_(name) { delete _sheetDataCache[name]; }
 
@@ -2317,8 +2357,9 @@ function saveScreenshot_(username, data) {
       const bytes = Utilities.base64Decode(data.slice(data.indexOf(",") + 1));
       const type = detectImageType_(bytes);
       if (!type) { console.log("Screenshot ignored: not a recognised image."); return { url: "" }; }
-      const blob = Utilities.newBlob(bytes, type.mime, username + "_payment_" + Date.now() + "." + type.ext);
-      const file = getOrCreateFolder_("PaymentScreenshots").createFile(blob);
+      const name = _uploadFilename_(username, "payment", type.ext);
+      const blob = Utilities.newBlob(bytes, type.mime, name);
+      const file = getOrCreateSystemFolder_("PaymentScreenshots").createFile(blob);
       return { url: file.getDownloadUrl() };
     } catch (e) { console.log("Screenshot upload failed: " + e.message); return { url: "" }; }
   }
@@ -2557,8 +2598,9 @@ function adminUploadWeeklySetFile(p) {
   } catch (e) { return { success: false, error: "That file isn't valid JSON — check the format." }; }
 
   try {
-    const blob = Utilities.newBlob(jsonText, "application/json", filename);
-    const folder = getOrCreateFolder_("WeeklySets");
+    const safeName = _uploadFilename_(chk.actor, "weeklyset", "json");
+    const blob = Utilities.newBlob(jsonText, "application/json", safeName);
+    const folder = getOrCreateSystemFolder_("WeeklySets");
     const file = folder.createFile(blob);
     /* v1.14: files stay PRIVATE. The script reads them as owner, so no public link is needed. */
     logAction_(chk.actor, "Upload Weekly Set File", filename, "fileId: " + file.getId());
@@ -2658,7 +2700,8 @@ function adminListWeeklySets(p) {
   const totalCount = Math.max(0, data.length - 1);
   const limit = Math.min(totalCount, MAX_LIST_WEEKLYSETS);
   const sets = [];
-  for (let i = 1; i <= limit; i++) sets.push(rowToWeeklySet_(data[i]));
+  /* v1.26: newest-first */
+  for (let i = data.length - 1; i >= data.length - limit; i--) sets.push(rowToWeeklySet_(data[i]));
   sets.sort((a, b) => new Date(a.releaseAt) - new Date(b.releaseAt));
   return { success: true, sets, totalCount, truncated: totalCount > MAX_LIST_WEEKLYSETS };
 }
@@ -3002,8 +3045,8 @@ function submitSubjectiveAnswer(p) {
      so several students uploading at once no longer cause "server busy". */
   let pdfFileId = "", pdfUrl = "";
   try {
-    const safeName = `${username}_${kind}_${Date.now()}.pdf`;
-    const folder = getOrCreateFolder_("SubjectiveAnswers");
+    const safeName = _uploadFilename_(username, kind, "pdf");
+    const folder = getOrCreateSystemFolder_("SubjectiveAnswers");
     const blob = Utilities.newBlob(parsed.bytes, "application/pdf", safeName);
     const file = folder.createFile(blob);
     pdfFileId = file.getId();
@@ -3378,9 +3421,8 @@ function adminReplaceSubmissionPdf(p) {
     let backupId = String(row[19] || "").trim();
     if (!backupId) {
       try {
-        const folder = getOrCreateFolder_("SubjectivePdfBackups");
-        const backupName = "backup_" + id.slice(0, 8) + "_" + Date.now() + "_" +
-                           (file.getName() || "submission.pdf");
+        const folder = getOrCreateSystemFolder_("SubjectivePdfBackups");
+        const backupName = _uploadFilename_("backup", id.slice(0, 8), "pdf");
         backupId = file.makeCopy(backupName, folder).getId();
       } catch (e) {
         /* A failed backup shouldn't block the replace — but log it so
@@ -3474,7 +3516,8 @@ function adminListQuestionReports(p) {
   const totalCount = Math.max(0, data.length - 1);
   const limit = Math.min(totalCount, MAX_LIST_QREPORTS);
   const reports = [];
-  for (let i = 1; i <= limit; i++) reports.push(rowToQReport_(data[i]));
+  /* v1.26: newest-first */
+  for (let i = data.length - 1; i >= data.length - limit; i--) reports.push(rowToQReport_(data[i]));
   reports.sort((a, b) => {
     if (a.status === "open" && b.status !== "open") return -1;
     if (a.status !== "open" && b.status === "open") return 1;
@@ -3535,7 +3578,9 @@ function adminListUsers(p) {
   const totalCount = Math.max(0, data.length - 1);
   const limit = Math.min(totalCount, MAX_LIST_USERS);
   const users = [];
-  for (let i = 1; i <= limit; i++) users.push(rowToUser_(data[i]));
+  /* v1.26: newest-first. Before this, row 2 upward stopped at MAX_LIST_USERS,
+     so once a busy install passed that many signups the newest were invisible. */
+  for (let i = data.length - 1; i >= data.length - limit; i--) users.push(rowToUser_(data[i]));
   return { success: true, users, totalCount, truncated: totalCount > MAX_LIST_USERS };
 }
 
@@ -3979,7 +4024,9 @@ function adminListPayments(p) {
 
   const limit = Math.min(totalCount, MAX_LIST_PAYMENTS);
   const payments = [];
-  for (let i = 1; i <= limit; i++) {
+  /* v1.26: newest-first — the OUTPUT is capped, the txId-duplicate scan above
+     still covers every row. */
+  for (let i = data.length - 1; i >= data.length - limit; i--) {
     const txId = String(data[i][4] || "");
     const username = String(data[i][0] || "");
     const owners = txIdOwners[txId.trim().toLowerCase()];
@@ -4221,6 +4268,13 @@ function adminStats(p) {
   const chk = checkAdminCan_(p, "dashboard");
   if (!chk.ok) return { success: false, error: chk.error };
 
+  /* v1.27: the dashboard polls this every 60 s. Without a cache it read every
+     Users row plus every Payments row on every poll. 30 s is well under the
+     poll interval and short enough that a new signup still appears promptly. */
+  if (_adminStatsCache && Date.now() - _adminStatsCache.at < 30000) {
+    return _adminStatsCache.payload;
+  }
+
   const userData = _cachedSheetData_(USERS_SHEET, getUsersSheet_).data;
   const payData = _cachedSheetData_(PAYMENTS_SHEET, getPaymentsSheet_).data;
 
@@ -4241,13 +4295,15 @@ function adminStats(p) {
     else if (s === "verified") verified++;
     else if (s === "rejected") rejected++;
   }
-  return {
+  const payload = {
     success: true,
     stats: {
       users: { total, trial, active, expired, paymentPending: pendingPay },
       payments: { total: totalPay, pending, verified, rejected }
     }
   };
+  _adminStatsCache = { at: Date.now(), payload };
+  return payload;
 }
 
 function adminListLogs(p) {
@@ -5147,6 +5203,82 @@ function nudgeInactiveUsers() {
   console.log("nudgeInactiveUsers: sent " + sent + " nudge(s).");
   return "Sent " + sent + " nudge(s).";
 }
+
+/* ── v1.22: weekly admin summary ──
+   Runs Sundays 08:00 via setup.gs. Lists new signups, payments and open
+   question reports, so the owner has one place to see what needs attention. */
+function sendWeeklyAdminSummary() {
+  const ss = getSpreadsheet_();
+  const owner = (function () {
+    const data = getAdminsSheet_().getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][6] || "").toLowerCase() === ADMIN_ROLE_OWNER) return String(data[i][0]);
+    }
+    return ADMIN_SEED_USERNAME;
+  })();
+
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const userData = _cachedSheetData_(USERS_SHEET, getUsersSheet_).data;
+  const payData  = _cachedSheetData_(PAYMENTS_SHEET, getPaymentsSheet_).data;
+  const repData  = _cachedSheetData_(QREPORTS_SHEET, getQReportsSheet_).data;
+
+  let newUsers = 0, active = 0, trial = 0;
+  for (let i = 1; i < userData.length; i++) {
+    const created = new Date(userData[i][8]).getTime();
+    if (!isNaN(created) && created >= weekAgo) newUsers++;
+    const s = userData[i][7];
+    if (s === "active") active++;
+    else if (s === "trial") trial++;
+  }
+  let pendPay = 0, verifiedThisWeek = 0, rejectedThisWeek = 0;
+  for (let i = 1; i < payData.length; i++) {
+    const s = payData[i][6];
+    if (s === "pending") { pendPay++; continue; }
+    const reviewed = new Date(payData[i][10]).getTime();
+    if (!isNaN(reviewed) && reviewed >= weekAgo) {
+      if (s === "verified") verifiedThisWeek++;
+      else if (s === "rejected") rejectedThisWeek++;
+    }
+  }
+  let openReports = 0;
+  for (let i = 1; i < repData.length; i++) {
+    if (String(repData[i][8]) === "open") openReports++;
+  }
+
+  const to = getSettingValue_("adminEmail", "");
+  if (!to) {
+    console.log("Weekly summary: no adminEmail setting configured, skipping send.");
+    return "no adminEmail set";
+  }
+  const lines = [
+    "Abhyas weekly summary — " + new Date().toISOString().slice(0, 10),
+    "",
+    "New signups this week: " + newUsers,
+    "Active (paid) students: " + active,
+    "On trial: " + trial,
+    "",
+    "Payments waiting for review: " + pendPay,
+    "Payments verified this week: " + verifiedThisWeek,
+    "Payments rejected this week: " + rejectedThisWeek,
+    "",
+    "Open question reports: " + openReports,
+    "",
+    "Admin console: https://app.mku.name.np/admin.html",
+    "Sheet: " + ss.getUrl()
+  ];
+  try {
+    MailApp.sendEmail({
+      to,
+      subject: "Abhyas weekly summary — " + newStudentsLine(newUsers),
+      body: lines.join("\n")
+    });
+    return "sent to " + to;
+  } catch (e) {
+    console.error("Weekly summary send failed:", e);
+    return "send failed: " + e.message;
+  }
+}
+function newStudentsLine(n) { return n + " new student" + (n === 1 ? "" : "s"); }
 
 function getOrCreateFolder_(name) {
   const iter = DriveApp.getFoldersByName(name);

@@ -2,8 +2,8 @@
 
 Offline-first study app for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam, plus Level 5 Engineering and General Knowledge. Built as a static PWA on top of Google Apps Script + Google Sheets + Google Drive. No build step, no bundler, no server to run.
 
-Client version: 1.20 (version.js)
-Backend version: 1.20 (gas/code.gs)
+Client version: 1.31 (version.js)
+Backend version: 1.31 (code.gs)
 Both must match. tests/check.js fails if they drift.
 
 ---

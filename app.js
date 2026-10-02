@@ -21,8 +21,9 @@ const BK_TAGS = ['Need Check','Interesting','Debating','Confusing','Formulae'];
 const SR_INTERVALS = [1, 3, 7, 14];   // days for spaced repetition
 
 // Weekly Sets exam window — once released, the student has this many
-// hours to take it as a timed, graded Exam. After the window closes,
-// the set switches to unlimited Flashcard-mode review.
+// hours to submit an OFFICIAL, server-recorded attempt. After the window
+// closes, the paper can still be sat as a local-only practice run, and the
+// recorded attempt can always be reviewed. Retakes never touch the server.
 const WEEKLY_EXAM_WINDOW_HOURS = 12;
 
 const LS = {
@@ -68,6 +69,37 @@ if(!S.tt.reminders) S.tt.reminders = {enabled:false, leadMinutes:5};
 if(!Array.isArray(S.prog.sessions)) S.prog.sessions = [];
 if(!S.stk.days) S.stk.days = [];
 if(!S.weeklyAttempts || typeof S.weeklyAttempts !== 'object') S.weeklyAttempts = {};
+
+/* v1.23: ABHYAS_DEBUG gate.
+   The app is chatty in the console during normal operation — normQ warnings
+   for a malformed question, HOURLY diagnostics, adaptive-practice load
+   traces. On a student's device that is noise they cannot act on. Set
+   localStorage.abhyas_debug = '1' (or paste window.ABHYAS_DEBUG = true
+   before a reload) and everything comes back. Genuine console.error()s
+   are never suppressed. */
+(function () {
+  let debug = false;
+  try {
+    debug = localStorage.getItem('abhyas_debug') === '1'
+         || (typeof window.ABHYAS_DEBUG === 'boolean' && window.ABHYAS_DEBUG === true);
+  } catch (e) {}
+  window.ABHYAS_DEBUG = debug;
+  if (debug) return;
+  const _warn = console.warn.bind(console);
+  const _info = console.info.bind(console);
+  const QUIET_WARN = /^\[(normQ|SUBJ|HOURLY|adaptive|daily|retake|chapters-loader|cross-tab|AUTH|PAY_QUEUE|reset-snapshot|PDFVIEW|marking)\]/;
+  const QUIET_INFO = /^\[(HOURLY|Session bridge|PDFVIEW|PAY_QUEUE)\]/;
+  console.warn = function () {
+    const first = String((arguments[0] == null ? '' : arguments[0]));
+    if (QUIET_WARN.test(first)) return;
+    _warn.apply(null, arguments);
+  };
+  console.info = function () {
+    const first = String((arguments[0] == null ? '' : arguments[0]));
+    if (QUIET_INFO.test(first)) return;
+    _info.apply(null, arguments);
+  };
+})();
 
 /* ═══════════════ 3. UTILITIES ═══════════════ */
 function _load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
@@ -477,7 +509,10 @@ const NETCHECK = {
 
   start(){
     if(NETCHECK._timer) return;
-    NETCHECK._timer = setInterval(()=>NETCHECK.ping(), 15000);
+    /* v1.30: 30 s, not 15 s. The connection dot does not need second-level
+       accuracy, and on a cold Apps Script container three pings a minute
+       competed with the login POST for the same worker. */
+    NETCHECK._timer = setInterval(()=>NETCHECK.ping(), 30000);
   },
 
   reset(){ this._failCount = 0; }
@@ -1261,7 +1296,9 @@ const WEEKLY = {
         const lastRetake = this._loadRetakes()[s.id];
         const shown = lastRetake || attempted;
         const isRetake = !!lastRetake;
-        const canRetake = s.status !== 'archived' && this.examOpen(s);
+        /* v1.32: retakes are always available, so the hint does not depend on
+           whether the official window happens to be open. */
+        const canRetake = s.status !== 'archived';
         const tag = isRetake
           ? '↻ Last practice ' + shown.pct + '% · Official ' + attempted.pct + '%'
           : '✓ ' + attempted.pct + '%' + (attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : '');
@@ -1282,10 +1319,10 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Not attempted, window closed — review only.
+      // Not attempted, window closed — the paper is still open as practice.
       return `<div class="qb-btn" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.75" onclick='WEEKLY.open(${idJson})'>
-        <span><i class="ph ph-eye"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
-        <span style="font-size:.62rem;opacity:.75">Review only</span>
+        <span><i class="ph ph-note-pencil"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
+        <span style="font-size:.62rem;opacity:.75">Practice</span>
       </div>`;
     }).join('');
   },
@@ -1405,16 +1442,12 @@ const WEEKLY = {
       }catch(e){ /* network hiccup — fall through */ }
     }
 
-    /* v1.21: already attempted. Archived or window-closed sets go straight
-       to review. Otherwise the retake modal offers Review / Retake. */
+    /* v1.32: retakes are always available, regardless of the official
+       window — they are scored on this device only and never touch the
+       server, so there is no reason to gate them by time. */
     if(attempt){
       if(s.status === 'archived'){
         toast(`🔒 Archived — showing your recorded result (${attempt.pct}%)`, 3500);
-        this._startReview(s, attempt);
-        return;
-      }
-      if(!this.examOpen(s)){
-        toast('👁️ Exam window closed — viewing answers only', 3500);
         this._startReview(s, attempt);
         return;
       }
@@ -1422,9 +1455,19 @@ const WEEKLY = {
       return;
     }
 
+    /* Not yet attempted. The official window may already be closed — in that
+       case the student can sit the paper as a practice run, scored locally,
+       and it will not change the record on the server. */
     if(!this.examOpen(s)){
-      toast('👁️ Exam window closed — viewing answers only', 3500);
-      this._startReview(s, null);
+      const ok = await ASK.confirm({
+        title: 'Practice exam — ' + s.title,
+        body:  'The ' + WEEKLY_EXAM_WINDOW_HOURS + '-hour window for the official attempt on this set has closed. ' +
+               'You can still sit the paper as a practice run — it will be scored on this device ' +
+               'and will not change the record on the server.',
+        ok:    'Start practice'
+      });
+      if(!ok) return;
+      this._startRetake(s.id);
       return;
     }
 
@@ -1519,7 +1562,7 @@ const WEEKLY = {
   async _startRetake(id){
     const s = this.sets.find(x=>x.id===id);
     if(!s || !s.fileId){ toast('Not available.'); return; }
-    if(!this.examOpen(s)){ toast('The exam window has closed.', 4000); this._startReview(s, this.attempts[id] || null); return; }
+    /* v1.32: no examOpen check — a retake is local-only and always allowed. */
     toast('🎯 Retake — for practice. Your official score will not change.', 4000);
     /* v1.26: if the paper build throws (offline mid-build, a Drive hiccup,
        or a chapter that fails to load), the student used to be left on
@@ -3133,6 +3176,48 @@ document.addEventListener('DOMContentLoaded', ()=>{
     try { BOOT_ERROR.show(err); } catch (e) {}
   }
 });
+
+/* v1.23: focus-scroll for mobile keyboards.
+   On a phone, tapping a field in the lower part of the screen opens the
+   keyboard OVER the field, and the Save button goes under the keyboard too.
+   Scroll the focused field toward centre so both stay visible. The 300 ms
+   wait lets the keyboard finish animating before we measure. */
+(function focusScroll() {
+  if (!window.matchMedia || !matchMedia('(pointer:coarse)').matches) return;
+  document.addEventListener('focusin', function (e) {
+    const el = e.target;
+    if (!el || !el.matches || !el.matches('input, textarea, select')) return;
+    if (el.type === 'hidden' || el.readOnly || el.disabled) return;
+    setTimeout(function () {
+      try {
+        const r = el.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        if (r.top > vh * 0.55) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch (err) {}
+    }, 300);
+  });
+})();
+
+/* v1.27: repaint day-based cards across midnight. A phone tab that is never
+   closed otherwise shows a stale countdown until something else triggers a
+   render. */
+(function midnightRepaint() {
+  function dayStart(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
+  let last = dayStart(new Date());
+  function check() {
+    const now = dayStart(new Date());
+    if (now === last) return;
+    last = now;
+    try { if (typeof EXAM_DATE !== 'undefined' && EXAM_DATE.render) EXAM_DATE.render(); } catch (e) {}
+    try { if (typeof DAILY10 !== 'undefined' && DAILY10.render) DAILY10.render(); } catch (e) {}
+    try { if (typeof TODAY_PLAN !== 'undefined' && TODAY_PLAN.render) TODAY_PLAN.render(); } catch (e) {}
+    try { if (typeof SYLLABUS_MOCK !== 'undefined' && SYLLABUS_MOCK.render) SYLLABUS_MOCK.render(); } catch (e) {}
+  }
+  setInterval(check, 60000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) check();
+  });
+})();
 
 /* ═══════════════ GLOBAL EXPOSURE ═══════════════
    Only core modules are exposed here; objective.js and subjective.js
