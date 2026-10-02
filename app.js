@@ -1,6 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
    APP.JS — Abhyas: Your path to mastery  (V1 – Cloud Sync)
-   ─────────────────────────────────────────────────────────────────────
    CORE — state, storage, sync, auth, PWA, weekly sets, home dashboard,
           timetable, offline cache, progress tracking, data management,
           tutorial, and app boot.
@@ -20,10 +19,6 @@ const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Satur
 const BK_TAGS = ['Need Check','Interesting','Debating','Confusing','Formulae'];
 const SR_INTERVALS = [1, 3, 7, 14];   // days for spaced repetition
 
-// Weekly Sets exam window — once released, the student has this many
-// hours to submit an OFFICIAL, server-recorded attempt. After the window
-// closes, the paper can still be sat as a local-only practice run, and the
-// recorded attempt can always be reviewed. Retakes never touch the server.
 const WEEKLY_EXAM_WINDOW_HOURS = 12;
 
 const LS = {
@@ -60,7 +55,6 @@ const S = {
   cov: _load(LS.COV, {}),
   dpi: null,
   localQs: null,
-  // Quiz state — kept here because HOME/UI read S.quiz.active to gate nav.
   quiz: {qs:[],ans:[],mode:'',idx:0,timer:null,elapsed:0,left:0,active:false,ch:'',scope:null},
   cloud: _load(LS.CLOUD, {fid:''}),
   profile: _load(LS.PROFILE, {ver:1, id:''})
@@ -70,13 +64,6 @@ if(!Array.isArray(S.prog.sessions)) S.prog.sessions = [];
 if(!S.stk.days) S.stk.days = [];
 if(!S.weeklyAttempts || typeof S.weeklyAttempts !== 'object') S.weeklyAttempts = {};
 
-/* v1.23: ABHYAS_DEBUG gate.
-   The app is chatty in the console during normal operation — normQ warnings
-   for a malformed question, HOURLY diagnostics, adaptive-practice load
-   traces. On a student's device that is noise they cannot act on. Set
-   localStorage.abhyas_debug = '1' (or paste window.ABHYAS_DEBUG = true
-   before a reload) and everything comes back. Genuine console.error()s
-   are never suppressed. */
 (function () {
   let debug = false;
   try {
@@ -123,7 +110,6 @@ function _save(k,v){
   }
 }
 
-/* ── QDB: IndexedDB-backed question-set cache ── */
 const QDB = (() => {
   const DB_NAME = 'abhyas_question_cache';
   const STORE = 'sets';
@@ -160,10 +146,7 @@ const QDB = (() => {
         tx.onerror = () => reject(tx.error);
       });
       return true;
-    } catch (e) {
-      // Callers decide whether a cache-write failure is worth surfacing.
-      return false;
-    }
+    } catch (e) { return false; }
   }
   async function del(key) {
     try {
@@ -262,10 +245,6 @@ function qImgHtml(q){
   const alt = q.imgCaption || 'Question figure';
   return `<div style="margin:.4rem 0"><img src="${esc(q.img)}" alt="${esc(alt)}" style="max-width:100%;border-radius:8px;border:1px solid var(--b1);display:block" loading="lazy" onerror="this.parentElement.style.display='none'"></div>`;
 }
-/* ═══════════════ GOOGLE SEARCH — rich AI prompt ═══════════════
-   Sends Google a full instruction so its AI Overview answers it like a
-   tutor: correct option, why each trap is a trap, the underlying
-   concept, related concepts, common confusions, memory trick. */
 
 const GOOGLE_PROMPT_MAX = 1400;
 
@@ -384,9 +363,6 @@ function closeMod(){document.getElementById('mbg').classList.remove('show')}
 
 function _anyModalOpen(){
   if(document.getElementById('mbg')?.classList.contains('show')) return true;
-  // Visibility-based check — the loader/error cards are created once and
-  // only hidden, so a mere presence check would permanently return true
-  // after the first quiz load, silently disabling every keyboard shortcut.
   return [
     '#quiz-limit-modal','#exam-resume-modal','#quiz-exit-modal',
     '#quiz-error-card','#quiz-loader'
@@ -398,22 +374,12 @@ function _anyModalOpen(){
 
 function qs(params){return Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')}
 
-/* ── getFile pacing ──────────────────────────────────────────────────
-   The backend allows each account 60 getFile calls a minute (and 600
-   across everyone). "Download everything" walks every configured file —
-   roughly 200 of them — so without pacing the tail of the run comes back
-   rate-limited and writes broken entries into the offline cache. This
-   gate spaces the calls out instead, and backs right off if the server
-   still says slow down. Every question fetch in the app goes through it. */
 const GETFILE_GATE = {
-  MAX: 45,            // stay under the server's 60, leaving room for retries
-  BG_MAX: 15,         // background top-ups never eat the whole budget
+  MAX: 45,
+  BG_MAX: 15,
   WINDOW: 60000,
   _hits: [],
   _penaltyUntil: 0,
-  /* kind 'bg' is for the silent offline top-up. It is held to a third of the
-     budget so that a student tapping a chapter is never stuck behind a
-     download they never asked for. */
   async take(kind){
     const ceiling = kind === 'bg' ? this.BG_MAX : this.MAX;
     for(;;){
@@ -429,9 +395,7 @@ const GETFILE_GATE = {
       await new Promise(r=>setTimeout(r, waitMs));
     }
   },
-  /* Called when the server itself reports a rate limit. */
   backoff(ms = 10000){ this._penaltyUntil = Date.now() + ms; this._hits = []; },
-  /* Rough seconds until `n` more files could be fetched — used for ETAs. */
   etaSeconds(n){
     const perMin = this.MAX;
     return n <= perMin ? 0 : Math.round(((n - perMin) / perMin) * 60);
@@ -453,7 +417,6 @@ async function netFetch(url, opts, timeoutMs=20000){
   }
 }
 
-/* ── SEARCH — opens a new tab with the current question on Google ── */
 function _buildSearchQuery(){
   const q = S.quiz?.qs?.[S.quiz.idx];
   if(!q) return '';
@@ -473,15 +436,9 @@ const SRCH = {
   }
 };
 
-/* ═══════════════ 3b. NETCHECK ═══════════════ */
 const NETCHECK = {
   _timer: null,
   _failCount: 0,
-  /* v1.28: a single slow health-check is not enough to declare offline.
-     Apps Script can take several seconds to wake up (cold start) and a
-     brief stall on a mobile connection is normal. Three consecutive
-     failures — about 45 seconds — before we flip to offline. A single
-     success flips back online immediately. */
   FAILS_BEFORE_OFFLINE: 3,
 
   async ping(){
@@ -495,12 +452,9 @@ const NETCHECK = {
       S.online = true;
     } else {
       this._failCount++;
-      /* The browser's own signal is authoritative when it says we are
-         offline. Otherwise we need repeated failures before we agree. */
       if(!navigator.onLine || this._failCount >= this.FAILS_BEFORE_OFFLINE){
         S.online = false;
       }
-      /* else: stay online, retry at next interval */
     }
 
     if(S.online !== wasOnline){ _updateNetBtn(); _updateOfflineWarn(); }
@@ -509,16 +463,12 @@ const NETCHECK = {
 
   start(){
     if(NETCHECK._timer) return;
-    /* v1.30: 30 s, not 15 s. The connection dot does not need second-level
-       accuracy, and on a cold Apps Script container three pings a minute
-       competed with the login POST for the same worker. */
     NETCHECK._timer = setInterval(()=>NETCHECK.ping(), 30000);
   },
 
   reset(){ this._failCount = 0; }
 };
 
-/* ═══════════════ 3c. CHAPSTATS ═══════════════ */
 const CHAPSTATS = {
   record(sess){
     const key = sess.chapter || 'Unknown';
@@ -557,12 +507,6 @@ const CHAPSTATS = {
   }
 };
 
-/* ═══════════════ 3d. COV — per-file coverage ═══════════════
-   One tiny record per question file, kept apart from the 50-session history:
-     p = one character per question: '0' unseen, '1' last answer right, '2' last answer wrong
-     a = attempts, c = correct
-   A few KB for the whole library, so it syncs reliably, and "Practised" and
-   "Coverage" no longer shrink as old sessions are trimmed. */
 const COV = {
   _ok(){
     if(!S.cov || typeof S.cov !== 'object' || Array.isArray(S.cov)) S.cov = {};
@@ -576,10 +520,6 @@ const COV = {
     const fid = uid.slice(0, i);
     if(fid === 'local') return;
     const idx = parseInt(uid.slice(i + 1), 10);
-    /* v1.26: raised from 5000 to 20000. A file with more than 5000
-       questions was silently dropped from COV, so "Practised" never
-       counted its tail. 20000 is generous enough for any single file and
-       still guards against a malformed uid. */
     if(!isFinite(idx) || idx < 0 || idx > 20000) return;
     const rec = S.cov[fid] || (S.cov[fid] = {p:'', a:0, c:0});
     if(rec.p.length <= idx) rec.p = rec.p.padEnd(idx + 1, '0');
@@ -595,7 +535,7 @@ const COV = {
   rebuildFromSessions(){
     if(!COV._ok()) return;
     const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions : [];
-    for(let i = sessions.length - 1; i >= 0; i--){   // sessions are newest-first
+    for(let i = sessions.length - 1; i >= 0; i--){
       (sessions[i].qres || []).forEach(q => COV._add(q));
     }
     _save(LS.COV, S.cov);
@@ -622,10 +562,6 @@ const COV = {
   }
 };
 
-/* ═══════════════ 3e. ASK — in-app confirm dialog ═══════════════
-   Replaces the browser's confirm()/prompt() for the destructive actions
-   (installed apps on iOS can suppress the native boxes). Usage:
-     if(!(await ASK.confirm({title, body, ok, danger, requireText}))) return; */
 const ASK = {
   confirm(o){
     o = o || {};
@@ -666,7 +602,6 @@ const ASK = {
   }
 };
 
-/* ═══════════════ 4. AUTH ═══════════════ */
 const AUTH = {
   async restore(){
     const u = _load(LS.USER, null);
@@ -680,12 +615,6 @@ const AUTH = {
       return;
     }
 
-    /* v1.30: the login POST already returned the full user object and
-       issued the session token. Redirecting to user.html used to fire a
-       second checkSession asking for the exact same data. If the session
-       was verified within the last 30 seconds (which is exactly the case
-       right after login) go straight through. Saves one full Apps Script
-       round-trip — typically 1-2 s on the redirect. */
     const age = Date.now() - (Number(u.lastVerified) || 0);
     if (age >= 0 && age < 30 * 1000 && AUTH._isValidOffline(u)) {
       AUTH._enter(u);
@@ -711,8 +640,6 @@ const AUTH = {
       else AUTH._bounce();
     }
   },
-  /* POST, not GET: a session token in a query string ends up in the Apps
-     Script execution log and in any proxy log on the way. */
   async _checkSessionOnce(u){
     const r = await netFetch(APPS, {
       method:'POST', headers:{'Content-Type':'text/plain'},
@@ -729,8 +656,6 @@ const AUTH = {
   },
   _buildSession(prevSession, res){
     const user = res.user || {};
-    // Access-level computation lives in one place — shared.js's
-    // computeAccessLevel() — so index.html and app.js never drift.
     const access = computeAccessLevel(res, user);
     return {
       ...prevSession,
@@ -743,8 +668,6 @@ const AUTH = {
       lastVerified: Date.now()
     };
   },
-  /* Never yank someone out of a quiz because their access changed:
-     wait until they leave the quiz screen, then send them to sign in. */
   _bounce(){
     const onScreen = () => { const w = document.getElementById('quiz-wrap'); return !!(w && w.style.display !== 'none'); };
     if(onScreen()){
@@ -784,7 +707,6 @@ const AUTH = {
     TT._startReminderChecker();
     if(typeof PUSH!=='undefined') PUSH.silentRefresh();
     WEEKLY.init();
-    // Let the sidebar refresh its hints once everything is set.
     if(typeof SB_HINTS !== 'undefined') setTimeout(() => SB_HINTS.refresh(), 200);
   },
   _updateSidebarCard(user){
@@ -859,7 +781,6 @@ const AUTH = {
   }
 };
 
-/* ═══════════════ 4b. PSYNC ═══════════════ */
 const PSYNC = {
   _timer: null,
   _state: 'idle',
@@ -900,7 +821,7 @@ const PSYNC = {
         data: this._syncPayload()
       });
       navigator.sendBeacon?.(APPS, new Blob([body], {type:'text/plain'}));
-    }catch(e){ /* best-effort */ }
+    }catch(e){ }
   },
   flushOnHide(){
     if(!this._timer) return;
@@ -913,9 +834,6 @@ const PSYNC = {
   _capList(arr, max){
     return Array.isArray(arr) && arr.length > max ? arr.slice(-max) : arr;
   },
-  /* v1.14: fits the payload under the server limit by shedding per-question
-     detail from the OLDEST sessions first (the old code could not shrink at
-     all, so active students' backups failed for good). Also syncs COV. */
   _syncPayload(){
     const CEIL = this._SYNC_PAYLOAD_CEILING;
     const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions.map(s => ({...s})) : [];
@@ -928,8 +846,6 @@ const PSYNC = {
       fl: this._capList(S.fl, lim.fl),
       wr: this._capList(S.wr, lim.wr),
       stk: S.stk,
-      /* v1.23: personal notes ride along. Read straight from localStorage
-         so no extra state needs threading through S. */
       qnotes: (function(){
         try {
           const raw = localStorage.getItem('abhyas_qnotes');
@@ -938,16 +854,13 @@ const PSYNC = {
       })()
     });
     let json = build();
-    // 1) Sessions are newest-first: drop per-question detail from the oldest first.
     for(let i = sessions.length - 1; i >= 0 && json.length > CEIL; i--){
       if(sessions[i].qres){ delete sessions[i].qres; json = build(); }
     }
-    // 2) Then trim the review lists (newest items are last, so the tail is kept).
     while(json.length > CEIL && lim.bk > 20){
       lim.bk = lim.fl = lim.wr = Math.max(20, Math.floor(lim.bk / 2));
       json = build();
     }
-    // 3) Last resort: drop the oldest sessions entirely.
     while(json.length > CEIL && sessions.length > 10){ sessions.pop(); json = build(); }
     return json;
   },
@@ -1000,9 +913,6 @@ const PSYNC = {
         _save(LS.CHAPSTATS, S.chapStats);
       }
       if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
-      /* v1.23: merge personal notes from the cloud. Local wins on
-         conflict — a note typed on this device is never silently
-         overwritten by an older copy from another. */
       if(data.qnotes && typeof data.qnotes === 'object' && !Array.isArray(data.qnotes)){
         try {
           const KEY = 'abhyas_qnotes';
@@ -1029,7 +939,6 @@ const PSYNC = {
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') PSYNC.flushOnHide(); });
 window.addEventListener('pagehide', ()=>PSYNC.flushOnHide());
 
-/* ═══════════════ 4c. PUSH ═══════════════ */
 const PUSH = {
   _messaging: null,
   supported(){
@@ -1089,7 +998,7 @@ const PUSH = {
         headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({action:'savePushToken', username:S.user.username, token:S.user.token, fcmToken:token})
       }, 15000);
-    }catch(e){ /* best-effort */ }
+    }catch(e){ }
   },
   refreshButtonUI(){
     const btn = document.getElementById('push-enable-btn');
@@ -1115,7 +1024,6 @@ const PUSH = {
   }
 };
 
-/* ═══════════════ 5. PWA ═══════════════ */
 const PWA = {
   init(){
     window.addEventListener('beforeinstallprompt', e=>{
@@ -1134,9 +1042,6 @@ const PWA = {
     });
     if('serviceWorker' in navigator){
       navigator.serviceWorker.register('./sw.js', {scope:'./'}).catch(()=>{});
-      // Service Worker updated and new SW has claimed the page — show a
-      // reload prompt. Never auto-reload (that would blow away an
-      // in-progress quiz).
       navigator.serviceWorker.addEventListener('message', (e) => {
         if(e.data?.type === 'SW_ACTIVATED' && e.data.version !== (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '')){
           if(!S.quiz.active){
@@ -1171,15 +1076,8 @@ const PWA = {
   }
 };
 
-/* ═══════════════ 5b. WEEKLY SETS ═══════════════
-   Only the state + fetch/attempt plumbing lives here — the render and
-   open() logic reads QUIZ, which loads in objective.js. Fine because
-   _renderHomeCard() only runs at runtime, after all scripts loaded. */
+/* ═══════════════ 5b. WEEKLY SETS ═══════════════ */
 const WEEKLY = {
-  /* v1.21: the retake score is kept on this device only. The sheet holds
-     the FIRST attempt forever. This map is what the "last time you got X"
-     prompt reads from, so a student can see their most recent practice
-     run even though the official record never changes. */
   LS_RETAKES: 'abhyas_weekly_last_retake',
   _retakes: null,
 
@@ -1213,19 +1111,76 @@ const WEEKLY = {
     if (all[id]) { delete all[id]; try { localStorage.setItem(this.LS_RETAKES, JSON.stringify(all)); } catch(e){} }
   },
 
+  /* ═══════════════════════════════════════════════════════════════════
+     v1.33: Loksewa scoring for EVERY weekly test.
+     +1 per correct, −0.2 per wrong, 0 for skipped. Display-only — the
+     raw correct count is still what the server stores (rankings use it),
+     but every score the student sees is computed here. Works on both
+     shapes of attempt we hold (local retake and server-returned), since
+     `wrong` is always derivable from total − correct − skipped.
+     ═══════════════════════════════════════════════════════════════════ */
+  loksewaScore(attempt){
+    if (!attempt) return null;
+    const total = Number(attempt.total) || 0;
+    if (!total) return null;
+    const correct = Number(attempt.correct) || 0;
+    const skipped = Number(attempt.skipped) || 0;
+    const wrong   = Math.max(0, total - correct - skipped);
+    const score   = correct - wrong * 0.2;
+    return {
+      score:   Math.round(score * 10) / 10,
+      pct:     Math.round((score / total) * 1000) / 10,
+      correct, wrong, skipped, total
+    };
+  },
+
   sets: [],
   attempts: S.weeklyAttempts || {},
   _tickTimer: null,
 
-  /* Loksewa L7 Civil pattern: 30 / 25 / 25 / 20 by group, 100 questions,
-     90 minutes. Used by WEEKLY.open to build the mock paper. */
+  /* ═══════════════════════════════════════════════════════════════════
+     v1.33: chapter matching for the Loksewa mock.
+     Groups list both exact IDs (matching subjective_chapters.js) AND
+     lowercase keyword fragments. A chapter file is included if its ID
+     matches exactly OR its display name contains any keyword. This is
+     robust to whatever key scheme chapters-data.js uses — the toast
+     "Could not build the full Loksewa paper" only fires when a group
+     truly has zero matching files.
+     ═══════════════════════════════════════════════════════════════════ */
   LOKSEWA_GROUPS: {
-    A: { name: 'Group A — Structure + Geotech',   marks: 30, chapters: ['structure','geotech'] },
-    B: { name: 'Group B — Water Resource',        marks: 25, chapters: ['irrigationAndCo'] },
-    C: { name: 'Group C — Transportation',        marks: 25, chapters: ['transportAndCo'] },
-    D: { name: 'Group D — Public Health & Misc',  marks: 20, chapters: ['publicHealth','miscellaneous'] }
+    A: { name: 'Group A — Structure + Geotech',   marks: 30,
+         chapters: ['structure','geotech'],
+         keywords: ['structur','geotech','soil','foundation','rcc','concrete','steel','masonry'] },
+    B: { name: 'Group B — Water Resource',        marks: 25,
+         chapters: ['irrigationAndCo'],
+         keywords: ['water','irrigat','hydraul','hydrolog','hydropower','canal','dam','reservoir'] },
+    C: { name: 'Group C — Transportation',        marks: 25,
+         chapters: ['transportAndCo'],
+         keywords: ['transport','highway','airport','traffic','pavement','road','bridge'] },
+    D: { name: 'Group D — Public Health & Misc',  marks: 20,
+         chapters: ['publicHealth','miscellaneous'],
+         keywords: ['public health','sanit','environment','water supply','sewer','misc',
+                    'management','survey','estimat','ethic','profession'] }
   },
   LOKSEWA_SECONDS: 90 * 60,
+
+  /* Given one LOKSEWA_GROUPS entry, return every registered chapter file
+     that belongs to it. Match by exact ID first, then by keyword fragment
+     against the chapter's display name — whichever lands. */
+  _chapterRefsForGroup(g){
+    if (typeof ChapterData === 'undefined' || !ChapterData.allFileRefs) return [];
+    const all  = ChapterData.allFileRefs();
+    const ids  = new Set((g.chapters || []).map(s => String(s).toLowerCase()));
+    const kws  = (g.keywords || []).map(s => String(s).toLowerCase());
+    return all.filter(r => {
+      if (ids.has(String(r.ch).toLowerCase())) return true;
+      if (!kws.length) return false;
+      let name = '';
+      try { name = String(ChapterData.chapterName(r.lv, r.ch) || '').toLowerCase(); }
+      catch(e){ name = ''; }
+      return kws.some(k => name.indexOf(k) !== -1);
+    });
+  },
 
   _saveAttempts(){
     S.weeklyAttempts = this.attempts;
@@ -1281,7 +1236,6 @@ const WEEKLY = {
       const attempted = this.attempts[s.id];
       const idJson = JSON.stringify(String(s.id));
 
-      // Not yet released — locked countdown.
       if(!s.released){
         const when = s.releaseAt ? new Date(s.releaseAt) : null;
         const whenTxt = when ? when.toLocaleString([], {weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'}) : 'soon';
@@ -1290,18 +1244,21 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Attempted — show the recorded or last-practice score. Retakes are
-      // allowed until the admin archives the set or the window closes.
       if(attempted){
         const lastRetake = this._loadRetakes()[s.id];
         const shown = lastRetake || attempted;
         const isRetake = !!lastRetake;
-        /* v1.32: retakes are always available, so the hint does not depend on
-           whether the official window happens to be open. */
         const canRetake = s.status !== 'archived';
+
+        /* v1.33: score with Loksewa negative marking — see loksewaScore(). */
+        const lkLast = this.loksewaScore(shown);
+        const lkOff  = this.loksewaScore(attempted);
+        const lastPct = lkLast ? lkLast.pct : (Number(shown.pct) || 0);
+        const offPct  = lkOff  ? lkOff.pct  : (Number(attempted.pct) || 0);
+
         const tag = isRetake
-          ? '↻ Last practice ' + shown.pct + '% · Official ' + attempted.pct + '%'
-          : '✓ ' + attempted.pct + '%' + (attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : '');
+          ? '↻ Last practice ' + lastPct + '% · Official ' + offPct + '%'
+          : '✓ ' + lastPct + '%' + (attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : '');
         const hint = canRetake ? ' · Tap to review or retake' : ' · Tap to review';
         return `<div class="qb-btn ok" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.92" onclick='WEEKLY.open(${idJson})'>
           <span><i class="ph ph-check-circle"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
@@ -1309,7 +1266,6 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Not attempted, window still open — graded exam with live countdown.
       const open = this.examOpen(s);
       const closeAt = this.examCloseAt(s);
       if(open){
@@ -1319,7 +1275,6 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Not attempted, window closed — the paper is still open as practice.
       return `<div class="qb-btn" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.75" onclick='WEEKLY.open(${idJson})'>
         <span><i class="ph ph-note-pencil"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
         <span style="font-size:.62rem;opacity:.75">Practice</span>
@@ -1327,7 +1282,6 @@ const WEEKLY = {
     }).join('');
   },
 
-  /* Rank and percentile, fetched once a set's exam window has closed. */
   async _loadStandings(){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     let changed = false;
@@ -1349,8 +1303,6 @@ const WEEKLY = {
     if(changed){ this._saveAttempts(); this._renderHomeCard(); }
   },
 
-  /* Records the start on the server so closing the app and restarting cannot
-     be used to look at the questions and try again. Returns 'go' or 'stop'. */
   async _startOnServer(s){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return 'go';
     let res = null;
@@ -1420,7 +1372,6 @@ const WEEKLY = {
     }, 1000);
   },
 
-  // Entry point from the home card. QUIZ lives in objective.js.
   async open(id){
     const s = this.sets.find(x=>x.id===id);
     if(!s || !s.released || !s.fileId){ toast('Not unlocked yet.'); return; }
@@ -1439,12 +1390,9 @@ const WEEKLY = {
           this._saveAttempts();
           this._renderHomeCard();
         }
-      }catch(e){ /* network hiccup — fall through */ }
+      }catch(e){ }
     }
 
-    /* v1.32: retakes are always available, regardless of the official
-       window — they are scored on this device only and never touch the
-       server, so there is no reason to gate them by time. */
     if(attempt){
       if(s.status === 'archived'){
         toast(`🔒 Archived — showing your recorded result (${attempt.pct}%)`, 3500);
@@ -1455,9 +1403,6 @@ const WEEKLY = {
       return;
     }
 
-    /* Not yet attempted. The official window may already be closed — in that
-       case the student can sit the paper as a practice run, scored locally,
-       and it will not change the record on the server. */
     if(!this.examOpen(s)){
       const ok = await ASK.confirm({
         title: 'Practice exam — ' + s.title,
@@ -1473,8 +1418,7 @@ const WEEKLY = {
 
     toast(`📝 Graded exam — you get ONE official attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left. Retakes for practice are allowed.`, 5000);
     if(await WEEKLY._startOnServer(s) === 'stop') return;
-    /* v1.32: awaited with a catch so a rejection inside the builder —
-       ChapterData missing, a Drive hiccup past the per-file catch — does
+    /* v1.33: awaited with a catch so a rejection inside the builder does
        not leave the student staring at the home screen with the loader
        stuck on and no explanation. Mirrors the retake path's guard. */
     try {
@@ -1486,7 +1430,6 @@ const WEEKLY = {
     }
   },
 
-  /* v1.21: pulled out of open() so the retake path can reuse it. */
   async _buildLoksewaPaper(s){
     const groups = WEEKLY.LOKSEWA_GROUPS;
     const picks = [];
@@ -1494,7 +1437,7 @@ const WEEKLY = {
     try {
       for (const key of Object.keys(groups)) {
         const g = groups[key];
-        const refs = ChapterData.allFileRefs().filter(r => g.chapters.indexOf(r.ch) !== -1);
+        const refs = this._chapterRefsForGroup(g);
         const pool = [];
         for (const r of refs) {
           try {
@@ -1525,16 +1468,20 @@ const WEEKLY = {
     );
   },
 
-  /* v1.21: prompt shown when a set has already been attempted. */
   _showRetakeModal(s, attempt){
     const last = this._lastAttemptFor(s.id) || attempt;
-    const correct = Number(last.correct) || 0;
-    const total   = Number(last.total)   || 0;
-    const skipped = Number(last.skipped) || 0;
-    const wrong   = Math.max(0, total - correct - skipped);
-    const pct     = Number(last.pct) || (total ? Math.round((correct/total)*100) : 0);
+    /* v1.33: Loksewa scoring — the big number is the exam score, the
+       stats row underneath still shows the raw counts. */
+    const lk = this.loksewaScore(last) || { correct:0, wrong:0, skipped:0, total:0, pct:0 };
+    const correct = lk.correct;
+    const total   = lk.total;
+    const skipped = lk.skipped;
+    const wrong   = lk.wrong;
+    const pct     = lk.pct;
     const isRetake = last !== attempt;
     const stamp = last.at ? new Date(last.at).toLocaleString() : '';
+    const lkOff = this.loksewaScore(attempt);
+    const officialPct = lkOff ? lkOff.pct : (Number(attempt && attempt.pct) || 0);
 
     MODAL.sheet('Weekly test — ' + s.title,
       '<div class="qotd-head" style="margin-bottom:var(--sp-4)">' +
@@ -1551,8 +1498,9 @@ const WEEKLY = {
         '<div class="scard"><div class="sv ta2">' + skipped + '</div><div class="stat-lbl">Skipped</div></div>' +
         '<div class="scard"><div class="sv">' + total + '</div><div class="stat-lbl">Total</div></div>' +
       '</div>' +
+      '<p class="t-cap text-center" style="margin-bottom:var(--sp-3)">Loksewa marking: +1 per correct, −0.2 per wrong, 0 for skipped.</p>' +
       (isRetake
-        ? '<div class="banner banner-info" style="margin-bottom:var(--sp-3)"><i class="ph ph-info"></i><span>Your <b>official score</b> for this set is <b>' + (attempt.pct || 0) + '%</b> — the first attempt. Retakes are practice only and are never recorded for the admin.</span></div>'
+        ? '<div class="banner banner-info" style="margin-bottom:var(--sp-3)"><i class="ph ph-info"></i><span>Your <b>official score</b> for this set is <b>' + officialPct + '%</b> — the first attempt. Retakes are practice only and are never recorded for the admin.</span></div>'
         : '') +
       '<p class="t-callout mb4" style="text-align:center">Review your answers, or try the exam again?</p>' +
       '<div class="flex g2 mt4">' +
@@ -1567,16 +1515,10 @@ const WEEKLY = {
     );
   },
 
-  /* v1.21: a retake is a normal exam run, but scope.weeklyRetake is set so
-     the results screen and _recordAttempt know not to overwrite anything. */
   async _startRetake(id){
     const s = this.sets.find(x=>x.id===id);
     if(!s){ toast('Not available.'); return; }
-    /* v1.32: no examOpen check — a retake is local-only and always allowed. */
     toast('🎯 Retake — for practice. Your official score will not change.', 4000);
-    /* v1.26: if the paper build throws (offline mid-build, a Drive hiccup,
-       or a chapter that fails to load), the student used to be left on
-       the home screen with no explanation. Now we fall back to review. */
     try {
       await this._buildLoksewaPaperRetake(s);
     } catch (e) {
@@ -1594,7 +1536,7 @@ const WEEKLY = {
     try {
       for (const key of Object.keys(groups)) {
         const g = groups[key];
-        const refs = ChapterData.allFileRefs().filter(r => g.chapters.indexOf(r.ch) !== -1);
+        const refs = this._chapterRefsForGroup(g);
         const pool = [];
         for (const r of refs) {
           try {
@@ -1609,8 +1551,6 @@ const WEEKLY = {
     }
 
     if (!picks.length) {
-      /* Fall back to the weekly set's own question file so the retake
-         still opens, mirroring _buildLoksewaPaper's behaviour. */
       if (!s || !s.fileId){
         toast('Could not build the paper — download this chapter or go online and try again.', 6000);
         return;
@@ -1631,13 +1571,6 @@ const WEEKLY = {
     );
   },
 
-  /* v1.32: async + mismatch guard.
-     A Loksewa-format attempt is built from CHAPTER POOLS, not from the
-     admin's uploaded weekly-set file. Reviewing it through s.fileId would
-     load a completely different question list, so preset answers can't
-     line up — every question would render as "unanswered" at 0%. Instead
-     we compare the stored answers' length against the file's actual
-     question count and refuse cleanly when they don't match. */
   async _startReview(s, attempt){
     if (!s || !s.fileId){
       toast('This weekly set has no attached question file to review.', 6000);
@@ -1648,7 +1581,7 @@ const WEEKLY = {
       try {
         const raw = await QUIZ._fetch(s.fileId, `weekly_${s.id}`);
         fileQCount = normQ(raw, s.fileId).length;
-      } catch(e){ /* leave null — fall through and try the review anyway */ }
+      } catch(e){ }
       if (fileQCount !== null && fileQCount !== attempt.answers.length){
         toast(
           'This was a Loksewa-format paper — your score is saved, but the ' +
@@ -1665,15 +1598,10 @@ const WEEKLY = {
     });
   },
 
-
-  // Called from QUIZ._showResults after a weekly exam completes.
   async _recordAttempt(quiz, stats){
     const weeklyId = quiz.scope?.weeklyId;
     if(!weeklyId) return;
 
-    /* v1.21: a retake keeps its score only on this device. Nothing is sent
-       to the server, and the official (first) attempt is left untouched
-       in this.attempts[]. */
     if(quiz.scope && quiz.scope.weeklyRetake){
       this._saveRetakeScore(weeklyId, stats);
       return;
@@ -1725,10 +1653,7 @@ const WEEKLY = {
         this._renderHomeCard();
         toast('ℹ️ This set was already submitted on another device — showing the recorded result.', 5000);
       }
-    }catch(e){
-      // Offline or transient error. Leave synced:false; retryUnsynced
-      // picks it up on next reconnect.
-    }
+    }catch(e){ }
   },
 
   retryUnsynced(){
@@ -1739,7 +1664,6 @@ const WEEKLY = {
   }
 };
 
-/* ═══════════════ 6. UI ═══════════════ */
 const UI = {
   cur: 'home',
   _goRaw(v){
@@ -1751,14 +1675,10 @@ const UI = {
     const ni=document.getElementById('nav-'+v);
     if(ni)ni.classList.add('active');
 
-    // Clear view-scoped intervals when leaving their view. Without this,
-    // HOME._clockTimer and TT._clockTimer kept running forever after a
-    // single visit.
     if(UI.cur === 'home' && v !== 'home' && HOME._clockTimer){ clearInterval(HOME._clockTimer); HOME._clockTimer = null; }
     if(UI.cur === 'timetable' && v !== 'timetable' && TT._clockTimer){ clearInterval(TT._clockTimer); TT._clockTimer = null; }
 
     UI.cur=v;UI.sidebarClose();
-    // Scroll the actual scrolling pane (#main), not window.
     const mainEl = document.getElementById('main');
     if(mainEl) mainEl.scrollTop = 0;
     window.scrollTo(0,0);
@@ -1796,9 +1716,6 @@ const UI = {
   }
 };
 
-/* ═══════════════ 10a. PROGRESS TRACKING ═══════════════
-   PROG stays here — it's core data management, not quiz-specific. The
-   quiz engine calls into it, but that's a one-way dependency. */
 const PROG = {
   track(correct){
     { const _d = today(); if(!S._tc || S._tc.d !== _d) S._tc = {d:_d, n:0}; S._tc.n++; if(S._tc.n === 5) STREAK.markToday(); }
@@ -1809,14 +1726,9 @@ const PROG = {
     HOME.updateBadges();
   },
 
-  /* Progress is written in a batch shortly after the last answer instead of
-     rewriting the whole history on every tap (kinder to low-end phones), and
-     always flushed when the page is hidden or closed. */
   _st: null,
   _saveSoon(){
     if(PROG._st) clearTimeout(PROG._st);
-    /* v1.22: 150ms instead of 400ms — the extra latency on the save was
-       occasionally losing the last answer if the tab was closed fast. */
     PROG._st = setTimeout(() => { PROG._st = null; _save(LS.PROG, S.prog); }, 150);
   },
   flushNow(){
@@ -1829,9 +1741,6 @@ const PROG = {
     S.prog.sessions = S.prog.sessions.slice(0,50);
     _save(LS.PROG, S.prog);
 
-    /* v1.22: any cached "how many times have I missed this" or "seen Nx"
-       value is stale once a session lands. Drop both caches so the next
-       render reads fresh numbers. */
     try { if (typeof WRONGBY !== 'undefined') WRONGBY._missCache = null; } catch(e){}
     try { if (typeof QHIST !== 'undefined') QHIST._cache = null; } catch(e){}
 
@@ -1943,7 +1852,6 @@ const PROG = {
   }
 };
 
-/* ═══════════════ 10b. STREAK ═══════════════ */
 const STREAK = {
   markToday(){
     const t = today();
@@ -1954,9 +1862,6 @@ const STREAK = {
     _save(LS.STK, S.stk);
     HOME.render();
   },
-  /* Streak forgiveness (v1.18): allow ONE silent skipped day in the chain.
-     Travelling, festivals, illness — none of them should destroy a long
-     streak. The skip is never announced and never shown to the student. */
   currentStreak(){
     const set = new Set(S.stk.days||[]);
     if(!set.size) return 0;
@@ -1967,7 +1872,7 @@ const STREAK = {
     }
     let n = 0;
     let offset = hasToday ? 0 : 1;
-    let skipBudget = 1;                 // one free skip for the whole chain
+    let skipBudget = 1;
     while(n <= 400){
       if(set.has(localDateOffset(new Date(), -offset))){
         n++;
@@ -2015,7 +1920,6 @@ const STREAK = {
   }
 };
 
-/* ═══════════════ 10c. HOME ═══════════════ */
 const HOME = {
   render(){
     const h = new Date().getHours();
@@ -2118,7 +2022,6 @@ const HOME = {
   }
 };
 
-/* ═══════════════ 10d. TIMETABLE ═══════════════ */
 const TT = {
   add(){
     const day = Number(document.getElementById('tt-day')?.value);
@@ -2244,7 +2147,7 @@ const TT = {
       } else {
         new Notification(title, { body, icon:'./icon-192.png' });
       }
-    }catch(e){ /* non-fatal */ }
+    }catch(e){ }
   },
   _clockTimer:null,
   render(){
@@ -2346,8 +2249,6 @@ const TT = {
     }
   },
 
-  /* Real reminders: a calendar file (repeating weekly) that any phone's
-     calendar app will alert on, even when Abhyas is closed. */
   exportICS(){
     const sess = (S.tt.sessions || []).filter(s => (s.start || s.time));
     if(!sess.length){ toast('Add a session to your study plan first.'); return; }
@@ -2413,7 +2314,6 @@ const TT = {
   }
 };
 
-/* ═══════════════ 10e. OFFLINE CACHE ═══════════════ */
 const CACHE = {
   async render(){
     const refs = ChapterData.allFileRefs();
@@ -2533,14 +2433,12 @@ const CACHE = {
   },
 
   async autoSync(){
-    if(!_load('abhyas_autosync', false)) return;   // opt-in only: never spend mobile data unasked
+    if(!_load('abhyas_autosync', false)) return;
     if(!S.online || S.forcedOffline) return;
     const cachedKeys = new Set(await QDB.keys());
     const missing = ChapterData.allFileRefs().filter(r=>!cachedKeys.has(r.key));
     if(!missing.length) return;
 
-    /* Mobile data is expensive here. Never spend it on a download nobody
-       asked for — offer it instead, every time, not just once. */
     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const isCellular = conn && (conn.type === 'cellular' || /^(slow-2g|2g|3g)$/i.test(conn.effectiveType || ''));
     const saver = conn && conn.saveData;
@@ -2553,14 +2451,12 @@ const CACHE = {
       return;
     }
 
-    /* A capped slice per session: the rest is picked up next time, or all at
-       once from Downloads. Keeps the boot quiet and the data bill small. */
     const BATCH = 40;
     const batch = missing.slice(0, BATCH);
     CACHE._badge(`Saving for offline · 0/${batch.length}`);
     let done = 0;
     for(const ref of batch){
-      try{ await QUIZ._fetch(ref.fid, ref.key, 1, 'bg'); }catch{ /* quietly skip */ }
+      try{ await QUIZ._fetch(ref.fid, ref.key, 1, 'bg'); }catch{ }
       done++;
       CACHE._badge(`Saving for offline · ${done}/${batch.length}`);
     }
@@ -2582,7 +2478,6 @@ const CACHE = {
   }
 };
 
-/* ═══════════════ 10f. DATA MANAGEMENT ═══════════════ */
 const DATA = {
   exportAll(){
     const payload = {
@@ -2687,19 +2582,15 @@ const DATA = {
   async reset(){
     if(!(await ASK.confirm({title:'Reset this device?', body:'This deletes ALL progress, bookmarks, flags, wrong answers and study plan on this device. Your cloud backup is not touched.', ok:'Continue', danger:true}))) return;
     if(!(await ASK.confirm({title:'Are you absolutely sure?', body:'This cannot be undone.', ok:'Yes, reset', danger:true}))) return;
-    /* v1.29: snapshot before the wipe so a mis-click is recoverable. */
     RESET_SNAPSHOT.save('reset');
     [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
     toast('All data reset');
     location.reload();
   },
-  /* ---- v1.13: cloud reset + account deletion ----------- ABHYAS_PATCH_1_13 ---- */
   async resetCloud(){
     if(!S.user || !S.user.token){ toast('Log in first'); return; }
     if(!S.online || S.forcedOffline){ toast('Go online first. This also clears your cloud copy.'); return; }
     if(!(await ASK.confirm({title:'Reset your progress everywhere?', body:'This deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.', ok:'Reset everywhere', danger:true, requireText:'RESET'}))){ toast('Cancelled. Nothing was changed.'); return; }
-    /* v1.29: snapshot before the wipe. Only helps this device, but that
-       is usually where the mis-click happened. */
     RESET_SNAPSHOT.save('resetCloud');
     let res;
     try{
@@ -2727,9 +2618,6 @@ const DATA = {
     if(!password){ toast('Enter your password first'); return; }
     if(typed !== 'DELETE'){ toast('Type DELETE in the box to confirm'); return; }
     if(!(await ASK.confirm({title:'Delete your account?', body:'Your login, progress, payment record, weekly-set attempts and written answers (including uploaded files) are removed from the server. This cannot be undone.', ok:'Delete my account', danger:true}))) return;
-    /* v1.29: keep a local snapshot so if the account deletion turns out to
-       be a mistake (or the server refuses it), the progress can be read
-       back with no data loss. */
     RESET_SNAPSHOT.save('deleteAccount');
     let res;
     try{
@@ -2748,14 +2636,6 @@ const DATA = {
   }
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
-   v1.29: PRE-RESET SAFETY SNAPSHOT.
-
-   Every destructive operation saves a local snapshot first. If the
-   student realises within 24 hours that they didn't mean to wipe
-   everything, a small card on Home offers a one-tap restore. After
-   24 hours the snapshot is dropped automatically.
-   ═══════════════════════════════════════════════════════════════════════ */
 const RESET_SNAPSHOT = {
   KEY: 'abhyas_pre_reset_snapshot',
   TTL_MS: 24 * 60 * 60 * 1000,
@@ -2857,6 +2737,7 @@ const RESET_SNAPSHOT = {
     toast('Snapshot discarded.');
   }
 };
+
 const TUTORIAL = {
   _seenKey: 'abhyas_tut_seen',
   _idx: 0,
@@ -2977,7 +2858,6 @@ const TUTORIAL = {
   }
 };
 
-/* ═══════════════ 11. APP BOOT ═══════════════ */
 const APP = {
   _booted: false,
   async init(){
@@ -2992,13 +2872,10 @@ const APP = {
     if(typeof migrateSessionScopes === 'function') migrateSessionScopes();
     if(!Object.keys(S.chapStats).length && S.prog.sessions?.length) CHAPSTATS.rebuildFromSessions();
     if(!S.cov || !Object.keys(S.cov).length) COV.rebuildFromSessions();
-    /* Known question counts (content-index.js) make progress bars right from the first launch. */
     if(window.CONTENT_INDEX && typeof window.CONTENT_INDEX === 'object'){
       Object.keys(window.CONTENT_INDEX).forEach(k => { if(S.fcount[k] == null) S.fcount[k] = window.CONTENT_INDEX[k]; });
     }
 
-    /* Only scan the whole question cache once per app version: reading every
-       cached set on every launch was a startup spike on low-end phones. */
     const _appV = String(typeof APP_VERSION !== 'undefined' ? APP_VERSION : '');
     const _scanned = _load('abhyas_qscan', '') === _appV;
     const qKeys = _scanned ? [] : await QDB.keys();
@@ -3026,7 +2903,6 @@ const APP = {
   }
 };
 
-/* ═══════════════ 12. NETWORK STATE BINDING ═══════════════ */
 function _updateOfflineWarn(){
   const modern = document.getElementById('on-offline-warn');
   if(modern) modern.style.display = (S.online && !S.forcedOffline) ? 'none' : 'flex';
@@ -3087,7 +2963,6 @@ window.addEventListener('offline', ()=>{
   _updateOfflineWarn();
 });
 
-/* ═══════════════ 12b. NET — manual toggle ═══════════════ */
 const NET = {
   toggle(){
     if(!S.online && !S.forcedOffline){
@@ -3108,18 +2983,8 @@ const NET = {
   }
 };
 
-/* ═══════════════ 13. pluralize ═══════════════ */
 function pluralize(n, word, pluralWord){ return `${n} ${n===1 ? word : (pluralWord || word + 's')}`; }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   v1.28: CROSS-TAB SYNC.
-
-   The storage event only fires in OTHER tabs, so there is no write loop.
-   We listen for the keys that hold user state, debounce 300 ms to survive
-   a burst of rapid saves, and refresh the in-memory state + home screen.
-   A change to the session key (login/logout in another tab) reloads this
-   tab so the student is never looking at someone else's data.
-   ═══════════════════════════════════════════════════════════════════════ */
 (function crossTabSync(){
   const WATCH = new Set([LS.PROG, LS.BK, LS.FL, LS.WR, LS.COV, LS.STK, LS.CHAPSTATS, LS.USER]);
   let pending = null;
@@ -3128,8 +2993,6 @@ function pluralize(n, word, pluralWord){ return `${n} ${n===1 ? word : (pluralWo
     if (!e.key || !WATCH.has(e.key)) return;
     if (e.newValue === e.oldValue) return;
 
-    /* Session changed in another tab → reload here too, so we are not
-       showing a stale identity. */
     if (e.key === LS.USER){
       const before = e.oldValue ? (() => { try { return JSON.parse(e.oldValue).username; } catch(x){ return null; } })() : null;
       const after  = e.newValue ? (() => { try { return JSON.parse(e.newValue).username; } catch(x){ return null; } })() : null;
@@ -3153,10 +3016,6 @@ function pluralize(n, word, pluralWord){ return `${n} ${n===1 ? word : (pluralWo
   });
 })();
 
-/* ═══════════════ 14. BOOT SEQUENCE ═══════════════ */
-/* v1.22: a boot failure used to leave the student on a blank screen.
-   This catches a synchronous throw OR a rejected promise from the boot
-   chain and swaps the loading spinner for a recovery card. */
 const BOOT_ERROR = {
   show(err){
     try {
@@ -3179,7 +3038,7 @@ const BOOT_ERROR = {
             '</button>' +
           '</div>' +
         '</div>';
-    } catch (e) { /* if even this fails, do nothing */ }
+    } catch (e) { }
   },
   async clearCache(){
     try {
@@ -3216,11 +3075,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 });
 
-/* v1.23: focus-scroll for mobile keyboards.
-   On a phone, tapping a field in the lower part of the screen opens the
-   keyboard OVER the field, and the Save button goes under the keyboard too.
-   Scroll the focused field toward centre so both stay visible. The 300 ms
-   wait lets the keyboard finish animating before we measure. */
 (function focusScroll() {
   if (!window.matchMedia || !matchMedia('(pointer:coarse)').matches) return;
   document.addEventListener('focusin', function (e) {
@@ -3237,9 +3091,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 })();
 
-/* v1.27: repaint day-based cards across midnight. A phone tab that is never
-   closed otherwise shows a stale countdown until something else triggers a
-   render. */
 (function midnightRepaint() {
   function dayStart(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
   let last = dayStart(new Date());
@@ -3258,9 +3109,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 })();
 
-/* ═══════════════ GLOBAL EXPOSURE ═══════════════
-   Only core modules are exposed here; objective.js and subjective.js
-   expose their own (QUIZ, ON, LOC, PSY, REV, CNT, ONPROG, SUBJ). */
 window.AUTH = AUTH;
 window.NET = NET;
 window.UI = UI;

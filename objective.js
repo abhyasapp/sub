@@ -1778,7 +1778,15 @@ const QUIZ = {
     S.quiz.qs.forEach((q,i)=>{ if(isOk(S.quiz.ans[i], q.correct)) correct++; });
     const wrong = S.quiz.ans.filter((a,i)=> a!==null && !isOk(a,S.quiz.qs[i].correct)).length;
     const skipped = S.quiz.ans.filter(a=>a===null).length;
-    const pct = total ? Math.round((correct/total)*100) : 0;
+        const rawPct = total ? Math.round((correct/total)*100) : 0;
+    /* v1.33: weekly tests use Loksewa negative marking. Every other quiz
+       type (chapter practice, daily, mock, review) keeps the plain
+       percentage, so this check is scoped to weeklyId only. */
+    const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
+    const loksewa = (isWeekly && total)
+      ? Math.round(((correct - wrong * 0.2) / total) * 1000) / 10
+      : null;
+    const pct = (loksewa !== null) ? loksewa : rawPct;
 
     document.getElementById('res-ring').style.setProperty('--p', pct+'%');
     document.getElementById('res-pct').textContent = pct+'%';
