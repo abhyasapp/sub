@@ -87,22 +87,6 @@ function fileMissedNowCount(fid){
   return n;
 }
 
-function _fileStatsMapFromSessions(leaves){
-  const map = new Map();
-  leaves.forEach(ref=>{ if(!map.has(ref.fid)) map.set(ref.fid, {practised:new Set(), attempted:0, correct:0, wrong:0}); });
-  S.prog.sessions.forEach(s=>{
-    (s.qres||[]).forEach(q=>{
-      if(!q || !q.uid) return;
-      const rec = map.get(fidFromUid(q.uid));
-      if(!rec) return;
-      rec.practised.add(q.uid);
-      rec.attempted++;
-      if(q.ok) rec.correct++; else rec.wrong++;
-    });
-  });
-  return map;
-}
-
 function scopedStats(leaves){
   const fileMap = fileStatsMap(leaves);
   const uids = new Set();
@@ -176,11 +160,19 @@ const ONPROG = {
     ONPROG.render();
   },
 
-  resetFile(fid){
+  async resetFile(fid){
     if(!fid) return;
     const ref = ONPROG._lastLeaves.find(l=>l.fid===fid);
     const label = ref ? `${ref.book} — ${ref.subtopic}` : 'this file';
-    if(!confirm(`Reset practice progress for "${label}"?\n\nThis clears only the Practised/Attempted/Correct/Wrong counts for this one file. Bookmarks, flags, and your wrong-answer bank are not touched — and the question file itself is never modified.`)) return;
+    /* v1.27: was native confirm(), which an installed iOS PWA silently
+       suppresses — the reset ran even if the student tapped Cancel. */
+    const ok = await ASK.confirm({
+      title: 'Reset practice progress?',
+      body:  'Reset progress for <b>' + esc(label) + '</b>? This clears only the Practised / Attempted / Correct / Wrong counts for this one file. Bookmarks, flags and your wrong-answer bank are not touched — the question file itself is never modified.',
+      ok:    'Reset',
+      danger: true
+    });
+    if(!ok) return;
     let removedTotal=0, removedCorrectTotal=0;
     S.prog.sessions.forEach(s=>{
       if(!s.qres || !s.qres.length) return;
@@ -569,6 +561,21 @@ const PSY = {
 
 /* ═══════════════ REV — Review lists ═══════════════ */
 const REV = {
+  /* v1.22: per-list free-text filter. Populated by the search inputs on the
+     Saved / Flagged / Missed views. Empty string means "show everything". */
+  _filters: { bk: '', fl: '', wr: '' },
+  filterList(kind, term){
+    this._filters[kind] = String(term || '').toLowerCase().trim();
+    if (kind === 'wr' && typeof WRONGBY !== 'undefined' && WRONGBY.render) WRONGBY.render();
+    else this.renderList(kind);
+  },
+  _matches(q, term){
+    if (!term) return true;
+    return (String(q.q || '').toLowerCase().indexOf(term) !== -1) ||
+           (q.options || []).some(o => String(o).toLowerCase().indexOf(term) !== -1) ||
+           (String(q.explanation || '').toLowerCase().indexOf(term) !== -1) ||
+           (String(q.tag || '').toLowerCase().indexOf(term) !== -1);
+  },
   _store(kind){ return kind==='bk'?S.bk : kind==='fl'?S.fl : S.wr; },
   _lsKey(kind){ return kind==='bk'?LS.BK : kind==='fl'?LS.FL : LS.WR; },
   _listEl(kind){ return kind==='bk'?'bk-list' : kind==='fl'?'fl-list' : 'wr-list'; },
@@ -632,6 +639,9 @@ const REV = {
 
   renderList(kind){
     let arr = REV._store(kind);
+    /* v1.22: if the student has typed a search, filter before rendering. */
+    const filter = this._filters[kind] || '';
+    if (filter) arr = arr.filter(q => this._matches(q, filter));
     const el = document.getElementById(REV._listEl(kind));
     if(!el)return;
     if(!arr.length){
@@ -783,10 +793,15 @@ const QUIZ = {
       try{ data = JSON.parse(text); }
       catch(pe){ throw new Error('Could not parse server response. The file may be corrupted or the server returned an unexpected format.'); }
       /* The server asked us to slow down — wait it out rather than caching
-         the error object as if it were a question file. */
+         the error object as if it were a question file.
+         v1.22: the server now sends retryAfterSec, so we wait exactly as
+         long as needed (capped at 20s so a student is not left staring at
+         a spinner) and tell them how long it will be. */
       if(data && data.rateLimited && attempt < 4){
-        if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(12000);
-        await new Promise(res => setTimeout(res, 6000));
+        const waitSec = Math.min(20, Math.max(3, Number(data.retryAfterSec) || 6));
+        if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(waitSec * 1000 + 500);
+        toast('⏳ Server is busy — retrying in ' + waitSec + 's…', 3000);
+        await new Promise(res => setTimeout(res, waitSec * 1000));
         return QUIZ._fetch(fileId, cacheKey, attempt + 1, kind);
       }
       if(data && data.sessionInvalid){
@@ -896,9 +911,12 @@ const QUIZ = {
       document.body.appendChild(el);
     }
     el._retry = retryFn || null;
-    el.innerHTML = `<div style="background:var(--c2);border:1px solid var(--bad-bd);border-radius:var(--r3);padding:1.4rem 1.5rem;max-width:380px;width:100%;box-shadow:var(--sh3)" role="dialog" aria-modal="true">
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'quiz-err-title');
+    el.innerHTML = `<div style="background:var(--c2);border:1px solid var(--bad-bd);border-radius:var(--r3);padding:1.4rem 1.5rem;max-width:380px;width:100%;box-shadow:var(--sh3)">
       <div style="font-size:1.4rem;margin-bottom:.5rem"><i class="ph ph-x-circle"></i></div>
-      <div style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--ros);margin-bottom:.6rem">Failed to Load</div>
+      <div id="quiz-err-title" style="font-family:var(--fd);font-size:.92rem;font-weight:700;color:var(--ros);margin-bottom:.6rem">Failed to Load</div>
       <div style="font-size:.78rem;color:var(--t2);line-height:1.6;margin-bottom:1rem">${esc(msg)}</div>
       <div style="display:flex;gap:.5rem">
         <button id="quiz-err-retry" style="flex:1;padding:.58rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r1);color:var(--on-accent);font-weight:700;font-size:.82rem;cursor:pointer;font-family:var(--ff)"><i class="ph ph-arrow-clockwise"></i> Retry</button>
@@ -1268,8 +1286,15 @@ const QUIZ = {
       modal.remove();
       QUIZ._resumeSnapshot(snap, adjustedLeft);
     };
-    document.getElementById('exam-discard-btn').onclick = ()=>{
-      if(!confirm(`Discard this exam? You'll lose ${answered}/${snap.qs.length} answered question${answered!==1?'s':''} — this can't be undone.`)) return;
+    document.getElementById('exam-discard-btn').onclick = async ()=>{
+      /* v1.27: native confirm() is unreliable inside an installed iOS PWA. */
+      const ok = await ASK.confirm({
+        title: 'Discard this exam?',
+        body:  'You\u2019ll lose ' + answered + '/' + snap.qs.length + ' answered question' + (answered !== 1 ? 's' : '') + '. This cannot be undone.',
+        ok:    'Discard',
+        danger: true
+      });
+      if(!ok) return;
       modal.remove();
       QUIZ._clearExamSnapshot();
     };
@@ -1512,14 +1537,22 @@ const QUIZ = {
   _star(){
     if(S.quiz.reviewOnly) return;
     const q=S.quiz.qs[S.quiz.idx];
-    REV.toggle('bk', q);
+    /* v1.27: undo. A mis-tap on the star used to mean leaving the quiz to
+       find the bookmark in the review list. */
+    const added = REV.toggle('bk', q);
     QUIZ._renderFlashcard();
+    if(added && typeof toastUndo === 'function'){
+      toastUndo('⭐ Saved', function(){ REV.toggle('bk', q); QUIZ._renderFlashcard(); });
+    }
   },
   _flag(){
     if(S.quiz.reviewOnly) return;
     const q=S.quiz.qs[S.quiz.idx];
-    REV.toggle('fl', q);
+    const added = REV.toggle('fl', q);
     QUIZ._renderFlashcard();
+    if(added && typeof toastUndo === 'function'){
+      toastUndo('🚩 Flagged', function(){ REV.toggle('fl', q); QUIZ._renderFlashcard(); });
+    }
   },
   _reportCurrent(){
     const q = S.quiz.qs?.[S.quiz.idx];
@@ -1793,9 +1826,71 @@ const QUIZ = {
 
         const weak = rows.filter(r => r.pct < 40 && r.total >= 2);
 
+        /* v1.28: Loksewa grades by group — A/B/C/D, 30/25/25/20. Add a
+           group-marks table above the chapter table so the student sees
+           the paper the way the commission will. */
+        const groupMap = (window.WEEKLY && window.WEEKLY.LOKSEWA_GROUPS) || {};
+        const byGroup = {};
+        (S.quiz.qs || []).forEach((q, i) => {
+          let key = 'Other';
+          try {
+            if (typeof fidFromUid === 'function' && typeof ChapterData !== 'undefined'){
+              const fid = fidFromUid(String(q.uid || ''));
+              const ref = ChapterData.allFileRefs().find(r => r.fid === fid);
+              if (ref){
+                for (const k of Object.keys(groupMap)){
+                  if ((groupMap[k].chapters || []).indexOf(ref.ch) !== -1){ key = k; break; }
+                }
+              }
+            }
+          } catch(e){}
+          const g = byGroup[key] || (byGroup[key] = { key, correct: 0, wrong: 0, skipped: 0, total: 0 });
+          const a = S.quiz.ans[i];
+          g.total++;
+          if (a === null || a === undefined) g.skipped++;
+          else if (isOk(a, q.correct)) g.correct++;
+          else g.wrong++;
+        });
+        const groupRows = Object.keys(byGroup).sort().map(k => {
+          const g = byGroup[k];
+          const score = g.correct - g.wrong * 0.2;
+          const target = (groupMap[k] && groupMap[k].marks) || g.total;
+          const pct = target ? Math.round((score / target) * 100) : 0;
+          const cls = pct >= 60 ? 'color:var(--success)'
+                    : pct >= 40 ? 'color:var(--accent)'
+                    : 'color:var(--danger)';
+          const label = (groupMap[k] && groupMap[k].name) ? groupMap[k].name : ('Group ' + k);
+          return '<tr>' +
+            '<td>' + esc(label) + '</td>' +
+            '<td class="num" style="text-align:center">' + g.total + '</td>' +
+            '<td class="num" style="text-align:center;color:var(--success)">' + g.correct + '</td>' +
+            '<td class="num" style="text-align:center;color:var(--danger)">' + g.wrong + '</td>' +
+            '<td class="num" style="text-align:center">' + g.skipped + '</td>' +
+            '<td class="num" style="text-align:right;font-weight:700;' + cls + '">' +
+              score.toFixed(1) + ' <span class="t-cap">/ ' + target + '</span>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+
         const block = document.createElement('div');
         block.className = 'chapter-breakdown';
         block.innerHTML =
+          '<h3 class="t-t3" style="margin:var(--sp-4) 0 var(--sp-2)">' +
+            '<i class="ph ph-medal"></i> Marks by group (Loksewa format)' +
+          '</h3>' +
+          '<div class="table-wrap" style="margin-bottom:var(--sp-3)">' +
+            '<table>' +
+              '<thead><tr>' +
+                '<th>Group</th>' +
+                '<th style="text-align:center">Q</th>' +
+                '<th style="text-align:center">Right</th>' +
+                '<th style="text-align:center">Wrong</th>' +
+                '<th style="text-align:center">Skipped</th>' +
+                '<th style="text-align:right">Score</th>' +
+              '</tr></thead>' +
+              '<tbody>' + groupRows + '</tbody>' +
+            '</table>' +
+          '</div>' +
           '<h3 class="t-t3" style="margin:var(--sp-4) 0 var(--sp-2)">' +
             '<i class="ph ph-chart-bar"></i> Marks by chapter' +
           '</h3>' +
@@ -1901,18 +1996,37 @@ const QUIZ = {
     PROG.recordSession(sessionObj);
     CHAPSTATS.record(sessionObj);
 
-    // Weekly set: capture the attempt now that the score is computed,
-    // then lock the retry button so the UI matches the server-enforced
-    // one-attempt rule.
+    // Weekly set: capture the score. Only the FIRST attempt is synced to
+    // the server; retakes stay on this device for the "last time you got
+    // X" prompt. The retry button always offers "Practice again".
     const isWeekly = !!(scope.weeklyId);
+    const isRetake = !!(scope.weeklyRetake);
     if(isWeekly){
       WEEKLY._recordAttempt(S.quiz, { total, correct, wrong, skipped, pct });
+
       const retryBtn = document.querySelector('#res-wrap .btn-p');
       if(retryBtn){
-        retryBtn.disabled = true;
-        retryBtn.innerHTML = '<i class="ph ph-lock-simple"></i> One attempt only — see Review from the home card';
-        retryBtn.style.opacity = '.55';
-        retryBtn.style.pointerEvents = 'none';
+        retryBtn.disabled = false;
+        retryBtn.style.opacity = '';
+        retryBtn.style.pointerEvents = '';
+        retryBtn.innerHTML = isRetake
+          ? '<i class="ph ph-repeat"></i> Retake again'
+          : '<i class="ph ph-repeat"></i> Practice again (score won\'t change)';
+        retryBtn.onclick = function(){
+          UI.go('home');
+          setTimeout(function(){ WEEKLY._startRetake(scope.weeklyId); }, 150);
+        };
+      }
+
+      if(isRetake){
+        const grade = document.getElementById('res-grade');
+        if(grade && !grade.parentNode.querySelector('.retake-notice')){
+          const note = document.createElement('div');
+          note.className = 'retake-notice t-foot';
+          note.style.cssText = 'text-align:center;margin-top:.5rem;color:var(--warning)';
+          note.innerHTML = '<i class="ph ph-info"></i> This was a practice retake. Your <b>official score</b> for this set has not changed.';
+          grade.parentNode.insertBefore(note, grade.nextSibling);
+        }
       }
     }
   }

@@ -67,4 +67,14 @@
           recovery mode after 3+ days away, read-aloud button. */
 /* 1.20 - chapters refresh when you're online; weekly leaderboard; badges;
           wrong-first results; streak insurance; sidebar search; push nudge. */
-const APP_VERSION = '1.20';
+/* 1.21 - weekly test retakes: the first attempt is the official record;
+          later attempts are local-only practice, and the retake modal
+          shows the last score with Review / Retake options. Every system
+          Drive folder now lives under "Abhyas System Data", and uploaded
+          files are renamed to a standard YYYY-MM-DD_HHMMSS_user_type.ext
+          pattern. */
+/* 1.22 - polish: rate-limit retry-after shown to the student, exam
+          copy protection, live Loksewa negative-marking score in the
+          exam bar, boot error boundary, search inside Saved/Flagged/
+          Missed lists, faster progress flush, weekly admin summary. */
+const APP_VERSION = '1.29';

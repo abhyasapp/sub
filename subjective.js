@@ -106,6 +106,151 @@ const TIMERS = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
+   v1.29: OFFLINE WRITTEN-ANSWER QUEUE.
+
+   A QOTD or exam answer that cannot be uploaded (no signal, a hiccup at
+   the wrong moment) is written to localStorage and posted automatically
+   when the connection returns. One pending item per (user, kind,
+   questionId): a retake replaces the previous queued item rather than
+   stacking, so localStorage cannot grow unbounded.
+
+   The queue is deliberately user-scoped — a second student signing in on
+   the same phone never sends the previous student's answer.
+   ═══════════════════════════════════════════════════════════════════════ */
+const SUBJ_QUEUE = {
+  KEY: 'abhyas_subj_queue_v1',
+  MAX_BYTES: 2 * 1024 * 1024,   // 2 MB — a phone's localStorage budget varies
+  MAX_ATTEMPTS: 5,
+
+  read(){
+    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]') || []; }
+    catch(e){ return []; }
+  },
+  write(list){
+    try { localStorage.setItem(this.KEY, JSON.stringify(list || [])); } catch(e){}
+  },
+  add(item){
+    const list = this.read().filter(x => !(
+      x.username === item.username &&
+      x.kind === item.kind &&
+      x.questionId === item.questionId
+    ));
+    list.push(Object.assign({}, item, { queuedAt: Date.now(), attempts: 0 }));
+    this.write(list);
+  },
+  removeFor(username, kind, questionId){
+    this.write(this.read().filter(x => !(
+      x.username === username && x.kind === kind && x.questionId === questionId
+    )));
+  },
+  forUser(username){
+    return this.read().filter(x => x.username === username);
+  },
+
+  async process(){
+    if(typeof navigator !== 'undefined' && !navigator.onLine) return;
+    let user = null;
+    try { user = (typeof S !== 'undefined' && S && S.user) ? S.user : null; } catch(e){}
+    if(!user || !user.token) return;
+
+    const list = this.read();
+    if(!list.length) return;
+
+    const remaining = [];
+    let sentAny = false;
+
+    for(const item of list){
+      if(item.username !== user.username){ remaining.push(item); continue; }
+      item.attempts = (item.attempts || 0) + 1;
+      if(item.attempts > this.MAX_ATTEMPTS) continue;
+
+      try {
+        const res = await this._send(item, user);
+        if(res && res.success){
+          sentAny = true;
+          this._markSubmitted(item);
+        } else if(res && res.sessionInvalid){
+          remaining.push(item);
+        } else if(res && res.alreadySubmitted){
+          sentAny = true;
+          this._markSubmitted(item);
+        }
+      } catch(e){
+        remaining.push(item);
+      }
+    }
+
+    this.write(remaining);
+    if(sentAny && typeof toast === 'function') toast('✅ Queued answer sent.', 4500);
+    try { if(typeof SUBJ !== 'undefined'){ SUBJ._renderQotd(); SUBJ._renderExam(); } } catch(e){}
+    try { if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh(); } catch(e){}
+  },
+
+  _markSubmitted(item){
+    if(item.kind === 'qotd'){
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_QOTD) || 'null');
+        if(raw){ raw.submitted = true; raw.submittedAt = Date.now(); raw.queued = false; localStorage.setItem(LS_QOTD, JSON.stringify(raw)); }
+      } catch(e){}
+      try { if(typeof QOTD !== 'undefined' && QOTD){ QOTD.submitted = true; QOTD.submittedAt = Date.now(); QOTD.queued = false; } } catch(e){}
+    }
+    if(item.kind === 'exam'){
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_EXAM) || 'null');
+        if(raw){ raw.submitted = true; raw.submittedAt = Date.now(); raw.queued = false; localStorage.setItem(LS_EXAM, JSON.stringify(raw)); }
+      } catch(e){}
+      try { if(typeof EXAM !== 'undefined' && EXAM){ EXAM.submitted = true; EXAM.submittedAt = Date.now(); EXAM.queued = false; } } catch(e){}
+    }
+  },
+
+  async _send(item, user){
+    const url = (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG && ABHYAS_CONFIG.GAS_URL) || '';
+    if(!url) return { success: false, error: 'Backend URL not configured.' };
+    const body = JSON.stringify({
+      action: 'submitSubjectiveAnswer',
+      username: user.username, token: user.token,
+      kind: item.kind,
+      questionId: item.questionId,
+      questionText: item.questionText,
+      chapterId: item.chapterId,
+      marks: item.marks,
+      solveSec: item.solveSec,
+      startedAt: item.startedAt,
+      pdfData: item.pdfData,
+      filename: item.filename
+    });
+    const ctrl = ('AbortController' in window) ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 45000) : null;
+    try {
+      const r = await fetch(url, {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body, signal: ctrl && ctrl.signal
+      });
+      if(timer) clearTimeout(timer);
+      if(!r.ok) return { success: false, error: 'HTTP ' + r.status };
+      return await r.json();
+    } catch(e){
+      if(timer) clearTimeout(timer);
+      throw e;
+    }
+  },
+
+  /* Called from the boot path and on every 'online' event. */
+  scheduleProcess(){
+    if(this._scheduled) return;
+    this._scheduled = true;
+    setTimeout(() => {
+      this._scheduled = false;
+      this.process().catch(() => {});
+    }, 1200);
+  }
+};
+
+window.addEventListener('online', () => SUBJ_QUEUE.scheduleProcess());
+try { setTimeout(() => SUBJ_QUEUE.scheduleProcess(), 3000); } catch(e){}
+setInterval(() => { try { SUBJ_QUEUE.process(); } catch(e){} }, 60000);
+
+/* ═══════════════════════════════════════════════════════════════════════
    CUSTOM EXAM COOLDOWN
    ─────────────────────────────────────────────────────────────────────
    The "Build Your Own Paper" feature is rate-limited to once every 6
@@ -523,6 +668,22 @@ function _renderQotd(){
   }
 
   if(phase === 'submitted'){
+    /* v1.29: while the answer is still in the local queue, do not claim
+       "sent to admin" — the student needs to know it is safe on the
+       device but not yet in the admin's hands. */
+    if(QOTD.queued){
+      body.innerHTML = `
+        <div class="card qotd-done">
+          <span class="big"><i class="ph ph-cloud-slash" style="color:var(--amb)"></i></span>
+          <h3 style="color:var(--amb)">Queued on this device</h3>
+          <p>Your answer is saved locally and will be sent to admin the moment you are back online.</p>
+          <div class="bg mt3" style="justify-content:center">
+            <button class="btn btn-sm btn-a" onclick="SUBJ_QUEUE.process()"><i class="ph ph-paper-plane-tilt"></i> Try sending now</button>
+          </div>
+        </div>`;
+      _stopQotdTick();
+      return;
+    }
     body.innerHTML = `
       <div class="card qotd-done">
         <span class="big"><i class="ph ph-check-circle" style="color:var(--grn)"></i></span>
@@ -765,30 +926,6 @@ async function _qotdFile(input){
     input.value = '';
   }
 }
-function _qotdFileLegacy(input){
-  const f = input.files && input.files[0];
-  if(!f) return;
-  if(f.size > MAX_PDF_BYTES){
-    toast('❌ PDF too large — max ' + Math.round(MAX_PDF_BYTES/1024/1024) + ' MB');
-    input.value = '';
-    return;
-  }
-  const looksPdf = /pdf/i.test(f.type || '') || /\.pdf$/i.test(f.name);
-  if(!looksPdf){
-    toast('❌ Only PDF files are accepted');
-    input.value = '';
-    return;
-  }
-  const r = new FileReader();
-  r.onload = e => {
-    _pendingQotdFile = { dataUrl: e.target.result, filename: f.name, size: f.size };
-    _renderQotdFileChip(_pendingQotdFile);
-    const btn = $('qotd-submit'); if(btn) btn.disabled = false;
-  };
-  r.onerror = () => toast('❌ Could not read that file');
-  r.readAsDataURL(f);
-}
-
 function _qotdClearFile(){
   _pendingQotdFile = null;
   const input = $('qotd-pdf'); if(input) input.value = '';
@@ -808,6 +945,42 @@ async function _qotdSubmitInner(){
   if(!q){ toast('❌ Question no longer available'); return; }
   const btn = $('qotd-submit');
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Uploading…'; }
+
+  /* v1.29: no connection → queue the answer on this device rather than
+     throwing it away. The QOTD card shows "Queued" until the server
+     confirms receipt. */
+  const _offline = (typeof navigator !== 'undefined' && !navigator.onLine)
+    || (typeof S !== 'undefined' && S && (S.forcedOffline || !S.online));
+  if(_offline){
+    if(_pendingQotdFile.dataUrl.length > SUBJ_QUEUE.MAX_BYTES){
+      if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Submit for Review'; }
+      toast('❌ That answer is too large to queue offline. Reconnect and try again.', 6000);
+      return;
+    }
+    SUBJ_QUEUE.add({
+      username: (typeof S !== 'undefined' && S && S.user ? S.user.username : ''),
+      kind: 'qotd',
+      questionId: QOTD.questionId,
+      questionText: String(q.q || '').slice(0, 2000),
+      chapterId: q.chapterId,
+      marks: QOTD.marks,
+      solveSec: _solveSecFor(QOTD.marks),
+      startedAt: QOTD.startedAt,
+      pdfData: _pendingQotdFile.dataUrl,
+      filename: _pendingQotdFile.filename
+    });
+    QOTD.submitted = true;
+    QOTD.submittedAt = Date.now();
+    QOTD.queued = true;
+    _persistQotd();
+    _pendingQotdFile = null;
+    _stopQotdTick();
+    toast('💾 Saved on this device — it will send automatically when you are back online.', 6000);
+    _renderQotd();
+    if(typeof window.SB_HINTS !== 'undefined') window.SB_HINTS.refresh();
+    SUBJ_QUEUE.scheduleProcess();
+    return;
+  }
 
   const res = await _api('submitSubjectiveAnswer', {
     kind: 'qotd',
@@ -1046,12 +1219,19 @@ function _examGenerate(){
   _renderExam();
 }
 
-function _examReset(){
-  if(EXAM && !EXAM.submitted){
-    if(!confirm('Discard this paper? Any answers you\'ve written on paper will not be submitted.')) return;
-  } else {
-    if(!confirm('Discard this submitted paper? You can generate a new one afterwards.')) return;
-  }
+/* v1.27: was native confirm() — suppressed by an installed iOS PWA, so
+   the discard ran silently even if the student tried to cancel. */
+async function _examReset(){
+  const body = (EXAM && !EXAM.submitted)
+    ? 'Any answers you have written on paper will not be submitted.'
+    : 'This clears the submitted paper. You can generate a new one afterwards.';
+  const ok = await ASK.confirm({
+    title: 'Discard this paper?',
+    body:  body,
+    ok:    'Discard',
+    danger: true
+  });
+  if(!ok) return;
   _clearExam();
   _pendingExamFile = null;
   _stopExamTick();
@@ -1118,6 +1298,42 @@ async function _examSubmit(){
   if(!EXAM || !_pendingExamFile){ toast('Attach the PDF first'); return; }
   const btn = $('exam-submit');
   if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Uploading…'; }
+
+  /* v1.29: offline → queue instead of failing. */
+  const _offline = (typeof navigator !== 'undefined' && !navigator.onLine)
+    || (typeof S !== 'undefined' && S && (S.forcedOffline || !S.online));
+  if(_offline){
+    if(_pendingExamFile.dataUrl.length > SUBJ_QUEUE.MAX_BYTES){
+      if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Submit Paper for Grading'; }
+      toast('❌ That paper is too large to queue offline. Reconnect and try again.', 6000);
+      return;
+    }
+    const paperTextQ = EXAM.sections.map(s =>
+      `[${s.name}]\n` + s.questions.map((q,i) => `${i+1}. ${q.q} [${q.marks}]`).join('\n')
+    ).join('\n\n').slice(0, 3000);
+    SUBJ_QUEUE.add({
+      username: (typeof S !== 'undefined' && S && S.user ? S.user.username : ''),
+      kind: 'exam',
+      questionId: 'exam_' + EXAM.generatedAt,
+      questionText: paperTextQ,
+      chapterId: 'exam',
+      marks: 100,
+      solveSec: TIMERS.examSeconds,
+      startedAt: EXAM.generatedAt,
+      pdfData: _pendingExamFile.dataUrl,
+      filename: _pendingExamFile.filename
+    });
+    EXAM.submitted = true;
+    EXAM.submittedAt = Date.now();
+    EXAM.queued = true;
+    _persistExam();
+    _pendingExamFile = null;
+    _stopExamTick();
+    toast('💾 Saved on this device — it will send automatically when you are back online.', 6000);
+    _renderExam();
+    SUBJ_QUEUE.scheduleProcess();
+    return;
+  }
 
   const paperText = EXAM.sections.map(s =>
     `[${s.name}]\n` + s.questions.map((q,i) => `${i+1}. ${q.q} [${q.marks}]`).join('\n')
@@ -1322,17 +1538,6 @@ const SUBJ = {
     toast('🔄 Question bank refreshed');
   },
 
-  goTo(tab){
-    const el = document.getElementById('subj-' + tab);
-    if(!el) return;
-    el.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'start' });
-    document.querySelectorAll('.subj-tab').forEach(t => {
-      const on = t.dataset.tab === tab;
-      t.classList.toggle('active', on);
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-  },
-
   _qotdPublicState,
   _hasBank,
 
@@ -1373,6 +1578,7 @@ const SUBJ = {
 };
 
 window.SUBJ = SUBJ;
+window.SUBJ_QUEUE = SUBJ_QUEUE;
 
 /* ═══════════════════════════════════════════════════════════════════════
    SMART PASTE PARSER — used by admin.html

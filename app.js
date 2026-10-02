@@ -433,8 +433,6 @@ const SRCH = {
     if(!text){ toast('No question to search'); return; }
     SRCH._openGoogle(text);
   },
-  go(){ SRCH.quickSearch(); },
-  toggle(){ SRCH.quickSearch(); },
   _openGoogle(text){
     const q = encodeURIComponent(text); if(!q) return;
     const url = `https://www.google.com/search?q=${q}`;
@@ -543,7 +541,11 @@ const COV = {
     const fid = uid.slice(0, i);
     if(fid === 'local') return;
     const idx = parseInt(uid.slice(i + 1), 10);
-    if(!isFinite(idx) || idx < 0 || idx > 5000) return;
+    /* v1.26: raised from 5000 to 20000. A file with more than 5000
+       questions was silently dropped from COV, so "Practised" never
+       counted its tail. 20000 is generous enough for any single file and
+       still guards against a malformed uid. */
+    if(!isFinite(idx) || idx < 0 || idx > 20000) return;
     const rec = S.cov[fid] || (S.cov[fid] = {p:'', a:0, c:0});
     if(rec.p.length <= idx) rec.p = rec.p.padEnd(idx + 1, '0');
     rec.p = rec.p.slice(0, idx) + (q.ok ? '1' : '2') + rec.p.slice(idx + 1);
@@ -858,7 +860,6 @@ const PSYNC = {
     this._timer = null;
     this._beaconSync();
   },
-  _MAX_SYNCED_SESSIONS: 500,
   _MAX_SYNCED_LIST_ITEMS: 300,
   _SYNC_PAYLOAD_CEILING: 44000,
   _capList(arr, max){
@@ -901,40 +902,6 @@ const PSYNC = {
     // 3) Last resort: drop the oldest sessions entirely.
     while(json.length > CEIL && sessions.length > 10){ sessions.pop(); json = build(); }
     return json;
-  },
-  _syncPayloadLegacy(){
-    const build = (bkMax, flMax, wrMax, sessMax) => {
-      const prog = (S.prog && S.prog.sessions && S.prog.sessions.length > sessMax)
-        ? { ...S.prog, sessions: S.prog.sessions.slice(-sessMax) }
-        : S.prog;
-      return JSON.stringify({
-        prog,
-        chapStats: S.chapStats,
-        bk: this._capList(S.bk, bkMax),
-        fl: this._capList(S.fl, flMax),
-        wr: this._capList(S.wr, wrMax),
-        stk: S.stk
-      });
-    };
-    const full = this._MAX_SYNCED_LIST_ITEMS;
-    const half = Math.max(20, Math.floor(full / 2));
-    const quarter = Math.max(20, Math.floor(full / 4));
-    const min = 20;
-    const sessFull = this._MAX_SYNCED_SESSIONS;
-    const sessHalf = Math.max(50, Math.floor(sessFull / 2));
-    const sessMin = 50;
-
-    const attempts = [
-      [full, full, full, sessFull],
-      [half, half, half, sessHalf],
-      [quarter, quarter, quarter, sessHalf],
-      [min, min, min, sessMin]
-    ];
-    for (const [bk, fl, wr, ss] of attempts) {
-      const payload = build(bk, fl, wr, ss);
-      if (payload.length <= this._SYNC_PAYLOAD_CEILING) return payload;
-    }
-    return build(min, min, min, sessMin);
   },
   async pushNow(){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
@@ -1161,6 +1128,43 @@ const PWA = {
    open() logic reads QUIZ, which loads in objective.js. Fine because
    _renderHomeCard() only runs at runtime, after all scripts loaded. */
 const WEEKLY = {
+  /* v1.21: the retake score is kept on this device only. The sheet holds
+     the FIRST attempt forever. This map is what the "last time you got X"
+     prompt reads from, so a student can see their most recent practice
+     run even though the official record never changes. */
+  LS_RETAKES: 'abhyas_weekly_last_retake',
+  _retakes: null,
+
+  _loadRetakes(){
+    if (this._retakes) return this._retakes;
+    try {
+      const raw = localStorage.getItem(this.LS_RETAKES);
+      this._retakes = raw ? JSON.parse(raw) : {};
+      if (!this._retakes || typeof this._retakes !== 'object') this._retakes = {};
+    } catch(e){ this._retakes = {}; }
+    return this._retakes;
+  },
+  _saveRetakeScore(id, stats){
+    const all = this._loadRetakes();
+    all[id] = {
+      correct: Number(stats.correct) || 0,
+      wrong:   Number(stats.wrong)   || 0,
+      skipped: Number(stats.skipped) || 0,
+      total:   Number(stats.total)   || 0,
+      pct:     Number(stats.pct)     || 0,
+      at: Date.now()
+    };
+    try { localStorage.setItem(this.LS_RETAKES, JSON.stringify(all)); } catch(e){}
+  },
+  _lastAttemptFor(id){
+    const retake = this._loadRetakes()[id];
+    return retake || this.attempts[id] || null;
+  },
+  _clearRetakesFor(id){
+    const all = this._loadRetakes();
+    if (all[id]) { delete all[id]; try { localStorage.setItem(this.LS_RETAKES, JSON.stringify(all)); } catch(e){} }
+  },
+
   sets: [],
   attempts: S.weeklyAttempts || {},
   _tickTimer: null,
@@ -1238,11 +1242,20 @@ const WEEKLY = {
         </div>`;
       }
 
-      // Attempted — show recorded score. No countdown.
+      // Attempted — show the recorded or last-practice score. Retakes are
+      // allowed until the admin archives the set or the window closes.
       if(attempted){
+        const lastRetake = this._loadRetakes()[s.id];
+        const shown = lastRetake || attempted;
+        const isRetake = !!lastRetake;
+        const canRetake = s.status !== 'archived' && this.examOpen(s);
+        const tag = isRetake
+          ? '↻ Last practice ' + shown.pct + '% · Official ' + attempted.pct + '%'
+          : '✓ ' + attempted.pct + '%' + (attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : '');
+        const hint = canRetake ? ' · Tap to review or retake' : ' · Tap to review';
         return `<div class="qb-btn ok" style="cursor:pointer;width:100%;justify-content:space-between;align-items:center;opacity:.92" onclick='WEEKLY.open(${idJson})'>
           <span><i class="ph ph-check-circle"></i> ${esc(s.title)}${s.chapterLabel?` <span style="opacity:.6">— ${esc(s.chapterLabel)}</span>`:''}</span>
-          <span class="ctag tg" style="font-size:.62rem;font-weight:700">✓ ${attempted.pct}%${attempted.standing ? ' · Rank ' + attempted.standing.rank + '/' + attempted.standing.total : ''} · Review</span>
+          <span class="ctag tg" style="font-size:.62rem;font-weight:700">${tag}${hint}</span>
         </div>`;
       }
 
@@ -1376,12 +1389,23 @@ const WEEKLY = {
           this._saveAttempts();
           this._renderHomeCard();
         }
-      }catch(e){ /* network hiccup — fall through, let exam start */ }
+      }catch(e){ /* network hiccup — fall through */ }
     }
 
+    /* v1.21: already attempted. Archived or window-closed sets go straight
+       to review. Otherwise the retake modal offers Review / Retake. */
     if(attempt){
-      toast(`🔒 One attempt only — showing your recorded result (${attempt.pct}%)`, 3500);
-      this._startReview(s, attempt);
+      if(s.status === 'archived'){
+        toast(`🔒 Archived — showing your recorded result (${attempt.pct}%)`, 3500);
+        this._startReview(s, attempt);
+        return;
+      }
+      if(!this.examOpen(s)){
+        toast('👁️ Exam window closed — viewing answers only', 3500);
+        this._startReview(s, attempt);
+        return;
+      }
+      this._showRetakeModal(s, attempt);
       return;
     }
 
@@ -1391,13 +1415,13 @@ const WEEKLY = {
       return;
     }
 
-    toast(`📝 Graded exam — you get ONE attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left.`, 5000);
+    toast(`📝 Graded exam — you get ONE official attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left. Retakes for practice are allowed.`, 5000);
     if(await WEEKLY._startOnServer(s) === 'stop') return;
+    this._buildLoksewaPaper(s);
+  },
 
-    /* v1.20: Loksewa-format mock — fixed section counts (30/25/25/20 = 100
-       questions) and 90 minutes, matching the actual Level 7 Civil paper
-       pattern. Falls back to the original single-file exam if the chapters
-       cannot be loaded (offline, or content not yet cached). */
+  /* v1.21: pulled out of open() so the retake path can reuse it. */
+  async _buildLoksewaPaper(s){
     const groups = WEEKLY.LOKSEWA_GROUPS;
     const picks = [];
     QUIZ._showLoader('Building the Loksewa-format paper…');
@@ -1435,6 +1459,109 @@ const WEEKLY = {
     );
   },
 
+  /* v1.21: prompt shown when a set has already been attempted. */
+  _showRetakeModal(s, attempt){
+    const last = this._lastAttemptFor(s.id) || attempt;
+    const correct = Number(last.correct) || 0;
+    const total   = Number(last.total)   || 0;
+    const skipped = Number(last.skipped) || 0;
+    const wrong   = Math.max(0, total - correct - skipped);
+    const pct     = Number(last.pct) || (total ? Math.round((correct/total)*100) : 0);
+    const isRetake = last !== attempt;
+    const stamp = last.at ? new Date(last.at).toLocaleString() : '';
+
+    MODAL.sheet('Weekly test — ' + s.title,
+      '<div class="qotd-head" style="margin-bottom:var(--sp-4)">' +
+        '<div>' +
+          '<div class="qotd-meta">' + (isRetake ? 'Your last practice run' : 'Your official attempt') + '</div>' +
+          '<div style="font-size:.95rem;font-weight:700;color:var(--t1);margin-top:.15rem">' + esc(s.title) + '</div>' +
+          (stamp ? '<div class="t-cap" style="margin-top:.15rem">' + esc(stamp) + '</div>' : '') +
+        '</div>' +
+        '<div class="qotd-marks">' + pct + '%</div>' +
+      '</div>' +
+      '<div class="stats-row" style="margin-bottom:var(--sp-4)">' +
+        '<div class="scard"><div class="sv tc2">' + correct + '</div><div class="stat-lbl">Correct</div></div>' +
+        '<div class="scard"><div class="sv tb2">' + wrong   + '</div><div class="stat-lbl">Wrong</div></div>' +
+        '<div class="scard"><div class="sv ta2">' + skipped + '</div><div class="stat-lbl">Skipped</div></div>' +
+        '<div class="scard"><div class="sv">' + total + '</div><div class="stat-lbl">Total</div></div>' +
+      '</div>' +
+      (isRetake
+        ? '<div class="banner banner-info" style="margin-bottom:var(--sp-3)"><i class="ph ph-info"></i><span>Your <b>official score</b> for this set is <b>' + (attempt.pct || 0) + '%</b> — the first attempt. Retakes are practice only and are never recorded for the admin.</span></div>'
+        : '') +
+      '<p class="t-callout mb4" style="text-align:center">Review your answers, or try the exam again?</p>' +
+      '<div class="flex g2 mt4">' +
+        '<button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\');WEEKLY._startReview(WEEKLY.sets.find(function(x){return x.id===\'' + escAttrJs(s.id) + '\'}), WEEKLY.attempts[\'' + escAttrJs(s.id) + '\'] || null)">' +
+          '<i class="ph ph-eye"></i> Review' +
+        '</button>' +
+        '<button class="btn btn-solid" style="flex:1" onclick="MODAL.close(\'sheet\');WEEKLY._startRetake(\'' + escAttrJs(s.id) + '\')">' +
+          '<i class="ph ph-note-pencil"></i> Retake Exam' +
+        '</button>' +
+      '</div>',
+      { wide:false }
+    );
+  },
+
+  /* v1.21: a retake is a normal exam run, but scope.weeklyRetake is set so
+     the results screen and _recordAttempt know not to overwrite anything. */
+  async _startRetake(id){
+    const s = this.sets.find(x=>x.id===id);
+    if(!s || !s.fileId){ toast('Not available.'); return; }
+    if(!this.examOpen(s)){ toast('The exam window has closed.', 4000); this._startReview(s, this.attempts[id] || null); return; }
+    toast('🎯 Retake — for practice. Your official score will not change.', 4000);
+    /* v1.26: if the paper build throws (offline mid-build, a Drive hiccup,
+       or a chapter that fails to load), the student used to be left on
+       the home screen with no explanation. Now we fall back to review. */
+    try {
+      await this._buildLoksewaPaperRetake(s);
+    } catch (e) {
+      try { QUIZ._hideLoader(); } catch (ignored) {}
+      console.error('[retake] build failed:', e);
+      toast('Could not build the retake — opening review instead.', 5000);
+      this._startReview(s, this.attempts[id] || null);
+    }
+  },
+
+  async _buildLoksewaPaperRetake(s){
+    const groups = WEEKLY.LOKSEWA_GROUPS;
+    const picks = [];
+    QUIZ._showLoader('Building the Loksewa-format paper…');
+    try {
+      for (const key of Object.keys(groups)) {
+        const g = groups[key];
+        const refs = ChapterData.allFileRefs().filter(r => g.chapters.indexOf(r.ch) !== -1);
+        const pool = [];
+        for (const r of refs) {
+          try {
+            const raw = await QUIZ._fetch(r.fid, r.key);
+            pool.push(...normQ(raw, r.fid));
+          } catch(e) {}
+        }
+        picks.push(...shuf(pool).slice(0, g.marks));
+      }
+    } finally {
+      QUIZ._hideLoader();
+    }
+
+    if (!picks.length) {
+      toast('Could not build the paper — try again in a moment.', 5000);
+      return;
+    }
+
+    QUIZ._doStart(
+      picks.slice(0, 100),
+      'exam',
+      '🎯 ' + s.title + ' — Retake',
+      false,
+      {
+        weeklyId: s.id,
+        weeklyTitle: s.title,
+        weeklyRetake: true,
+        timeLimitSec: WEEKLY.LOKSEWA_SECONDS,
+        loksewaMock: true
+      }
+    );
+  },
+
   _startReview(s, attempt){
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'flashcard', s.title, {
       weeklyId: s.id,
@@ -1448,6 +1575,15 @@ const WEEKLY = {
   async _recordAttempt(quiz, stats){
     const weeklyId = quiz.scope?.weeklyId;
     if(!weeklyId) return;
+
+    /* v1.21: a retake keeps its score only on this device. Nothing is sent
+       to the server, and the official (first) attempt is left untouched
+       in this.attempts[]. */
+    if(quiz.scope && quiz.scope.weeklyRetake){
+      this._saveRetakeScore(weeklyId, stats);
+      return;
+    }
+
     const attempt = {
       weeklyId,
       answers: (quiz.ans || []).slice(),
@@ -1584,7 +1720,9 @@ const PROG = {
   _st: null,
   _saveSoon(){
     if(PROG._st) clearTimeout(PROG._st);
-    PROG._st = setTimeout(() => { PROG._st = null; _save(LS.PROG, S.prog); }, 400);
+    /* v1.22: 150ms instead of 400ms — the extra latency on the save was
+       occasionally losing the last answer if the tab was closed fast. */
+    PROG._st = setTimeout(() => { PROG._st = null; _save(LS.PROG, S.prog); }, 150);
   },
   flushNow(){
     if(PROG._st){ clearTimeout(PROG._st); PROG._st = null; _save(LS.PROG, S.prog); }
@@ -1595,6 +1733,13 @@ const PROG = {
     S.prog.sessions.unshift(sess);
     S.prog.sessions = S.prog.sessions.slice(0,50);
     _save(LS.PROG, S.prog);
+
+    /* v1.22: any cached "how many times have I missed this" or "seen Nx"
+       value is stale once a session lands. Drop both caches so the next
+       render reads fresh numbers. */
+    try { if (typeof WRONGBY !== 'undefined') WRONGBY._missCache = null; } catch(e){}
+    try { if (typeof QHIST !== 'undefined') QHIST._cache = null; } catch(e){}
+
     HOME.render();
   },
 
@@ -1993,7 +2138,6 @@ const TT = {
       }
     }
   },
-  _checkDue(){ return TT._checkReminders(); },
   async _fireReminder(s, lead){
     const name = s.name || s.label || 'Study session';
     const title = lead > 0 ? `Starting in ${lead} min: ${name}` : `Now: ${name}`;
@@ -2279,24 +2423,6 @@ const CACHE = {
     CACHE.render();
   },
 
-  async cacheAll(){
-    if(!S.online){ toast('❌ Connect to the internet first'); return; }
-    const refs = ChapterData.allFileRefs();
-    if(!refs.length){ toast('No content configured'); return; }
-    if(!confirm(`Download all ${refs.length} question sets for offline use? This may use significant data.`)) return;
-    QUIZ._showLoader(`Caching 0/${refs.length}…`);
-    let done = 0, failed = 0;
-    for(const ref of refs){
-      try{ await QUIZ._fetch(ref.fid, ref.key); done++; }
-      catch(e){ failed++; }
-      const msg = document.getElementById('quiz-loader-msg');
-      if(msg) msg.textContent = `Caching ${done+failed}/${refs.length}…`;
-    }
-    QUIZ._hideLoader();
-    toast(`✅ Cached ${done} set${done!==1?'s':''}${failed?`, ${failed} failed`:''}`);
-    CACHE.render();
-  },
-
   async purgeStale(){
     let purged = 0;
     const keys = await QDB.keys();
@@ -2382,8 +2508,6 @@ const DATA = {
     URL.revokeObjectURL(url);
     toast('📥 Backup downloaded');
   },
-  exp(){ return DATA.exportAll(); },
-
   importFile(){
     const input = document.getElementById('data-import-file');
     const file = input?.files?.[0];
@@ -2468,31 +2592,20 @@ const DATA = {
   async reset(){
     if(!(await ASK.confirm({title:'Reset this device?', body:'This deletes ALL progress, bookmarks, flags, wrong answers and study plan on this device. Your cloud backup is not touched.', ok:'Continue', danger:true}))) return;
     if(!(await ASK.confirm({title:'Are you absolutely sure?', body:'This cannot be undone.', ok:'Yes, reset', danger:true}))) return;
+    /* v1.29: snapshot before the wipe so a mis-click is recoverable. */
+    RESET_SNAPSHOT.save('reset');
     [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
     toast('All data reset');
     location.reload();
   },
-  _resetLegacy(){
-    if(!confirm('⚠️ This deletes ALL progress, bookmarks, flags, wrong answers, and timetable on this device. Continue?')) return;
-    if(!confirm('Are you absolutely sure? This cannot be undone.')) return;
-    [LS.PROG,LS.BK,LS.FL,LS.WR,LS.TT,LS.STK,LS.CHAPSTATS,LS.EXAM_SNAP,LS.TT_NOTIFIED,LS.FCOUNT,LS.COV].forEach(k=>localStorage.removeItem(k));
-    toast('⚠️ All data reset');
-    location.reload();
-  },
-
-  async wipeDevice(){
-    if(!confirm('Erase ALL local data on this device (progress, bookmarks, flags, wrong-bank, cached question sets)? This cannot be undone. Anything already backed up to the cloud will still be there next time you log in online.')) return;
-    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT, LS.EXAM_SNAP, LS.TT_NOTIFIED, LS.CLOUD, LS.PROFILE, LS.LAST_USER, LS.COV].forEach(k=>localStorage.removeItem(k));
-    await QDB.clear();
-    toast('🗑 Local data wiped — reloading…');
-    setTimeout(()=>location.reload(), 1200);
-  },
-
   /* ---- v1.13: cloud reset + account deletion ----------- ABHYAS_PATCH_1_13 ---- */
   async resetCloud(){
     if(!S.user || !S.user.token){ toast('Log in first'); return; }
     if(!S.online || S.forcedOffline){ toast('Go online first. This also clears your cloud copy.'); return; }
     if(!(await ASK.confirm({title:'Reset your progress everywhere?', body:'This deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.', ok:'Reset everywhere', danger:true, requireText:'RESET'}))){ toast('Cancelled. Nothing was changed.'); return; }
+    /* v1.29: snapshot before the wipe. Only helps this device, but that
+       is usually where the mis-click happened. */
+    RESET_SNAPSHOT.save('resetCloud');
     let res;
     try{
       const r = await netFetch(APPS, {
@@ -2509,29 +2622,6 @@ const DATA = {
     toast('Progress reset everywhere. Reloading…');
     setTimeout(()=>location.reload(), 900);
   },
-  async _resetCloudLegacy(){
-    if(!S.user || !S.user.token){ toast('❌ Log in first'); return; }
-    if(!S.online || S.forcedOffline){ toast('❌ Go online first — this also clears your cloud copy'); return; }
-    if(!confirm('Reset your progress EVERYWHERE?\n\nThis deletes your progress, bookmarks, flags and wrong-answer bank from the server and from this device. Other devices keep their local copy until you reset them too. This cannot be undone.')) return;
-    const typed = prompt('Type RESET to confirm.');
-    if(typed === null || typed.trim().toUpperCase() !== 'RESET'){ toast('Cancelled — nothing was changed'); return; }
-    let res;
-    try{
-      const r = await netFetch(APPS, {
-        method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'resetMyProgress', username:S.user.username, token:S.user.token, confirm:'RESET'})
-      }, 30000);
-      res = await r.json();
-    }catch(e){ toast('❌ Could not reach the server — nothing was changed'); return; }
-    if(!res || !res.success){ toast('❌ ' + ((res && res.error) || 'Reset failed')); return; }
-    clearTimeout(PSYNC._timer); PSYNC._timer = null;
-    S.prog = {total:0,correct:0,sessions:[]}; S.bk = []; S.fl = []; S.wr = [];
-    S.stk = {days:[],last:''}; S.chapStats = {}; S.fcount = {}; S.cov = {};
-    [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.FCOUNT, LS.EXAM_SNAP, LS.COV].forEach(k=>localStorage.removeItem(k));
-    toast('✅ Progress reset everywhere — reloading…');
-    setTimeout(()=>location.reload(), 900);
-  },
-
   async deleteAccount(){
     if(!S.user || !S.user.token){ toast('❌ Log in first'); return; }
     if(!S.online || S.forcedOffline){ toast('❌ Go online first — your account lives on the server'); return; }
@@ -2542,6 +2632,10 @@ const DATA = {
     if(!password){ toast('Enter your password first'); return; }
     if(typed !== 'DELETE'){ toast('Type DELETE in the box to confirm'); return; }
     if(!(await ASK.confirm({title:'Delete your account?', body:'Your login, progress, payment record, weekly-set attempts and written answers (including uploaded files) are removed from the server. This cannot be undone.', ok:'Delete my account', danger:true}))) return;
+    /* v1.29: keep a local snapshot so if the account deletion turns out to
+       be a mistake (or the server refuses it), the progress can be read
+       back with no data loss. */
+    RESET_SNAPSHOT.save('deleteAccount');
     let res;
     try{
       const r = await netFetch(APPS, {
@@ -2559,7 +2653,115 @@ const DATA = {
   }
 };
 
-/* ═══════════════ 10g. TUTORIAL ═══════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.29: PRE-RESET SAFETY SNAPSHOT.
+
+   Every destructive operation saves a local snapshot first. If the
+   student realises within 24 hours that they didn't mean to wipe
+   everything, a small card on Home offers a one-tap restore. After
+   24 hours the snapshot is dropped automatically.
+   ═══════════════════════════════════════════════════════════════════════ */
+const RESET_SNAPSHOT = {
+  KEY: 'abhyas_pre_reset_snapshot',
+  TTL_MS: 24 * 60 * 60 * 1000,
+
+  save(reason){
+    try {
+      const snap = {
+        at: Date.now(),
+        reason: reason || 'reset',
+        prog:      S.prog,
+        bk:        S.bk,
+        fl:        S.fl,
+        wr:        S.wr,
+        stk:       S.stk,
+        chapStats: S.chapStats,
+        cov:       S.cov,
+        tt:        S.tt
+      };
+      localStorage.setItem(this.KEY, JSON.stringify(snap));
+      return true;
+    } catch(e){
+      console.warn('[reset-snapshot] save failed:', e);
+      return false;
+    }
+  },
+
+  read(){
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if(!raw) return null;
+      const snap = JSON.parse(raw);
+      if(!snap || !snap.at) return null;
+      if(Date.now() - snap.at > this.TTL_MS){ this.clear(); return null; }
+      return snap;
+    } catch(e){ return null; }
+  },
+
+  clear(){ try { localStorage.removeItem(this.KEY); } catch(e){} },
+
+  restore(){
+    const snap = this.read();
+    if(!snap) return false;
+    if(snap.prog)      S.prog      = snap.prog;
+    if(snap.bk)        S.bk        = snap.bk;
+    if(snap.fl)        S.fl        = snap.fl;
+    if(snap.wr)        S.wr        = snap.wr;
+    if(snap.stk)       S.stk       = snap.stk;
+    if(snap.chapStats) S.chapStats = snap.chapStats;
+    if(snap.cov)       S.cov       = snap.cov;
+    if(snap.tt)        S.tt        = snap.tt;
+    _save(LS.PROG, S.prog);
+    _save(LS.BK, S.bk);
+    _save(LS.FL, S.fl);
+    _save(LS.WR, S.wr);
+    _save(LS.STK, S.stk);
+    _save(LS.CHAPSTATS, S.chapStats);
+    _save(LS.COV, S.cov);
+    _save(LS.TT, S.tt);
+    this.clear();
+    return true;
+  },
+
+  renderCard(){
+    const snap = this.read();
+    const slot = document.getElementById('reset-recover-slot');
+    if(!slot) return;
+    if(!snap){ slot.innerHTML = ''; return; }
+    const mins = Math.max(1, Math.round((Date.now() - snap.at) / 60000));
+    const ago = mins < 60 ? mins + ' min ago' : Math.round(mins/60) + ' h ago';
+    const labels = { reset:'Reset this device', resetCloud:'Reset progress everywhere', deleteAccount:'Delete account' };
+    slot.innerHTML =
+      '<section class="card" style="border-color:var(--warning-line);background:var(--warning-soft)">' +
+        '<div class="card-hd"><h3 style="color:var(--warning)"><i class="ph ph-arrow-counter-clockwise"></i> Recover your data?</h3></div>' +
+        '<p class="t-callout" style="color:var(--ink);margin-bottom:var(--sp-3)">' +
+          'You ran <b>' + esc(labels[snap.reason] || snap.reason) + '</b> ' + esc(ago) + '. ' +
+          'A safety copy was kept on this device. Restore it to bring everything back?' +
+        '</p>' +
+        '<div class="bg">' +
+          '<button class="btn btn-solid" onclick="RESET_SNAPSHOT._doRestore()"><i class="ph ph-arrow-counter-clockwise"></i> Restore</button>' +
+          '<button class="btn btn-quiet" onclick="RESET_SNAPSHOT._dismiss()">Discard</button>' +
+        '</div>' +
+      '</section>';
+  },
+
+  _doRestore(){
+    if(this.restore()){
+      toast('✅ Your data has been restored.');
+      try { HOME.render(); PROG.render(); } catch(e){}
+      this.renderCard();
+    } else {
+      toast('Could not restore — the snapshot may have expired.');
+      this.renderCard();
+    }
+  },
+
+  _dismiss(){
+    this.clear();
+    this.renderCard();
+    toast('Snapshot discarded.');
+  }
+};
 const TUTORIAL = {
   _seenKey: 'abhyas_tut_seen',
   _idx: 0,
@@ -2811,33 +3013,112 @@ const NET = {
   }
 };
 
-function toggleForcedOffline(){
-  S.forcedOffline = !S.forcedOffline;
-  _save(LS.FORCED_OFFLINE, S.forcedOffline);
-  _updateNetBtn();
-  _updateOfflineWarn();
-  toast(S.forcedOffline ? '📴 Manual offline mode on' : '📶 Back online');
-  if(!S.forcedOffline){
-    NETCHECK.ping();
-    if(PSYNC._timer) PSYNC.pushNow();
-    if(typeof WEEKLY !== 'undefined') WEEKLY.retryUnsynced();
-  }
-}
-
 /* ═══════════════ 13. pluralize ═══════════════ */
 function pluralize(n, word, pluralWord){ return `${n} ${n===1 ? word : (pluralWord || word + 's')}`; }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.28: CROSS-TAB SYNC.
+
+   The storage event only fires in OTHER tabs, so there is no write loop.
+   We listen for the keys that hold user state, debounce 300 ms to survive
+   a burst of rapid saves, and refresh the in-memory state + home screen.
+   A change to the session key (login/logout in another tab) reloads this
+   tab so the student is never looking at someone else's data.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function crossTabSync(){
+  const WATCH = new Set([LS.PROG, LS.BK, LS.FL, LS.WR, LS.COV, LS.STK, LS.CHAPSTATS, LS.USER]);
+  let pending = null;
+
+  window.addEventListener('storage', e => {
+    if (!e.key || !WATCH.has(e.key)) return;
+    if (e.newValue === e.oldValue) return;
+
+    /* Session changed in another tab → reload here too, so we are not
+       showing a stale identity. */
+    if (e.key === LS.USER){
+      const before = e.oldValue ? (() => { try { return JSON.parse(e.oldValue).username; } catch(x){ return null; } })() : null;
+      const after  = e.newValue ? (() => { try { return JSON.parse(e.newValue).username; } catch(x){ return null; } })() : null;
+      if (!after || before !== after){ location.reload(); }
+      return;
+    }
+
+    if (pending) return;
+    pending = setTimeout(() => {
+      pending = null;
+      try {
+        if (e.key === LS.PROG){ S.prog = _load(LS.PROG, S.prog); HOME.render(); }
+        if (e.key === LS.BK)  { S.bk = _load(LS.BK, []); HOME.updateBadges(); }
+        if (e.key === LS.FL)  { S.fl = _load(LS.FL, []); HOME.updateBadges(); }
+        if (e.key === LS.WR)  { S.wr = _load(LS.WR, []); HOME.updateBadges(); }
+        if (e.key === LS.COV) { S.cov = _load(LS.COV, {}); }
+        if (e.key === LS.STK) { S.stk = _load(LS.STK, S.stk); HOME.render(); }
+        if (e.key === LS.CHAPSTATS){ S.chapStats = _load(LS.CHAPSTATS, {}); }
+      } catch (err){ console.warn('[cross-tab] refresh failed:', err); }
+    }, 300);
+  });
+})();
+
 /* ═══════════════ 14. BOOT SEQUENCE ═══════════════ */
+/* v1.22: a boot failure used to leave the student on a blank screen.
+   This catches a synchronous throw OR a rejected promise from the boot
+   chain and swaps the loading spinner for a recovery card. */
+const BOOT_ERROR = {
+  show(err){
+    try {
+      const el = document.getElementById('sg');
+      if (!el) return;
+      const msg = String((err && err.message) || err || 'Something went wrong.');
+      el.innerHTML =
+        '<div style="max-width:340px;text-align:center;padding:0 var(--sp-4)">' +
+          '<div style="font-size:2rem;color:var(--danger)"><i class="ph ph-warning-circle"></i></div>' +
+          '<h2 class="t-t2" style="margin:var(--sp-3) 0 var(--sp-1)">Abhyas could not start</h2>' +
+          '<p class="t-foot" style="line-height:1.55;margin-bottom:var(--sp-4)">' +
+            esc(msg).slice(0, 200) +
+          '</p>' +
+          '<div class="bg" style="justify-content:center;flex-wrap:wrap">' +
+            '<button class="btn btn-solid" type="button" onclick="location.reload()">' +
+              '<i class="ph ph-arrow-clockwise"></i> Reload' +
+            '</button>' +
+            '<button class="btn btn-quiet" type="button" onclick="BOOT_ERROR.clearCache()">' +
+              '<i class="ph ph-broom"></i> Clear cache and reload' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+    } catch (e) { /* if even this fails, do nothing */ }
+  },
+  async clearCache(){
+    try {
+      if (typeof QDB !== 'undefined' && QDB.clear) await QDB.clear();
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+    } catch (e) {}
+    location.reload();
+  }
+};
+
 document.addEventListener('DOMContentLoaded', ()=>{
-  if(_load('abhyas_theme','light')==='dark') document.body.classList.add('dark');
+  try {
+    if(_load('abhyas_theme','light')==='dark') document.body.classList.add('dark');
 
-  PWA.init();
-  _updateNetBtn();
-  _updateOfflineWarn();
+    PWA.init();
+    _updateNetBtn();
+    _updateOfflineWarn();
 
-  NETCHECK.start();
-  NETCHECK.ping();
-  AUTH.restore();
+    NETCHECK.start();
+    NETCHECK.ping();
+
+    Promise.resolve()
+      .then(() => AUTH.restore())
+      .catch(err => {
+        console.error('[boot] AUTH.restore failed:', err);
+        try { BOOT_ERROR.show(err); } catch (e) {}
+      });
+  } catch (err) {
+    console.error('[boot] DOMContentLoaded handler threw:', err);
+    try { BOOT_ERROR.show(err); } catch (e) {}
+  }
 });
 
 /* ═══════════════ GLOBAL EXPOSURE ═══════════════
@@ -2865,7 +3146,6 @@ window.PSYNC = PSYNC;
 window.NETCHECK = NETCHECK;
 window.GETFILE_GATE = GETFILE_GATE;
 window.SRCH = SRCH;
-window.toggleForcedOffline = toggleForcedOffline;
 window.pluralize = pluralize;
 window.today = today;
 window.localDateOffset = localDateOffset;

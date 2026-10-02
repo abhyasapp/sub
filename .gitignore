@@ -1,2 +1,7 @@
-﻿*.before-1.20
-*.before-1.21
+﻿*.bak
+*.v1.*.bak
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+node_modules/

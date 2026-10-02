@@ -752,6 +752,7 @@ details.faq p{
           <span class="fd-name" id="pay-file-name">No file chosen</span>
         </label>
       </div>
+      <div class="banner banner-warning" id="pay-queue-note" hidden></div>
       <button class="btn" id="btn-pay" onclick="APP.submitPayment()">Send for verification</button>
       <button class="btn btn-sec" onclick="APP.logout()">Back to sign in</button>
     </div>
@@ -907,6 +908,139 @@ function togglePw(btn){
 
 const MODES = ['redirecting','login','signup','forgot','reset','payment','trial','status'];
 
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.28: offline payment queue.
+
+   A student who fills in the payment form without signal used to lose
+   everything on submit. Now the submission is written to localStorage
+   and posted automatically when the connection returns. The queue is
+   user-scoped so a second student on the same device never sends the
+   previous student's payment.
+   ═══════════════════════════════════════════════════════════════════════ */
+const PAY_QUEUE = {
+  KEY: 'abhyas_pay_queue_v1',
+  MAX_SCREENSHOT_BYTES: 2 * 1024 * 1024,
+  MAX_ATTEMPTS: 3,
+
+  read(){
+    try { return JSON.parse(localStorage.getItem(this.KEY) || '[]') || []; }
+    catch(e){ return []; }
+  },
+  write(list){
+    try { localStorage.setItem(this.KEY, JSON.stringify(list || [])); } catch(e){}
+    this.paint();
+  },
+  add(item){
+    const list = this.read().filter(x => x.username !== item.username);   // one per user
+    list.push({ ...item, queuedAt: Date.now(), attempts: 0 });
+    this.write(list);
+  },
+  removeFor(username){
+    this.write(this.read().filter(x => x.username !== username));
+  },
+  forUser(username){
+    return this.read().filter(x => x.username === username);
+  },
+
+  paint(){
+    const el = document.getElementById('pay-queue-note');
+    if (!el) return;
+    const s = (typeof APP !== 'undefined' && APP.session) || null;
+    const mine = s ? this.forUser(s.username) : [];
+    const n = mine.length;
+    if (!n) { el.hidden = true; el.innerHTML = ''; return; }
+    el.hidden = false;
+    el.innerHTML =
+      '<i class="ph ph-cloud-slash"></i>' +
+      '<span>' +
+        (n === 1 ? '1 payment is queued' : n + ' payments are queued') +
+        ' on this device. ' +
+        (navigator.onLine
+          ? 'Sending now…'
+          : 'It will be sent automatically as soon as you are back online.') +
+      '</span>';
+  },
+
+  async process(){
+    if (!navigator.onLine) return;
+    const s = (typeof APP !== 'undefined' && APP.session) || null;
+    if (!s || !s.username || !s.token) return;
+
+    const list = this.read();
+    if (!list.length) return;
+
+    const remaining = [];
+    let sentAny = false;
+
+    for (const item of list){
+      /* Only send the current user's queued payments. Leave everyone
+         else's untouched for their next login. */
+      if (item.username !== s.username){ remaining.push(item); continue; }
+
+      item.attempts = (item.attempts || 0) + 1;
+      if (item.attempts > this.MAX_ATTEMPTS){
+        try { console.warn('[PAY_QUEUE] giving up after', this.MAX_ATTEMPTS, 'attempts:', item.txId); } catch(e){}
+        continue;
+      }
+
+      try {
+        const res = await this._send(item, s);
+        if (res && res.success){
+          sentAny = true;
+        } else if (res && (res.sessionInvalid || res.error && /session/i.test(res.error))){
+          /* Session no longer valid — keep the item for next login. */
+          remaining.push(item);
+        } else {
+          /* Server-side rejection (duplicate, no longer needed). Drop it. */
+          try { console.info('[PAY_QUEUE] server rejected queued payment:', res && res.error); } catch(e){}
+        }
+      } catch (e){
+        remaining.push(item);
+      }
+    }
+
+    this.write(remaining);
+
+    if (sentAny){
+      try {
+        const raw = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
+        if (raw){ delete raw.queued; localStorage.setItem('abhyas_session', JSON.stringify(raw)); }
+        if (APP.session){ delete APP.session.queued; APP.saveSession(APP.session); }
+      } catch(e){}
+      if (typeof APP.toast === 'function') APP.toast('Queued payment sent.', 4000);
+      if (typeof APP.loadPaymentStatus === 'function' && APP.mode === 'status'){
+        try { APP.loadPaymentStatus(); } catch(e){}
+      }
+    }
+  },
+
+  async _send(item, session){
+    const body = JSON.stringify({
+      action: 'submitPayment',
+      username: session.username, token: session.token,
+      name: item.name || '', email: item.email || '', mobile: item.mobile || '',
+      txId: item.txId || '', remarks: item.remarks || '',
+      screenshot: item.screenshot || ''
+    });
+    const ctrl = ('AbortController' in window) ? new AbortController() : null;
+    const timer = ctrl ? setTimeout(() => ctrl.abort(), 30000) : null;
+    try {
+      const r = await fetch(GAS_URL, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body, signal: ctrl && ctrl.signal
+      });
+      if (timer) clearTimeout(timer);
+      if (!r.ok) return { success: false, error: 'HTTP ' + r.status };
+      const data = await r.json();
+      if (data && data.sessionInvalid && typeof APP.clearSession === 'function') APP.clearSession();
+      return data;
+    } catch(e){
+      if (timer) clearTimeout(timer);
+      throw e;
+    }
+  }
+};
+
 const APP = {
   mode: 'login',
   online: (typeof navigator !== 'undefined' ? navigator.onLine : false),
@@ -924,6 +1058,7 @@ const APP = {
     this.loadPublicPrice();
     this.bindForms();
     this.showStoredNotice();
+    this._bootQueue();
 
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('resetToken') || params.get('reset');
@@ -988,6 +1123,8 @@ const APP = {
       const slow = roundTrip > 3000;
       dot.className = slow ? 'ndot warn' : 'ndot';
       txt.textContent = slow ? 'Connected, but slow' : 'Connected';
+      /* v1.28: flush any queued payment as soon as we are back online. */
+      if (!wasOnline) { try { PAY_QUEUE.process().catch(() => {}); } catch(e){} }
       if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
       if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type:'CLEAR_STALE_IF_ONLINE' });
@@ -1319,7 +1456,26 @@ const APP = {
   },
 
   async loadPaymentStatus(){
-    if (!this.session || !this.online) return;
+    if (!this.session) return;
+
+    /* v1.28: if the last submission was queued offline, say so clearly
+       until the server actually has a record. */
+    const queued = this.session.queued;
+    if (queued){
+      const mine = PAY_QUEUE.forUser(this.session.username);
+      if (mine.length){
+        const msgEl = $('st-msg');
+        if (msgEl){
+          msgEl.innerHTML =
+            'Your payment is saved on this device. It will be sent to the admin automatically as soon as you are back online.' +
+            '<br><br>Transaction ID: <span class="mono">' + esc(queued.txId) + '</span>';
+        }
+        if (this.online) PAY_QUEUE.process().catch(() => {});
+        return;
+      }
+    }
+
+    if (!this.online) return;
     try {
       const res = await this.api('getPaymentStatus', { username:this.session.username, token:this.session.token }, 'POST');
       if (res.success && res.payment) {
@@ -1597,23 +1753,6 @@ const APP = {
       img.src = url;
     });
   },
-  _onFileLegacy(){
-    const f = $('pay-file').files[0];
-    const nameEl = $('pay-file-name');
-    if (!f) { this.fileData = null; nameEl.textContent = 'No file chosen'; return; }
-    nameEl.textContent = f.name;
-    if (f.size > 4.5 * 1024 * 1024) {
-      this.showErr('That image is over 4.5 MB. Try a smaller screenshot.');
-      $('pay-file').value = '';
-      nameEl.textContent = 'No file chosen';
-      this.fileData = null;
-      return;
-    }
-    const r = new FileReader();
-    r.onload = e => { this.fileData = e.target.result; };
-    r.onerror = () => this.showErr('Couldn\u2019t read that image.');
-    r.readAsDataURL(f);
-  },
 
   async submitPayment(){
     const txn = $('pay-txn').value.trim();
@@ -1621,7 +1760,32 @@ const APP = {
     if (!txn) { $('pay-txn').classList.add('invalid'); $('pay-txn').focus(); return this.showErr('Enter the transaction ID from your payment.'); }
     $('pay-txn').classList.remove('invalid');
     if (!this.session || this.session.type !== 'user') return this.showErr('Something went wrong with your session. Please sign in again.');
-    if (!this.online) return this.showErr('You need a connection to send this. Reconnect and try again.');
+
+    /* v1.28: offline → queue the submission instead of failing. The
+       student keeps their transaction ID, remarks and screenshot, and
+       the app posts it the moment the signal returns. */
+    if (!this.online){
+      const shotBytes = (this.fileData || '').length;
+      if (shotBytes > PAY_QUEUE.MAX_SCREENSHOT_BYTES){
+        return this.showErr('The screenshot is too large to queue offline. Reconnect and send it, or pick a smaller image.');
+      }
+      PAY_QUEUE.add({
+        username: this.session.username,
+        name: this.session.name || '',
+        email: this.session.email || '',
+        mobile: this.session.mobile || '',
+        txId: txn, remarks: rem,
+        screenshot: this.fileData || ''
+      });
+      this.session.access.level = 'pending_review';
+      this.session.queued = { txId: txn, at: Date.now() };
+      this.saveSession(this.session);
+      this.toast('Saved on this device — it will send automatically.', 5000);
+      this.setMode('status');
+      /* Paint the status screen message before we have any server info. */
+      setTimeout(() => { try { this.loadPaymentStatus(); } catch(e){} }, 50);
+      return;
+    }
 
     this.setLoading('btn-pay', true);
     const res = await this.api('submitPayment', {

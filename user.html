@@ -1516,6 +1516,11 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   .qnote-input{font-size:16px}
 }
 </style>
+<style id="patch-129">
+/* v1.29 — print button on chapter rows */
+.ch-row-print{background:var(--bg-sunken);color:var(--ink-2);border-color:var(--sep)}
+.ch-row-print:hover{background:var(--ink);color:var(--bg);border-color:transparent}
+</style>
 <style id="patch-123">
 /* v1.23: per-question history line */
 .qhist-line{
@@ -1698,6 +1703,19 @@ html.focus-mode .marquee-bar{display:none!important}
   .chapter-breakdown th{background:#eee!important;color:#000!important}
   .chapter-breakdown td{color:#000!important;border-top:1px solid #ccc!important}
 }
+</style>
+<style id="patch-122">
+/* v1.22 — live Loksewa score tile + exam copy protection */
+.qtile.qt-lok { background: var(--success-soft); border-color: var(--success-line); }
+.qtile.qt-lok .qt-num, .qtile.qt-lok .qt-lbl { color: var(--success); }
+.qtile.qt-lok.warn { background: var(--warning-soft); border-color: var(--warning-line); }
+.qtile.qt-lok.warn .qt-num, .qtile.qt-lok.warn .qt-lbl { color: var(--warning); }
+.qtile.qt-lok.low { background: var(--danger-soft); border-color: var(--danger-line); }
+.qtile.qt-lok.low .qt-num, .qtile.qt-lok.low .qt-lbl { color: var(--danger); }
+/* Disable text selection while an exam is open so a student cannot
+   Ctrl+A / Ctrl+C the whole paper into WhatsApp in one go. */
+#ex-wrap { user-select: none; -webkit-user-select: none; }
+#ex-wrap input, #ex-wrap textarea { user-select: text; -webkit-user-select: text; }
 </style>
 </head>
 <body>
@@ -2243,6 +2261,9 @@ html.focus-mode .marquee-bar{display:none!important}
               <button class="btn btn-sm btn-r" onclick="REV.clearAll('bk')" aria-label="Clear saved questions"><i class="ph ph-trash"></i></button>
             </div>
           </div>
+          <div class="toolbar" style="margin-bottom:var(--sp-2)">
+            <input type="search" id="bk-search" placeholder="Search saved questions" oninput="REV.filterList('bk', this.value)" aria-label="Search saved questions">
+          </div>
           <div id="bk-list"></div>
         </div>
       </div>
@@ -2258,6 +2279,9 @@ html.focus-mode .marquee-bar{display:none!important}
               <button class="btn btn-sm btn-quiet" onclick="REV.start('fl','exam')"><i class="ph ph-note-pencil"></i> Test</button>
               <button class="btn btn-sm btn-r" onclick="REV.clearAll('fl')" aria-label="Clear flagged questions"><i class="ph ph-trash"></i></button>
             </div>
+          </div>
+          <div class="toolbar" style="margin-bottom:var(--sp-2)">
+            <input type="search" id="fl-search" placeholder="Search flagged questions" oninput="REV.filterList('fl', this.value)" aria-label="Search flagged questions">
           </div>
           <div id="fl-list"></div>
         </div>
@@ -2278,6 +2302,9 @@ html.focus-mode .marquee-bar{display:none!important}
               <button class="btn btn-sm btn-quiet" onclick="REV.start('wr','exam')"><i class="ph ph-note-pencil"></i> Test</button>
               <button class="btn btn-sm btn-r" onclick="REV.clearAll('wr')" aria-label="Clear the miss list"><i class="ph ph-trash"></i></button>
             </div>
+          </div>
+          <div class="toolbar" style="margin-bottom:var(--sp-2)">
+            <input type="search" id="wr-search" placeholder="Search your missed questions" oninput="REV.filterList('wr', this.value)" aria-label="Search missed questions">
           </div>
           <div id="wr-list"></div>
         </div>
@@ -2587,6 +2614,11 @@ html.focus-mode .marquee-bar{display:none!important}
               <div class="qbz qbz-c">
                 <div class="qb-tiles">
                   <div class="qtile qt-ans"><span class="qt-sym">✓</span><span class="qt-num" id="ex-ans">0</span><span class="qt-lbl">Answered</span></div>
+                  <div class="qtile qt-lok" id="ex-lok-tile" style="display:none" title="Loksewa score: +1 correct, −0.2 wrong, 0 skipped">
+                    <span class="qt-sym">★</span>
+                    <span class="qt-num" id="ex-lok">0.0</span>
+                    <span class="qt-lbl">Score</span>
+                  </div>
                 </div>
               </div>
               <div class="qbz qbz-r">
@@ -3826,7 +3858,9 @@ window.CH_GRID = {
         (m ? ' · ' + m + ' missed' : '') + '</div></div>' +
         '<button class="btn btn-sm btn-a" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'flashcard\')">Practise</button>' +
         (m ? '<button class="btn btn-sm btn-r" type="button" onclick="closeMod();WRONGBY.startFile(\'' + escAttrJs(r.fid) + '\',false)">Missed (' + m + ')</button>' : '') +
-        '<button class="btn btn-sm btn-quiet" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'exam\')">Test</button></div>';
+        '<button class="btn btn-sm btn-quiet" type="button"' + (blocked ? ' disabled' : '') + ' onclick="CH_GRID.go(\'' + r.fid + '\',\'exam\')">Test</button>' +
+        '<button class="btn btn-sm ch-row-print" type="button" title="Print a revision sheet"' + (blocked ? ' disabled' : '') + ' onclick="PRINT_Q.sheet(\'' + escAttrJs(r.fid) + '\')"><i class="ph ph-printer"></i></button>' +
+        '</div>';
     }).join('');
     const head = refs.length > 1
       ? '<div class="bg mb3"><button class="btn btn-solid" type="button"' + (offline ? ' disabled' : '') + ' onclick="CH_GRID.startChapter(\'' + lv + '\',\'' + ch + '\',\'flashcard\')">Practise the whole chapter</button>' +
@@ -4230,6 +4264,8 @@ window.HARDQ = {
 function _refreshHints(){
   /* v1.25: focus mode removed — clear any leftover class. */
   try { document.documentElement.classList.remove('focus-mode'); } catch(e){}
+  /* v1.29: paint the reset-recovery card if a recent snapshot exists. */
+  try { if (typeof RESET_SNAPSHOT !== 'undefined') RESET_SNAPSHOT.renderCard(); } catch(e){}
   try { if (typeof SIDEBAR   !== 'undefined') SIDEBAR.init(); } catch(e){}
   try { SB_HINTS.refresh(); } catch(e){}
   try { TRIAL_PILL.render(); } catch(e){}
@@ -4941,9 +4977,16 @@ window.TRIAL_PILL = {
 };
 
 setInterval(_refreshHints, 30000);
+/* v1.27: a rapid tab-switch storm fired every sub-renderer in sequence.
+   Throttle to once per 3s — the data does not change faster than that. */
+let _lastHintAt = 0;
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    _refreshHints();
+    const now = Date.now();
+    if (now - _lastHintAt > 3000) {
+      _lastHintAt = now;
+      _refreshHints();
+    }
     if (UI.cur === 'subj-mine' && typeof MY_SUBJ !== 'undefined' && MY_SUBJ._loaded) {
       MY_SUBJ.load(true);
     }
@@ -5550,7 +5593,6 @@ window.SIDEBAR = {
     });
     this._applyState();
   },
-  toggle(){ this._expanded = !this._expanded; this._applyState(); },
   _applyState(){
     const items = document.getElementById('sb-more-items');
     const chev  = document.getElementById('sb-more-chev');
@@ -5604,6 +5646,91 @@ window.QHIST = {
 /* ═══════════════════════════════════════════════════════════════════════
    QSEARCH — search across every question cached on the device.
    ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.29: PRINTABLE QUESTION SHEET.
+
+   One-tap print of any chapter or file: a clean A4 revision sheet with
+   numbered questions, lettered options, and an answer key on its own
+   page. Useful for students who still study from paper.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.PRINT_Q = {
+  async sheet(fid, title){
+    if(!fid){ toast('Not available.'); return; }
+    const ref = (typeof ChapterData !== 'undefined')
+      ? ChapterData.allFileRefs().find(r => r.fid === fid)
+      : null;
+    if(!ref){ toast('That chapter is not registered.'); return; }
+
+    toast('Preparing the sheet…', 2500);
+    let qs = [];
+    try {
+      const raw = await QUIZ._fetch(ref.fid, ref.key);
+      qs = normQ(raw, ref.fid);
+    } catch(e){
+      toast('Could not load the questions — try again online.');
+      return;
+    }
+    if(!qs.length){ toast('No questions to print.'); return; }
+
+    const label = title || (ChapterData.chapterName(ref.lv, ref.ch) + ' — ' + ref.book + ' — ' + ref.subtopic);
+    const html =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(label) + '</title>' +
+      '<style>' +
+        '@page{size:A4;margin:14mm}' +
+        'body{font:11pt/1.55 Georgia,"Times New Roman",serif;color:#111;max-width:186mm;margin:0 auto;padding:12px}' +
+        'h1{font-size:14pt;font-weight:700;margin:0 0 4px;border-bottom:2px solid #111;padding-bottom:4px}' +
+        '.meta{font-size:9pt;color:#666;margin-bottom:14px}' +
+        '.q{margin:10px 0;padding:8px 0;border-bottom:1px solid #eee;page-break-inside:avoid}' +
+        '.q-num{font-weight:700;margin-right:6px}' +
+        '.opts{margin:4px 0 0 20px;font-size:10pt;color:#333}' +
+        '.opt{display:inline-block;margin-right:14px}' +
+        '.answers{margin-top:22px;padding:10px;background:#f5f5f5;border:1px solid #ccc;border-radius:4px;font-size:9pt;page-break-before:always}' +
+        '.ans-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin-top:6px}' +
+        '.ans-cell{font-family:monospace;text-align:center;padding:2px 0}' +
+        '.footer{margin-top:16px;font-size:8pt;color:#999;text-align:center}' +
+      '</style></head><body>' +
+      '<h1>' + esc(label) + '</h1>' +
+      '<div class="meta">Abhyas revision sheet · ' + qs.length + ' questions · ' + new Date().toLocaleDateString() + '</div>' +
+      qs.map((q,i) => {
+        const opts = (q.options || []).map((o,j) =>
+          '<span class="opt">' + String.fromCharCode(65+j) + '. ' + esc(String(o)) + '</span>'
+        ).join('');
+        return '<div class="q">' +
+          '<div><span class="q-num">Q' + (i+1) + '.</span>' + esc(q.q) + '</div>' +
+          (opts ? '<div class="opts">' + opts + '</div>' : '') +
+        '</div>';
+      }).join('') +
+      '<div class="answers">' +
+        '<strong>Answer key</strong>' +
+        '<div class="ans-grid">' +
+          qs.map((q,i) => '<span class="ans-cell">' + (i+1) + ': ' +
+            (q.correct != null ? String.fromCharCode(65 + Number(q.correct)) : '?') + '</span>').join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="footer">Generated by Abhyas · abhyasbymku@gmail.com</div>' +
+      '<script>setTimeout(function(){try{window.print()}catch(e){}},350)<\/script>' +
+      '</body></html>';
+
+    let w = null;
+    try { w = window.open('', '_blank'); } catch(e){ w = null; }
+    if(!w){
+      /* Pop-up blocked — offer a download instead. */
+      const blob = new Blob([html], { type:'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (label.replace(/[^a-zA-Z0-9]+/g, '_') || 'sheet') + '.html';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast('Pop-up blocked — the sheet was downloaded instead.', 5000);
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+  }
+};
+
 window.QSEARCH = {
   _index: null, _loading: false, _last: [],
   async _build(){
@@ -5688,6 +5815,13 @@ window.QSEARCH = {
     if (!box) return;
     if (!term || term.length < 2){
       box.innerHTML = '';
+      if (this._index && this._index.length === 0) {
+        status.innerHTML =
+          '<i class="ph ph-info"></i> No questions downloaded yet. ' +
+          'Open <b>Chapters</b> once while online — then everything is searchable here, ' +
+          'even with no connection.';
+        return;
+      }
       status.textContent = this._index
         ? this._index.length + ' questions indexed \u00b7 type at least 2 characters.'
         : 'Indexing questions\u2026';
@@ -5874,8 +6008,7 @@ window.QNOTE = {
     this._save();
   },
   remove(uid){ this.set(uid, ''); },
-  has(uid){ return !!this.get(uid); },
-  count(){ return Object.keys(this._load()).length; },
+
 
   /* Renders a container. Three states:
        – note exists           → read-only box with edit/delete buttons
@@ -5947,11 +6080,6 @@ window.QNOTE = {
     toast(this.get(uid) ? 'Note saved' : 'Note cleared');
     this.render(containerId, uid);
   },
-  removeById(uid, containerId){
-    this.remove(uid);
-    toast('Note deleted');
-    this.render(containerId, uid);
-  }
 };
 
 window.WRONGBY = {
@@ -7402,6 +7530,81 @@ window.HOURLY = {
   // Keep the sidebar hint and badge fresh even when HOURLY isn't mounted.
   setTimeout(() => { try { HOURLY._refreshBadge(); } catch(e){} }, 1500);
   setInterval(() => { try { HOURLY._refreshBadge(); } catch(e){} }, 5000);
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   v1.22 additions — live Loksewa score, QSEARCH invalidation, filter reset
+   ═══════════════════════════════════════════════════════════════════════ */
+(function v122(){
+
+  /* ── 1. Invalidate the QSEARCH index whenever the question cache changes.
+     Otherwise a chapter downloaded after QSEARCH ran is invisible to
+     search until the page reloads. */
+  (function wireCacheInvalidation(){
+    if (typeof QDB === 'undefined' || !QDB.set) return;
+    const drop = () => { try { if (typeof QSEARCH !== 'undefined' && QSEARCH._index) QSEARCH._index = null; } catch(e){} };
+    const origSet = QDB.set.bind(QDB);
+    const origDel = QDB.del ? QDB.del.bind(QDB) : null;
+    const origClear = QDB.clear ? QDB.clear.bind(QDB) : null;
+    QDB.set = async function(k, v){ const r = await origSet(k, v); drop(); return r; };
+    if (origDel)   QDB.del = async function(k){ const r = await origDel(k); drop(); return r; };
+    if (origClear) QDB.clear = async function(){ const r = await origClear(); drop(); return r; };
+  })();
+
+  /* ── 2. Live Loksewa score in the exam bar. Painted whenever an answer
+     changes and whenever the exam bar is rendered. Hidden on every other
+     exam type so the bar stays clean. */
+  function paintLoksewa(){
+    const tile = document.getElementById('ex-lok-tile');
+    const val  = document.getElementById('ex-lok');
+    if (!tile || !val) return;
+
+    if (!S.quiz || S.quiz.mode !== 'exam' || !S.quiz.scope || !S.quiz.scope.loksewaMock){
+      tile.style.display = 'none';
+      return;
+    }
+    tile.style.display = '';
+
+    let correct = 0, wrong = 0, skipped = 0;
+    (S.quiz.qs || []).forEach((q, i) => {
+      const a = S.quiz.ans ? S.quiz.ans[i] : null;
+      if (a === null || a === undefined) { skipped++; return; }
+      if (isOk(a, q.correct)) correct++; else wrong++;
+    });
+    const score = correct - wrong * 0.2;
+    val.textContent = score.toFixed(1);
+
+    const pct = S.quiz.qs.length ? (score / S.quiz.qs.length) * 100 : 0;
+    tile.classList.remove('warn', 'low');
+    if (pct < 30) tile.classList.add('low');
+    else if (pct < 50) tile.classList.add('warn');
+  }
+
+  /* Hook into every path that changes answers or (re)paints the exam bar. */
+  if (typeof QUIZ !== 'undefined') {
+    const origRenderExam = QUIZ._renderExam.bind(QUIZ);
+    QUIZ._renderExam = function(){ origRenderExam(); try { paintLoksewa(); } catch(e){} };
+
+    const origExAnswer = QUIZ.exAnswer.bind(QUIZ);
+    QUIZ.exAnswer = function(qi, oi){ origExAnswer(qi, oi); try { paintLoksewa(); } catch(e){} };
+
+    const origDoStart = QUIZ._doStart.bind(QUIZ);
+    QUIZ._doStart = function(){
+      const r = origDoStart.apply(QUIZ, arguments);
+      try { setTimeout(paintLoksewa, 30); } catch(e){}
+      return r;
+    };
+
+    const origResume = QUIZ._resumeSnapshot ? QUIZ._resumeSnapshot.bind(QUIZ) : null;
+    if (origResume) QUIZ._resumeSnapshot = function(){ const r = origResume.apply(QUIZ, arguments); try { setTimeout(paintLoksewa, 30); } catch(e){} return r; };
+  }
+
+  /* ── 3. (v1.27) The previous version cleared the REV search when leaving
+     the view. That felt helpful but was wrong: a student who typed "shear"
+     and then briefly switched to Home would come back to an empty box.
+     Filters now persist via sessionStorage (see v1.27 IIFE above). */
+  /* (intentionally no-op) */
+
 })();
 
 })();
