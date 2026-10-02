@@ -1473,7 +1473,17 @@ const WEEKLY = {
 
     toast(`📝 Graded exam — you get ONE official attempt. ${fmtHMS(Math.max(0, Math.round((this.examCloseAt(s)-Date.now())/1000)))} left. Retakes for practice are allowed.`, 5000);
     if(await WEEKLY._startOnServer(s) === 'stop') return;
-    this._buildLoksewaPaper(s);
+    /* v1.32: awaited with a catch so a rejection inside the builder —
+       ChapterData missing, a Drive hiccup past the per-file catch — does
+       not leave the student staring at the home screen with the loader
+       stuck on and no explanation. Mirrors the retake path's guard. */
+    try {
+      await this._buildLoksewaPaper(s);
+    } catch (e) {
+      try { QUIZ._hideLoader(); } catch (ignored) {}
+      console.error('[weekly] build failed:', e);
+      toast('Could not build the paper — check your connection and try again.', 6000);
+    }
   },
 
   /* v1.21: pulled out of open() so the retake path can reuse it. */
@@ -1561,7 +1571,7 @@ const WEEKLY = {
      the results screen and _recordAttempt know not to overwrite anything. */
   async _startRetake(id){
     const s = this.sets.find(x=>x.id===id);
-    if(!s || !s.fileId){ toast('Not available.'); return; }
+    if(!s){ toast('Not available.'); return; }
     /* v1.32: no examOpen check — a retake is local-only and always allowed. */
     toast('🎯 Retake — for practice. Your official score will not change.', 4000);
     /* v1.26: if the paper build throws (offline mid-build, a Drive hiccup,
@@ -1599,33 +1609,62 @@ const WEEKLY = {
     }
 
     if (!picks.length) {
-      toast('Could not build the paper — try again in a moment.', 5000);
+      /* Fall back to the weekly set's own question file so the retake
+         still opens, mirroring _buildLoksewaPaper's behaviour. */
+      if (!s || !s.fileId){
+        toast('Could not build the paper — download this chapter or go online and try again.', 6000);
+        return;
+      }
+      toast('Could not build the full Loksewa paper — running the set as a normal retake.', 5000);
+      QUIZ.load(s.fileId, `weekly_${s.id}_retake`, 'exam', s.title, {
+        weeklyId: s.id,
+        weeklyTitle: s.title,
+        weeklyRetake: true
+      });
       return;
     }
 
     QUIZ._doStart(
-      picks.slice(0, 100),
-      'exam',
-      '🎯 ' + s.title + ' — Retake',
-      false,
-      {
-        weeklyId: s.id,
-        weeklyTitle: s.title,
-        weeklyRetake: true,
-        timeLimitSec: WEEKLY.LOKSEWA_SECONDS,
-        loksewaMock: true
-      }
+      picks.slice(0, 100), 'exam', '🎯 ' + s.title + ' — Retake', false,
+      { weeklyId: s.id, weeklyTitle: s.title, weeklyRetake: true,
+        timeLimitSec: WEEKLY.LOKSEWA_SECONDS, loksewaMock: true }
     );
   },
 
-  _startReview(s, attempt){
+  /* v1.32: async + mismatch guard.
+     A Loksewa-format attempt is built from CHAPTER POOLS, not from the
+     admin's uploaded weekly-set file. Reviewing it through s.fileId would
+     load a completely different question list, so preset answers can't
+     line up — every question would render as "unanswered" at 0%. Instead
+     we compare the stored answers' length against the file's actual
+     question count and refuse cleanly when they don't match. */
+  async _startReview(s, attempt){
+    if (!s || !s.fileId){
+      toast('This weekly set has no attached question file to review.', 6000);
+      return;
+    }
+    if (attempt && Array.isArray(attempt.answers) && attempt.answers.length){
+      let fileQCount = null;
+      try {
+        const raw = await QUIZ._fetch(s.fileId, `weekly_${s.id}`);
+        fileQCount = normQ(raw, s.fileId).length;
+      } catch(e){ /* leave null — fall through and try the review anyway */ }
+      if (fileQCount !== null && fileQCount !== attempt.answers.length){
+        toast(
+          'This was a Loksewa-format paper — your score is saved, but the ' +
+          'individual answers can\'t be replayed. Start a retake to see the ' +
+          'same format again.',
+          7000
+        );
+        return;
+      }
+    }
     QUIZ.load(s.fileId, `weekly_${s.id}`, 'flashcard', s.title, {
-      weeklyId: s.id,
-      weeklyTitle: s.title,
-      weeklyReviewMode: true,
-      weeklyAttempt: attempt || null
+      weeklyId: s.id, weeklyTitle: s.title,
+      weeklyReviewMode: true, weeklyAttempt: attempt || null
     });
   },
+
 
   // Called from QUIZ._showResults after a weekly exam completes.
   async _recordAttempt(quiz, stats){
