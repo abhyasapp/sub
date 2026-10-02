@@ -74,6 +74,11 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- v1.30: warm the TLS session to the Apps Script host before the user
+     even taps a button. The first POST of a session pays the full
+     DNS + TLS handshake; these hints hide it behind page paint. -->
+<link rel="preconnect" href="https://script.google.com" crossorigin>
+<link rel="dns-prefetch" href="https://script.googleusercontent.com">
 <link rel="stylesheet" href="vendor/fonts/fonts.css">
 <link rel="stylesheet" href="vendor/phosphor/phosphor-regular.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -1053,7 +1058,8 @@ const APP = {
 
   async init(){
     this.checkNet();
-    setInterval(() => { if (!document.hidden) this.checkNet(); }, 15000);
+    /* v1.30: 30s — the connection dot does not need second-level accuracy. */
+    setInterval(() => { if (!document.hidden) this.checkNet(); }, 30000);
     this.initGoogleSignIn();
     this.loadPublicPrice();
     this.bindForms();
@@ -1079,13 +1085,31 @@ const APP = {
     this.setMode('login');
   },
 
-  /* Show the real price on the landing page instead of hiding it until the trial ends. */
+  /* Show the real price on the landing page instead of hiding it until the trial ends.
+     v1.30: cache for 6 hours. The value changes roughly once a year; it
+     was costing a full Apps Script round-trip on every visit, competing
+     with the login POST for the same container. */
   async loadPublicPrice(){
+    const KEY = 'abhyas_price_cache_v1';
+    const TTL = 6 * 60 * 60 * 1000;
+    let cached = null;
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw){ const c = JSON.parse(raw); if (c && c.at && Date.now() - c.at < TTL) cached = c; }
+    } catch(e){}
+    if (cached && cached.amount){
+      const el = $('faq-price');
+      if (el) el.textContent = 'Rs ' + cached.amount;
+      return;
+    }
     try {
       const r = await this.api('getSettings', {}, 'GET', 8000);
       const amt = r && r.success && r.settings && r.settings.paymentAmount;
-      const el = $('faq-price');
-      if (amt && el) el.textContent = 'Rs ' + amt;
+      if (amt){
+        const el = $('faq-price');
+        if (el) el.textContent = 'Rs ' + amt;
+        try { localStorage.setItem(KEY, JSON.stringify({ at: Date.now(), amount: amt })); } catch(e){}
+      }
     } catch(e){}
   },
 
@@ -1109,31 +1133,48 @@ const APP = {
       const el = $(id);
       if (el) el.addEventListener('input', () => this.hideErr());
     });
+
+    /* v1.30: silent warm-up. Fired on the first interaction with a field —
+       the container is warm by the time Sign In is tapped. */
+    ['in-user','in-pass','su-user','su-pass'].forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener('focus', () => this._warmBackend(), { once:true });
+    });
   },
 
   /* ── Connection ─────────────────────────────────────────────────── */
+  /* v1.30: three quick pings competing for the same single-threaded Apps
+     Script container made the login POST look slower than it was. Now the
+     ping skips if a request is already in flight, and the interval
+     relaxed from 15 s to 30 s. */
+  _netBusy: false,
   async checkNet(){
-    const wasOnline = this.online;
-    const dot = $('ndot'), txt = $('nstat');
-    const startedAt = Date.now();
-    this.online = await pingBackend(GAS_URL);
+    if (this._netBusy) return;
+    this._netBusy = true;
+    try {
+      const wasOnline = this.online;
+      const dot = $('ndot'), txt = $('nstat');
+      const startedAt = Date.now();
+      this.online = await pingBackend(GAS_URL);
     const roundTrip = Date.now() - startedAt;
 
-    if (this.online) {
-      const slow = roundTrip > 3000;
-      dot.className = slow ? 'ndot warn' : 'ndot';
-      txt.textContent = slow ? 'Connected, but slow' : 'Connected';
-      /* v1.28: flush any queued payment as soon as we are back online. */
-      if (!wasOnline) { try { PAY_QUEUE.process().catch(() => {}); } catch(e){} }
-      if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
-      if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type:'CLEAR_STALE_IF_ONLINE' });
+      if (this.online) {
+        const slow = roundTrip > 3000;
+        dot.className = slow ? 'ndot warn' : 'ndot';
+        txt.textContent = slow ? 'Connected, but slow' : 'Connected';
+        if (!wasOnline) { try { PAY_QUEUE.process().catch(() => {}); } catch(e){} }
+        if (!wasOnline && this.mode === 'payment') this.loadPaymentUI();
+        if (!wasOnline && navigator.serviceWorker && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.controller.postMessage({ type:'CLEAR_STALE_IF_ONLINE' });
+        }
+      } else {
+        dot.className = 'ndot off';
+        txt.textContent = this.session ? 'Offline — using your saved session' : 'No connection';
       }
-    } else {
-      dot.className = 'ndot off';
-      txt.textContent = this.session ? 'Offline — using your saved session' : 'No connection';
+      this.updatePayButtonState();
+    } finally {
+      this._netBusy = false;
     }
-    this.updatePayButtonState();
   },
 
   updatePayButtonState(){
@@ -1225,6 +1266,19 @@ const APP = {
   hideErr(){ $('err').classList.remove('show'); },
 
   /* ── Transport ──────────────────────────────────────────────────── */
+  /* v1.30: warming ping. Fired the first time the student interacts with
+     the login form. Cold-starts the Apps Script container while they are
+     still typing, so the actual login POST lands on a warm worker instead
+     of paying the 2-4s cold-start penalty. Silent, one-shot. */
+  _warmed: false,
+  _warmBackend(){
+    if (this._warmed) return;
+    this._warmed = true;
+    try {
+      fetch(GAS_URL + '?action=ping&_=' + Date.now(), { cache:'no-store', keepalive:true }).catch(() => {});
+    } catch(e){}
+  },
+
   /* Apps Script can hang for a long time on a poor connection, so every
      call carries its own deadline rather than leaving a button spinning
      forever. Credentials always go by POST — the backend rejects them in
@@ -1314,7 +1368,17 @@ const APP = {
     if (u.length < 3) return this.showErr('That username is too short.');
 
     this.setLoading('btn-login', true);
+
+    /* v1.30: if the POST has not returned within 1.6 s, tell the student
+       we are still waiting on the server. Honest feedback beats a blank
+       spinner, especially when the container is cold-starting. */
+    const slowHint = setTimeout(() => {
+      const b = $('btn-login');
+      if (b && b.disabled) b.innerHTML = '<span class="spin"></span>Warming up…';
+    }, 1600);
+
     const res = await this.api('login', { username:u, password:p }, 'POST');
+    clearTimeout(slowHint);
     this.setLoading('btn-login', false);
 
     if (!res.success) return this.showErr(res.error || 'That username and password didn\u2019t match.');

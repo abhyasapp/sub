@@ -77,4 +77,4 @@
           copy protection, live Loksewa negative-marking score in the
           exam bar, boot error boundary, search inside Saved/Flagged/
           Missed lists, faster progress flush, weekly admin summary. */
-const APP_VERSION = '1.29';
+const APP_VERSION = '1.30';

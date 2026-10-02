@@ -644,6 +644,19 @@ const AUTH = {
       else AUTH._bounce();
       return;
     }
+
+    /* v1.30: the login POST already returned the full user object and
+       issued the session token. Redirecting to user.html used to fire a
+       second checkSession asking for the exact same data. If the session
+       was verified within the last 30 seconds (which is exactly the case
+       right after login) go straight through. Saves one full Apps Script
+       round-trip — typically 1-2 s on the redirect. */
+    const age = Date.now() - (Number(u.lastVerified) || 0);
+    if (age >= 0 && age < 30 * 1000 && AUTH._isValidOffline(u)) {
+      AUTH._enter(u);
+      return;
+    }
+
     try{
       const { res } = await AUTH._checkSessionOnce(u);
       if(!res.success){
