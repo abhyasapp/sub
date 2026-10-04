@@ -20,7 +20,7 @@
    • admin.html is never served from cache.
    ═══════════════════════════════════════════════════════════════════════ */
 
-importScripts('./version.js');
+importScripts('./js/core/version.js');
 const CACHE_NAME = 'abhyas-v' + APP_VERSION;
 const CDN_CACHE = 'abhyas-cdn-v1';
 const NETWORK_TIMEOUT_MS = 4000;
@@ -31,7 +31,7 @@ const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflar
    offline caching just because push could not initialise. */
 let _fcmMessaging = null;
 try {
-  importScripts('./firebase-config.js');
+  importScripts('./js/core/firebase-config.js');
   if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
     importScripts(
       'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
@@ -66,26 +66,27 @@ const SHELL = [
   './privacy.html',
   './terms.html',
 
-  './config.js',
-  './content-index.js',
-  './version.js',
-  './shared.js',
-  './firebase-config.js',
-  './chapters-loader.js',
-  './cloud-sync.js',
+  './js/core/config.js',
+  './js/data/content-index.js',
+  './js/core/version.js',
+  './js/core/shared.js',
+  './js/core/nav.js',
+  './js/core/firebase-config.js',
+  './js/data/chapters-loader.js',
+  './js/app/cloud-sync.js',
 
-  './app.js',
-  './objective.js',
-  './subjective.js',
-  './subjective_chapters.js',
-  './subjective-data.js',
-  './pdf-viewer.js',
+  './js/app/app.js',
+  './js/app/objective.js',
+  './js/app/subjective.js',
+  './js/data/subjective_chapters.js',
+  './js/data/subjective-data.js',
+  './js/app/pdf-viewer.js',
 
   './icon-192.png',
   './icon-512.png',
   './favicon.png',
 
-  './design-system.css',
+  './css/design-system.css',
   './manifest.json',
 
   './vendor/phosphor/phosphor-regular.css',

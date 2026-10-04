@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Abhyas Admin">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex,nofollow">
-<script src="config.js"></script>
+<script src="js/core/config.js"></script>
 <script>(function(){
   try{
     var raw = localStorage.getItem('abhyas_theme');
@@ -26,7 +26,7 @@
       if (m) m.setAttribute('content', '#101314');
     }
   } catch(e) {}
-})();<\/script>
+})();</script>
 <!-- ─── Session bridge: hide the password form on first paint if a
      student session exists. ADMIN.init() will try to exchange it for
      an admin token via adminSwitchFromUser before showing the gate. -->
@@ -37,8 +37,8 @@
       document.documentElement.classList.add('session-bridge');
     }
   }catch(e){}
-})();<\/script>
-<script>if(window.top!==window.self){window.top.location=window.self.location;}<\/script>
+})();</script>
+<script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <title>Abhyas Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -767,30 +767,14 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
       <span>Abhyas<small class="sub">Admin console</small></span>
     </div>
 
-    <div class="rail-group">Overview</div>
-    <button class="rail-item active" id="nav-today" onclick="UI.nav('today')"><i class="ph ph-sun-horizon"></i><span>Today</span></button>
-    <button class="rail-item" id="nav-dashboard" onclick="UI.nav('dashboard')"><i class="ph ph-chart-bar"></i><span>Insights</span></button>
-
-    <div class="rail-group">People</div>
-    <button class="rail-item" id="nav-users" onclick="UI.nav('users')"><i class="ph ph-users-three"></i><span>Students</span></button>
-    <button class="rail-item" id="nav-payments" onclick="UI.nav('payments')"><i class="ph ph-credit-card"></i><span>Payments</span><span class="rail-badge" id="badge-payments" hidden>0</span></button>
-    <button class="rail-item" id="nav-admins" onclick="UI.nav('admins')"><i class="ph ph-shield-check"></i><span>Admins</span></button>
-
-    <div class="rail-group">Content</div>
-    <button class="rail-item" id="nav-weeklysets" onclick="UI.nav('weeklysets')"><i class="ph ph-calendar-check"></i><span>Weekly sets</span></button>
-    <button class="rail-item" id="nav-subjective" onclick="UI.nav('subjective')"><i class="ph ph-note-pencil"></i><span>Grading</span><span class="rail-badge" id="badge-subjective" hidden>0</span></button>
-    <button class="rail-item" id="nav-qreports" onclick="UI.nav('qreports')"><i class="ph ph-flag"></i><span>Reports</span><span class="rail-badge" id="badge-qreports" hidden>0</span></button>
-
-    <div class="rail-group">System</div>
-    <button class="rail-item" id="nav-logs" onclick="UI.nav('logs')"><i class="ph ph-clock-counter-clockwise"></i><span>Activity</span></button>
-    <button class="rail-item" id="nav-data" onclick="UI.nav('data')"><i class="ph ph-database"></i><span>Data &amp; upkeep</span></button>
-    <button class="rail-item" id="nav-settings" onclick="UI.nav('settings')"><i class="ph ph-gear"></i><span>Settings</span></button>
+    <div id="rail-nav"></div>
 
     <div class="rail-foot">
       <button class="rail-item" id="rail-switch" onclick="ADMIN._leaveAdminMode()"><i class="ph ph-arrow-square-out"></i><span id="rail-switch-label">Student app</span></button>
       <div class="rail-version" id="rail-version">Abhyas V1</div>
     </div>
   </nav>
+  <script src="js/core/admin-nav.js"></script>
 
   <div id="main-col">
     <header id="topbar">
@@ -1015,6 +999,15 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
         </div>
         <div id="ws-trunc"></div>
         <div class="panel" id="ws-panel"><div id="weeklysets-list" class="stack2"></div></div>
+      </section>
+
+      <!-- ─────────────── STUDY PDFs ─────────────── -->
+      <section class="view" id="view-studydocs" aria-label="Study PDFs">
+        <div class="page-head">
+          <div><h1>Study PDFs</h1><p>Model answers, notes and past papers for students to read in the app. Only paid students can open them.</p></div>
+          <div class="acts"><button class="btn btn-primary btn-sm" data-perm="studydocs_manage" onclick="STUDYDOCS.openUpload()"><i class="ph ph-upload-simple"></i> Upload PDF</button></div>
+        </div>
+        <div class="panel"><div id="studydocs-list" class="stack2"></div></div>
       </section>
 
       <!-- ─────────────── REPORTS ─────────────── -->
@@ -1346,12 +1339,12 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
 
 <div id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 
-<script src="version.js"></script>
-<script src="shared.js"></script>
-<script src="chapters-loader.js"></script>
-<script src="subjective_chapters.js"></script>
-<script src="subjective-data.js"></script>
-<script src="subjective.js"></script>
+<script src="js/core/version.js"></script>
+<script src="js/core/shared.js"></script>
+<script src="js/data/chapters-loader.js"></script>
+<script src="js/data/subjective_chapters.js"></script>
+<script src="js/data/subjective-data.js"></script>
+<script src="js/app/subjective.js"></script>
 <script src="vendor/pdfjs/pdf.min.js"></script>
 <script src="vendor/pdf-lib/pdf-lib.min.js"></script>
 <script>
@@ -1359,7 +1352,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
     pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
   }
 </script>
-<script src="pdf-viewer.js"></script>
+<script src="js/app/pdf-viewer.js"></script>
 <script>
 'use strict';
 
@@ -1810,12 +1803,9 @@ const ADMIN = {
   },
   _hasFeature(k){ return this.can(k); },
   _applyPermissions(){
-    const map = {
-      'nav-dashboard':['dashboard'], 'nav-users':['users_view'], 'nav-payments':['payments_view'],
-      'nav-admins':['admins_view'], 'nav-weeklysets':['weeklysets_view'], 'nav-qreports':['qreports_view'],
-      'nav-subjective':['subjective_view'], 'nav-logs':['logs_view'], 'nav-settings':['settings_view'],
-      'nav-data':['imports','maintenance']
-    };
+    /* Which rail button needs which permission comes from js/core/admin-nav.js. */
+    const map = {};
+    ADMIN_NAV.ALL.forEach(it => { map['nav-' + it.view] = Array.isArray(it.feature) ? it.feature : [it.feature]; });
     Object.entries(map).forEach(([id, feats]) => {
       const el = $(id);
       if (el) el.hidden = !feats.some(f => this.can(f));
@@ -2268,6 +2258,7 @@ const ADMINS = {
     { name:'Students',  keys:['users_view','users_manage','users_bulk'] },
     { name:'Payments',  keys:['payments_view','payments_review','payments_bulk','screenshots'] },
     { name:'Weekly sets', keys:['weeklysets_view','weeklysets_manage'] },
+    { name:'Study PDFs', keys:['studydocs_view','studydocs_manage'] },
     { name:'Reports',   keys:['qreports_view','qreports_manage'] },
     { name:'Grading',   keys:['subjective_view','subjective_grade','subjective_import'] },
     { name:'Activity & settings', keys:['logs_view','settings_view','settings_manage'] },
@@ -2357,7 +2348,7 @@ const ADMINS = {
   openPromote(){
     this._selected = null;
     this._modeVal = 'existing';
-    const starter = ['dashboard','users_view','payments_view','subjective_view','weeklysets_view','qreports_view','logs_view'];
+    const starter = ['dashboard','users_view','payments_view','subjective_view','weeklysets_view','studydocs_view','qreports_view','logs_view'];
     MODAL.sheet('Add an admin',
       '<div class="segmented mb4" role="tablist">' +
         '<button class="active" id="ap-tab-existing" onclick="ADMINS._mode(\'existing\')">Existing student</button>' +
@@ -3113,6 +3104,193 @@ const QREPORTS = {
       this.render(this.all);
       TOAST.show('Report deleted', 'success');
     } catch(e){ TOAST.show(e.message, 'error'); }
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDY PDFs — upload model answers, notes and past papers for students.
+   Backend: adminListStudyDocs / adminAddStudyDoc / adminUpdateStudyDoc /
+   adminDeleteStudyDoc / adminDownloadStudyDoc. Students read them from
+   "Model answers & notes" in the student app (paid students only).
+   ═══════════════════════════════════════════════════════════════════════ */
+const STUDYDOCS = {
+  list: [], loaded: false, MAX_BYTES: 9 * 1024 * 1024,
+
+  async load(force){
+    const box = $('studydocs-list');
+    if (!box) return;
+    if (this.loaded && !force) { this.render(); return; }
+    box.innerHTML = '<div class="skeleton sk-100"></div><div class="skeleton sk-80"></div><div class="skeleton sk-60"></div>';
+    try {
+      const r = await ADMIN.post('adminListStudyDocs');
+      if (!r.success) throw new Error(r.error || 'Could not load the PDFs.');
+      this.list = r.docs || []; this.loaded = true;
+      this.render();
+    } catch(e){
+      box.innerHTML = '<div class="banner banner-danger"><i class="ph ph-warning-circle"></i><span>' + esc(e.message) +
+        ' <button class="btn btn-quiet btn-sm" onclick="STUDYDOCS.load(true)">Try again</button></span></div>';
+    }
+  },
+
+  render(){
+    const box = $('studydocs-list');
+    if (!box) return;
+    if (!this.list.length) {
+      box.innerHTML = '<div class="empty"><i class="ph ph-file-pdf"></i><div class="t">No study PDFs yet</div>' +
+        '<div class="d">Upload a model-answer PDF and students will find it under Written answers.</div>' +
+        '<div class="a"><button class="btn btn-primary" data-perm="studydocs_manage" onclick="STUDYDOCS.openUpload()">Upload a PDF</button></div></div>';
+      ADMIN._applyPermissions();
+      return;
+    }
+    const canManage = ADMIN.can('studydocs_manage');
+    box.innerHTML = '<div class="rows">' + this.list.map(d => {
+      const hidden = d.status === 'hidden';
+      const id = escAttrJs(d.id);
+      return '<div class="row">' +
+        '<div class="row-main"><div class="row-title">' + esc(d.title) + ' ' + badge(hidden ? 'archived' : 'live', hidden ? 'Hidden' : 'Visible') + '</div>' +
+        '<div class="row-sub">' + esc(STUDYDOC_LABELS[d.category] || 'Other') + (d.chapterId && subjChapterName(d.chapterId) ? ' · ' + esc(subjChapterName(d.chapterId)) : '') + ' · ' + esc(formatBytes(d.sizeBytes)) +
+          ' · added ' + esc(fullTime(d.uploadedAt)) + (d.uploadedBy ? ' by ' + esc(d.uploadedBy) : '') +
+          (d.description ? '<br>' + esc(d.description) : '') + '</div></div>' +
+        '<div class="row-actions">' +
+          '<button class="icon-btn sm" onclick="STUDYDOCS.preview(\'' + id + '\',\'' + escAttrJs(d.title) + '\')" aria-label="Open ' + esc(d.title) + '" title="Open"><i class="ph ph-eye"></i></button>' +
+          (canManage ? '<button class="icon-btn sm" onclick="STUDYDOCS.openEdit(\'' + id + '\')" aria-label="Edit ' + esc(d.title) + '" title="Edit"><i class="ph ph-pencil-simple"></i></button>' +
+            '<button class="icon-btn sm" onclick="STUDYDOCS.setStatus(\'' + id + '\',\'' + (hidden ? 'published' : 'hidden') + '\')" aria-label="' + (hidden ? 'Show to students' : 'Hide from students') + '" title="' + (hidden ? 'Show to students' : 'Hide from students') + '"><i class="ph ph-' + (hidden ? 'eye-slash' : 'eye-closed') + '"></i></button>' +
+            '<button class="icon-btn sm danger" onclick="STUDYDOCS.del(\'' + id + '\',\'' + escAttrJs(d.title) + '\')" aria-label="Delete ' + esc(d.title) + '" title="Delete"><i class="ph ph-trash"></i></button>' : '') +
+        '</div></div>';
+    }).join('') + '</div>';
+  },
+
+  _fields(d){
+    const cats = Object.keys(STUDYDOC_LABELS);
+    return '<div class="field"><label for="sd-title">Title</label>' +
+        '<input class="input" type="text" id="sd-title" maxlength="120" placeholder="Soil Mechanics: 10-mark model answers" value="' + esc(d ? d.title : '') + '"></div>' +
+      '<div class="field"><label for="sd-cat">Type</label><select class="select" id="sd-cat">' +
+        cats.map(c => '<option value="' + c + '"' + ((d ? d.category : 'model-answer') === c ? ' selected' : '') + '>' + esc(STUDYDOC_LABELS[c]) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label for="sd-chap">Written-answer chapter <span class="dim">(optional: students see a "model answer" button after their answer in this chapter is marked)</span></label>' +
+        '<select class="select" id="sd-chap"><option value="">Not tied to a chapter</option>' +
+        (window.SUBJECTIVE_CHAPTERS || []).map(c => '<option value="' + esc(c.id) + '"' + (d && d.chapterId === c.id ? ' selected' : '') + '>' + esc(c.name) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label for="sd-desc">Short note <span class="dim">(optional, shown under the title)</span></label>' +
+        '<input class="input" type="text" id="sd-desc" maxlength="400" placeholder="Worked answers for the last five years" value="' + esc(d ? d.description : '') + '"></div>' +
+      '<label class="flex g2 mt2" style="align-items:center;cursor:pointer"><input type="checkbox" id="sd-pin"' + (d && d.sortOrder <= 1 ? ' checked' : '') + '> <span class="t-callout">Show at the top of the list</span></label>';
+  },
+
+  openUpload(){
+    MODAL.sheet('Upload a study PDF',
+      this._fields(null) +
+      '<div class="field mt2"><span class="field-label">PDF file</span>' +
+        '<label class="file-drop" for="sd-file">' +
+          '<input type="file" id="sd-file" accept="application/pdf,.pdf" onchange="STUDYDOCS.onFilePicked()">' +
+          '<i class="ph ph-file-arrow-up fd-icon"></i>' +
+          '<span class="fd-main" id="sd-file-name">Choose a PDF</span>' +
+          '<span class="fd-sub">Under 9 MB. Scanned pages are fine, but smaller files open faster on phones.</span>' +
+        '</label><div class="t-foot mt2" id="sd-status" aria-live="polite"></div></div>' +
+      '<label class="flex g2 mt2" style="align-items:center;cursor:pointer"><input type="checkbox" id="sd-publish" checked> <span class="t-callout">Visible to students now</span></label>' +
+      '<div class="flex g2 mt4"><button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\')">Cancel</button>' +
+        '<button class="btn btn-primary" style="flex:2" id="sd-save" onclick="STUDYDOCS.upload()">Upload</button></div>');
+  },
+
+  onFilePicked(){
+    const input = $('sd-file'), status = $('sd-status'), nameEl = $('sd-file-name');
+    const f = input.files && input.files[0];
+    if (!f) return;
+    nameEl.textContent = f.name;
+    if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') {
+      status.innerHTML = '<span style="color:var(--danger)">That is not a PDF.</span>'; input.value = ''; nameEl.textContent = 'Choose a PDF'; return;
+    }
+    if (f.size > this.MAX_BYTES) {
+      status.innerHTML = '<span style="color:var(--danger)">That file is ' + formatBytes(f.size) + '. Keep it under 9 MB (a scanner or PDF compressor can shrink it).</span>';
+      input.value = ''; nameEl.textContent = 'Choose a PDF'; return;
+    }
+    status.textContent = formatBytes(f.size) + ' ready';
+    const t = $('sd-title');
+    if (t && !t.value.trim()) t.value = f.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim();
+  },
+
+  async upload(){
+    const f = $('sd-file').files && $('sd-file').files[0];
+    const title = $('sd-title').value.trim();
+    if (!title) { $('sd-title').classList.add('invalid'); return TOAST.show('Give the PDF a title', 'warning'); }
+    if (!f) return TOAST.show('Choose a PDF file first', 'warning');
+    const btn = $('sd-save'), status = $('sd-status');
+    btn.disabled = true; btn.textContent = 'Uploading…';
+    status.innerHTML = '<span class="inline-loader">Uploading to Drive</span>';
+    try {
+      const dataUrl = await new Promise((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(new Error('Could not read that file.')); r.readAsDataURL(f);
+      });
+      const r = await ADMIN.post('adminAddStudyDoc', {
+        title, category: $('sd-cat').value, chapterId: $('sd-chap').value, description: $('sd-desc').value.trim(),
+        sortOrder: $('sd-pin').checked ? 1 : 100, publish: $('sd-publish').checked, pdfData: dataUrl
+      });
+      if (!r.success) throw new Error(r.error || 'Upload failed.');
+      MODAL.close('sheet');
+      TOAST.show('Uploaded' + ($('sd-publish') && !$('sd-publish').checked ? ' (hidden)' : ''), 'success');
+      this.load(true);
+    } catch(e){
+      status.innerHTML = '<span style="color:var(--danger)">' + esc(e.message) + '</span>';
+      btn.disabled = false; btn.textContent = 'Upload';
+    }
+  },
+
+  openEdit(id){
+    const d = this.list.find(x => x.id === id);
+    if (!d) return;
+    MODAL.sheet('Edit study PDF',
+      this._fields(d) +
+      '<div class="field mt2"><label for="sd-state">Visibility</label><select class="select" id="sd-state">' +
+        '<option value="published"' + (d.status !== 'hidden' ? ' selected' : '') + '>Visible to students</option>' +
+        '<option value="hidden"' + (d.status === 'hidden' ? ' selected' : '') + '>Hidden</option></select></div>' +
+      '<div class="t-foot mt2">To replace the file itself, upload the new PDF and delete this one.</div>' +
+      '<div class="flex g2 mt4"><button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\')">Cancel</button>' +
+        '<button class="btn btn-primary" style="flex:2" id="sd-save" onclick="STUDYDOCS.saveEdit(\'' + escAttrJs(id) + '\')">Save</button></div>');
+  },
+
+  async saveEdit(id){
+    const title = $('sd-title').value.trim();
+    if (!title) { $('sd-title').classList.add('invalid'); return TOAST.show('Give the PDF a title', 'warning'); }
+    const btn = $('sd-save'); btn.disabled = true;
+    try {
+      const r = await ADMIN.post('adminUpdateStudyDoc', {
+        id, title, category: $('sd-cat').value, chapterId: $('sd-chap').value, description: $('sd-desc').value.trim(),
+        sortOrder: $('sd-pin').checked ? 1 : 100, status: $('sd-state').value
+      });
+      if (!r.success) throw new Error(r.error || 'Could not save.');
+      MODAL.close('sheet'); TOAST.show('Saved', 'success'); this.load(true);
+    } catch(e){ btn.disabled = false; TOAST.show(e.message, 'error'); }
+  },
+
+  async setStatus(id, status){
+    const d = this.list.find(x => x.id === id);
+    if (!d) return;
+    try {
+      const r = await ADMIN.post('adminUpdateStudyDoc', {
+        id, title: d.title, category: d.category, chapterId: d.chapterId, description: d.description, sortOrder: d.sortOrder, status
+      });
+      if (!r.success) throw new Error(r.error || 'Could not update.');
+      TOAST.show(status === 'hidden' ? 'Hidden from students' : 'Visible to students', 'success'); this.load(true);
+    } catch(e){ TOAST.show(e.message, 'error'); }
+  },
+
+  async del(id, title){
+    const ok = await CONFIRM.ask({ title: 'Delete this PDF?', body: '<b>' + esc(title) + '</b> will be removed for every student, including copies saved for offline reading once they next go online. This cannot be undone.', confirmText: 'Delete', tone: 'danger' });
+    if (!ok) return;
+    try {
+      const r = await ADMIN.post('adminDeleteStudyDoc', { id });
+      if (!r.success) throw new Error(r.error || 'Could not delete.');
+      TOAST.show('Deleted', 'success'); this.load(true);
+    } catch(e){ TOAST.show(e.message, 'error'); }
+  },
+
+  preview(id, title){
+    if (typeof PDFVIEW === 'undefined') return TOAST.show('The PDF reader did not load. Reload the page.', 'error');
+    PDFVIEW.open({
+      title: title || 'Study PDF',
+      load: async () => {
+        const r = await ADMIN.post('adminDownloadStudyDoc', { id });
+        if (!r.success) throw new Error(r.error || 'Could not open that PDF.');
+        return { base64: r.base64, filename: r.filename || 'study.pdf' };
+      }
+    });
   }
 };
 
@@ -4696,17 +4874,8 @@ MODAL.confirmReview = async function(username, status){
 
 const UI = {
   current: 'today',
-  TITLES: {
-    today:'Today', dashboard:'Insights', users:'Students', payments:'Payments',
-    admins:'Admins', weeklysets:'Weekly sets', qreports:'Reports', subjective:'Grading',
-    logs:'Activity', data:'Data & upkeep', settings:'Settings'
-  },
-  FEATURES: {
-    users:'users_view', payments:'payments_view', admins:'admins_view',
-    weeklysets:'weeklysets_view', qreports:'qreports_view', subjective:'subjective_view',
-    logs:'logs_view', settings:'settings_view', today:'dashboard', dashboard:'dashboard',
-    data:['imports','maintenance']
-  },
+  TITLES: ADMIN_NAV.TITLES,       /* defined once in js/core/admin-nav.js */
+  FEATURES: ADMIN_NAV.FEATURES,
   _scroll: {},
 
   nav(id, opts = {}){
@@ -4739,6 +4908,7 @@ const UI = {
     if (id === 'dashboard' && !MISSED.lastResults.length) MISSED.load();
     if (id === 'subjective') SUBJ_TABS.go(tab || SUBJ_TABS.current);
     if (id === 'admins') SUBJ_STORE.load();
+    if (id === 'studydocs') STUDYDOCS.load();
 
     this.railClose();
     if (opts.keepScroll && prev === id) window.scrollTo(0, this._scroll[id] || 0);

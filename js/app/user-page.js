@@ -303,50 +303,10 @@ document.addEventListener('keydown', e => {
   }
 });
 
-const SECTIONS = {
-  study: {
-    title:'Study', icon:'ph-books',
-    items:[
-      { icon:'ph-books',          label:'Chapters',        sub:'Work through a subtopic',      view:'online' },
-      { icon:'ph-lightning',      label:'Mixed practice',  sub:'Several chapters at once',     view:'psycho' },
-      { icon:'ph-calendar-check', label:'Weekly test',     sub:'One graded attempt',           view:'weekly' },
-      { icon:'ph-folder-open',    label:'Open a file',     sub:'A question bank you have',     view:'local' }
-    ]
-  },
-  subjective: {
-    title:'Written answers', icon:'ph-note-pencil',
-    items:[
-      { icon:'ph-sun-horizon',  label:'Question of the day', sub:'Timed write, then upload',  view:'subj-qotd' },
-      { icon:'ph-note-pencil',  label:'Full paper',          sub:'100 marks, three hours',    view:'subj-exam' },
-      { icon:'ph-list-dashes',  label:'Browse questions',    sub:'The whole written bank',    view:'subj-list' },
-      { icon:'ph-file-text',    label:'My submissions',      sub:'What you sent, and your score', view:'subj-mine' }
-    ]
-  },
-  progress: {
-    title:'Progress', icon:'ph-chart-bar',
-    items:[
-      { icon:'ph-chart-bar',              label:'Your progress',        sub:'Accuracy and weak chapters', view:'progress' },
-      { icon:'ph-arrow-counter-clockwise',label:'Questions you missed', sub:'Ready for another go',       view:'wrong' },
-      { icon:'ph-star',                   label:'Saved',                sub:'Starred for later',          view:'bookmarks' },
-      { icon:'ph-flag',                   label:'Flagged',              sub:'Marked to revisit',          view:'flagged' },
-      { icon:'ph-list-checks',            label:'Coverage by file',     sub:'How much of each file',      view:'server-progress' }
-    ]
-  },
-  more: {
-    title:'More', icon:'ph-dots-three',
-    items:[
-      { icon:'ph-calendar-blank', label:'Study plan',  sub:'When you plan to study',     view:'timetable' },
-      { icon:'ph-download-simple',label:'Downloads',   sub:'Save sets for offline',      view:'offline' },
-      { icon:'ph-floppy-disk',    label:'Backup',      sub:'Export or restore a file',   view:'data' },
-      { icon:'ph-question',       label:'How this works', sub:'A short tour',            special:'tutorial' }
-    ]
-  }
-};
-
 window.BN = {
   _activeKey: null,
   open(key){
-    const sec = SECTIONS[key];
+    const sec = NAV.sheet(key);
     if (!sec) return;
     set('bn-sheet-title-el', sec.title);
     $('bn-sheet-icon').className = 'ph ' + sec.icon;
@@ -364,7 +324,7 @@ window.BN = {
       }
     } catch(e){}
 
-    $('bn-sheet-grid').innerHTML = sec.items.map(it => {
+    const row = it => {
       const go = it.special === 'tutorial'
         ? "BN.close();setTimeout(function(){TUTORIAL.open()},140)"
         : "BN.close();setTimeout(function(){UI.go('" + it.view + "')},100)";
@@ -374,7 +334,10 @@ window.BN = {
         (it.sub ? '<span class="bn-sheet-sub">' + esc(it.sub) + '</span>' : '') + '</span>' +
         '<i class="ph ph-caret-right bn-sheet-arrow"></i>' +
       '</button>';
-    }).join('') + (key === 'more' ? adminCard : '');
+    };
+    $('bn-sheet-grid').innerHTML = sec.sections.map(sc =>
+      (sc.label ? '<div class="bn-sheet-lbl">' + esc(sc.label) + '</div>' : '') + sc.items.map(row).join('')
+    ).join('') + (key === 'more' ? adminCard : '');
 
     $('bn-sheet').classList.add('show');
     $('bn-sheet-backdrop').classList.add('show');
@@ -390,17 +353,9 @@ window.BN = {
   }
 };
 
-const TAB_FOR_VIEW = {
-  'home':'bn-home',
-  'online':'bn-study','local':'bn-study','psycho':'bn-study','weekly':'bn-study',
-  'subj-qotd':'bn-subjective','subj-exam':'bn-subjective','subj-list':'bn-subjective','subj-mine':'bn-subjective',
-  'progress':'bn-progress','server-progress':'bn-progress','heatmap':'bn-progress',
-  'bookmarks':'bn-progress','flagged':'bn-progress','wrong':'bn-progress',
-  'timetable':'bn-more','offline':'bn-more','data':'bn-more'
-};
 function _updateBottomNav(v){
   document.querySelectorAll('.bn-item').forEach(e => e.classList.remove('active'));
-  const b = $(TAB_FOR_VIEW[v]);
+  const b = $(NAV.tabForView(v));
   if (b) b.classList.add('active');
 }
 
@@ -614,6 +569,10 @@ window.MY_SUBJ = {
       return;
     }
     box.innerHTML = this._items.map(s => this._renderCard(s)).join('');
+    if (!this._modelChecked && typeof STUDYDOCS !== 'undefined' && this._items.some(s => s.chapterId)) {
+      this._modelChecked = true;
+      STUDYDOCS.ensureLoaded().then(() => { if (STUDYDOCS.docs.length) this.render(); });
+    }
   },
 
   _renderCard(s){
@@ -652,6 +611,12 @@ window.MY_SUBJ = {
       ? '<div class="subm-q">' + esc(s.questionText) + '</div>'
       : '';
 
+    const modelDocs = (typeof STUDYDOCS !== 'undefined' && s.chapterId) ? studyDocsForChapter(STUDYDOCS.docs, s.chapterId) : [];
+    const modelBtn = modelDocs.length
+      ? '<div class="subm-pdf-row"><button class="subm-pdf-btn" onclick="STUDYDOCS.showChapter(\'' + escAttrJs(s.chapterId) + '\')">' +
+          '<i class="ph ph-book-open-text"></i> ' + (modelDocs.length === 1 ? 'Read the model answer' : 'Model answers for ' + esc(subjChapterName(s.chapterId) || 'this chapter') + ' (' + modelDocs.length + ')') + '</button></div>'
+      : '';
+
     return '<div class="subm-card ' + cls + '">' +
       '<div class="subm-top">' +
         '<div>' +
@@ -668,6 +633,7 @@ window.MY_SUBJ = {
       '<div class="subm-pdf-row">' + pdfBtn + '</div>' +
       gradeBlock +
       feedbackBlock +
+      modelBtn +
     '</div>';
   },
 
@@ -780,33 +746,23 @@ window.VERIFY = {
   }
 };
 
-const _uigoraw = UI._goRaw.bind(UI);
-UI._goRaw = function(v){
-  const alias = { 'subjective':'subj-qotd' };
-  const real = alias[v] || v;
+/* Screen hooks: what each screen does when it opens. (Replaces the wrapper that used
+   to re-define UI._goRaw here; the alias and base behaviour live in UI itself.) */
+UI.onEnterAny(v => { _updateBottomNav(v); BN.close(); setTimeout(_refreshHints, 50); });
 
-  _uigoraw(real);
-  _updateBottomNav(real);
-  BN.close();
+UI.onEnter('online', () => { if (typeof CH_GRID !== 'undefined') CH_GRID.render(); });
 
-  if (real === 'online' && typeof CH_GRID !== 'undefined') CH_GRID.render();
+UI.onEnter('weekly', () => {
+  if (typeof WEEKLY === 'undefined') return;
+  if (typeof WEEKLY._renderHomeCard === 'function') WEEKLY._renderHomeCard();
+  const outer = $('weekly-sets-outer'), empty = $('weekly-empty');
+  if (outer && empty) empty.style.display = (outer.style.display === 'none') ? '' : 'none';
+});
 
-  if (real === 'weekly' && typeof WEEKLY !== 'undefined') {
-    if (typeof WEEKLY._renderHomeCard === 'function') WEEKLY._renderHomeCard();
-    const outer = $('weekly-sets-outer'), empty = $('weekly-empty');
-    if (outer && empty) empty.style.display = (outer.style.display === 'none') ? '' : 'none';
-  }
+UI.onEnter('subj-mine', () => { if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load(false); });
 
-  if (real === 'subj-mine') {
-    MY_SUBJ.load(false);
-    document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
-    const active = $('nav-subj-mine');
-    if (active) active.classList.add('active');
-    setTimeout(_refreshHints, 50);
-    return;
-  }
-
-  if ((real === 'subj-qotd' || real === 'subj-exam' || real === 'subj-list') && typeof SUBJ !== 'undefined') {
+['subj-qotd', 'subj-exam', 'subj-list'].forEach(view => UI.onEnter(view, () => {
+  if (typeof SUBJ !== 'undefined') {
     if (typeof SUBJ.ready === 'function' && SUBJ.ready()) {
       if (typeof SUBJ._renderQotd === 'function') SUBJ._renderQotd();
       if (typeof SUBJ._renderExam === 'function') SUBJ._renderExam();
@@ -814,23 +770,15 @@ UI._goRaw = function(v){
     } else if (typeof SUBJ.init === 'function') {
       SUBJ.init();
     }
-    document.querySelectorAll('.sb-item').forEach(el => el.classList.remove('active'));
-    const active = $('nav-' + real);
-    if (active) active.classList.add('active');
-
-    if (real === 'subj-exam') setTimeout(() => { if (typeof SUBJ_BUILDER !== 'undefined') { SUBJ_BUILDER._populate(); SUBJ_BUILDER._updateCooldownUI(); } }, 80);
-    if (real === 'subj-list') setTimeout(_populateChapterFilter, 80);
-    setTimeout(_refreshHints, 50);
-    return;
   }
+  if (view === 'subj-exam') setTimeout(() => { if (typeof SUBJ_BUILDER !== 'undefined') { SUBJ_BUILDER._populate(); SUBJ_BUILDER._updateCooldownUI(); } }, 80);
+  if (view === 'subj-list') setTimeout(_populateChapterFilter, 80);
+}));
 
-  if (real === 'server-progress' && typeof SERVER_PROG !== 'undefined') SERVER_PROG.load(false);
-  if (real === 'heatmap' && typeof HEATMAP !== 'undefined') HEATMAP.render();
-  if (real === 'progress' && typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render) setTimeout(CLOUD_UI.render, 0);
-  if ((real === 'home' || real === 'progress') && typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh();
-
-  setTimeout(_refreshHints, 50);
-};
+UI.onEnter('server-progress', () => { if (typeof SERVER_PROG !== 'undefined') SERVER_PROG.load(false); });
+UI.onEnter('heatmap',         () => { if (typeof HEATMAP !== 'undefined') HEATMAP.render(); });
+UI.onEnter('progress',        () => { if (typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render) setTimeout(CLOUD_UI.render, 0); });
+['home', 'progress'].forEach(view => UI.onEnter(view, () => { if (typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh(); }));
 
 function _populateChapterFilter(){
   const sel = $('subj-list-chapter');
@@ -1541,12 +1489,416 @@ function _refreshHints(){
   try { HARDQ.load(); } catch(e){}
   try { if (typeof SYLLABUS_MOCK     !== 'undefined') SYLLABUS_MOCK.render(); } catch(e){}
   try { if (typeof PRACTICE_RESUME   !== 'undefined') PRACTICE_RESUME.render(); } catch(e){}
+  try { if (typeof SPRINT           !== 'undefined') SPRINT.render(); } catch(e){}
   try { if (typeof DAILY10           !== 'undefined') DAILY10.render(); } catch(e){}
   try { if (typeof DIGEST            !== 'undefined') DIGEST.render(); } catch(e){}
   try { if (typeof CALENDAR          !== 'undefined') CALENDAR.render(); } catch(e){}
   try { if (typeof FORECAST          !== 'undefined') FORECAST.render(); } catch(e){}
   try { if (typeof SYLLABUS_PROGRESS !== 'undefined') SYLLABUS_PROGRESS.render(); } catch(e){}
 }
+
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   INSIGHTS — Progress charts drawn as inline SVG (no library, no network):
+   14-day activity, accuracy trend, study-day consistency, and a
+   this-week-vs-last-week summary. Data maths: insightsData() in shared.js.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.INSIGHTS = {
+  GOAL: 40,
+
+  _bars(days){
+    const W = 320, H = 120, padL = 4, padB = 18, padT = 8, n = days.length;
+    const max = Math.max(this.GOAL, ...days.map(d => d.q), 1);
+    const bw = (W - padL * 2) / n, plotH = H - padB - padT;
+    const y = v => padT + plotH - (v / max) * plotH;
+    const bars = days.map((d, i) => {
+      const h = Math.max(d.q ? 2 : 0, (d.q / max) * plotH), x = padL + i * bw + 2;
+      const col = d.q >= this.GOAL ? 'var(--grn)' : d.q > 0 ? 'var(--accent)' : 'transparent';
+      return '<rect x="' + x.toFixed(1) + '" y="' + (padT + plotH - h).toFixed(1) + '" width="' + (bw - 4).toFixed(1) +
+        '" height="' + h.toFixed(1) + '" rx="3" fill="' + col + '"' + (d.isToday ? ' opacity="1"' : ' opacity=".85"') + '></rect>' +
+        '<text x="' + (x + (bw - 4) / 2).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="middle" font-size="8" fill="var(--t3)"' +
+        (d.isToday ? ' font-weight="700"' : '') + '>' + d.label.charAt(0) + '</text>';
+    }).join('');
+    const gy = y(this.GOAL).toFixed(1);
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Questions answered per day over the last 14 days">' +
+      '<line x1="0" x2="' + W + '" y1="' + gy + '" y2="' + gy + '" stroke="var(--t3)" stroke-width=".8" stroke-dasharray="3 3" opacity=".6"></line>' +
+      '<text x="' + (W - 2) + '" y="' + (Number(gy) - 3) + '" text-anchor="end" font-size="8" fill="var(--t3)">goal ' + this.GOAL + '</text>' +
+      bars + '</svg>';
+  },
+
+  _line(points){
+    if (points.length < 2) return '';
+    const W = 320, H = 110, p = 10, n = points.length;
+    const x = i => p + (i / (n - 1)) * (W - p * 2), y = v => p + (1 - v / 100) * (H - p * 2);
+    const path = points.map((pt, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(pt.pct).toFixed(1)).join(' ');
+    const dots = points.map((pt, i) => '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(pt.pct).toFixed(1) + '" r="' + (i === n - 1 ? 4 : 2.5) +
+      '" fill="' + (pt.pct >= 70 ? 'var(--grn)' : pt.pct >= 50 ? 'var(--amb)' : 'var(--ros)') + '"></circle>').join('');
+    const py = y(70).toFixed(1);
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="Score of your last ' + n + ' sessions">' +
+      '<line x1="' + p + '" x2="' + (W - p) + '" y1="' + py + '" y2="' + py + '" stroke="var(--grn)" stroke-width=".8" stroke-dasharray="3 3" opacity=".6"></line>' +
+      '<text x="' + (W - p) + '" y="' + (Number(py) - 3) + '" text-anchor="end" font-size="8" fill="var(--t3)">70% target</text>' +
+      '<path d="' + path + '" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>' + dots + '</svg>';
+  },
+
+  _strip(cells){
+    const cols = 12, size = 14, gap = 3, W = cols * (size + gap), H = 7 * (size + gap);
+    const out = cells.map((c, i) => {
+      const col = Math.floor(i / 7), row = i % 7;
+      const fill = c.active ? (c.q >= this.GOAL ? 'var(--grn)' : 'var(--accent)') : 'var(--t3)';
+      return '<rect x="' + col * (size + gap) + '" y="' + row * (size + gap) + '" width="' + size + '" height="' + size + '" rx="3" fill="' + fill +
+        '" opacity="' + (c.active ? '1' : '.18') + '"><title>' + c.date + (c.active ? ' \u2713' : '') + '</title></rect>';
+    }).join('');
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" style="max-width:260px" role="img" aria-label="Study days over the last 12 weeks">' + out + '</svg>';
+  },
+
+  _delta(label, cur, prev, unit){
+    if (prev === null || cur === null) return '<div class="t-cap">' + label + ': <b>' + (cur === null ? '\u2014' : cur + unit) + '</b></div>';
+    const d = cur - prev, cls = d > 0 ? 'ok' : d < 0 ? 'low' : 'mid', arrow = d > 0 ? '\u25B2' : d < 0 ? '\u25BC' : '\u25AC';
+    return '<div class="t-cap">' + label + ': <b>' + cur + unit + '</b> <span class="pct ' + cls + '">' + arrow + ' ' + Math.abs(d) + unit + ' vs last week</span></div>';
+  },
+
+  render(){
+    const box = $('insights-card');
+    if (!box) return;
+    const d = insightsData((S.prog && S.prog.sessions) || [], (S.stk && S.stk.days) || [], new Date());
+    if (!d.recent.length && !d.activeDays12w) {
+      box.innerHTML = '<div class="card-hd"><h3><i class="ph ph-chart-line-up"></i> Insights</h3></div>' +
+        '<div class="empty"><p>Finish a quiz and your daily activity, score trend and study streak will appear here.</p></div>';
+      return;
+    }
+    box.innerHTML =
+      '<div class="card-hd"><h3><i class="ph ph-chart-line-up"></i> Insights</h3></div>' +
+      '<div class="t-cap" style="margin-bottom:6px"><b>Questions per day</b> \u00b7 last 14 days</div>' + this._bars(d.last14) +
+      '<div style="margin:10px 0 14px">' +
+        this._delta('Questions this week', d.weekQuestions, d.prevWeekQuestions, '') +
+        this._delta('Accuracy this week', d.accWeek, d.accPrev, '%') +
+        '<div class="t-cap">Study time this week: <b>' + (d.weekMinutes >= 60 ? Math.floor(d.weekMinutes / 60) + ' h ' + (d.weekMinutes % 60) + ' min' : d.weekMinutes + ' min') + '</b></div>' +
+      '</div>' +
+      (d.recent.length > 1 ? '<div class="t-cap" style="margin-bottom:6px"><b>Score trend</b> \u00b7 last ' + d.recent.length + ' sessions</div>' + this._line(d.recent) : '') +
+      '<div class="t-cap" style="margin:14px 0 6px"><b>Consistency</b> \u00b7 ' + d.activeDays12w + ' study days in 12 weeks' + (d.streak ? ' \u00b7 \ud83d\udd25 ' + d.streak + '-day streak' : '') + '</div>' + this._strip(d.cells);
+  }
+};
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDYDOCS — "Model answers & notes": PDFs the admin uploads for students.
+   List: listStudyDocs. Bytes: getStudyDocPdf (the Drive files stay private and
+   the paywall applies). Opened PDFs are kept on the device so they work offline
+   (IndexedDB via QDB, newest 20, up to 8 MB each). Filtering and "new" tracking
+   are pure helpers in shared.js (studyDocsFilter, studyDocsNewIds).
+   ═══════════════════════════════════════════════════════════════════════ */
+window.STUDYDOCS = {
+  LIST_KEY: 'abhyas_studydocs', SEEN_KEY: 'abhyas_studydocs_seen', CACHE_KEY: 'abhyas_studydocs_cache',
+  MAX_CACHED: 20, MAX_CACHE_BYTES: 8 * 1024 * 1024, STALE_MS: 10 * 60 * 1000,
+  docs: [], loaded: false, loading: false, cat: 'all', q: '', chapter: '', newIds: new Set(), _at: 0,
+
+  _user(){ try { return (typeof S !== 'undefined' && S.user) ? S.user : null; } catch(e){ return null; } },
+  _url(){ try { return (typeof ABHYAS_CONFIG !== 'undefined' && ABHYAS_CONFIG.GAS_URL) || ''; } catch(e){ return ''; } },
+  _online(){ try { return !!(S.online && !S.forcedOffline); } catch(e){ return navigator.onLine; } },
+  _read(key, dflt){ try { const v = JSON.parse(localStorage.getItem(key) || 'null'); return v == null ? dflt : v; } catch(e){ return dflt; } },
+  _write(key, v){ try { localStorage.setItem(key, JSON.stringify(v)); } catch(e){} },
+
+  async _post(body){
+    const u = this._user(), url = this._url();
+    if (!u || !u.token) throw new Error('Please sign in again.');
+    if (!url) throw new Error('The backend address is not set up.');
+    const r = await fetch(url, { method:'POST', headers:{ 'Content-Type':'text/plain' },
+      body: JSON.stringify(Object.assign({ username:u.username, token:u.token }, body)) });
+    if (!r.ok) throw new Error('The server replied with an error (' + r.status + ').');
+    const res = await r.json();
+    if (!res || !res.success) { const e = new Error((res && res.error) || 'Request failed.'); e.needsPayment = !!(res && res.needsPayment); throw e; }
+    return res;
+  },
+
+  /* Fetch the list and update the sidebar badge. Quiet by default (no screen needed). */
+  async _fetchList(){
+    const res = await this._post({ action:'listStudyDocs' });
+    this.docs = res.docs || [];
+    this._write(this.LIST_KEY, this.docs);
+    this.loaded = true; this._at = Date.now();
+    this._purgeStale();
+    return this.docs;
+  },
+
+  _updateBadge(){
+    const seen = this._read(this.SEEN_KEY, null);
+    const n = seen === null ? 0 : studyDocsNewIds(this.docs, seen).length;
+    const b = $('sdc');
+    if (b) { b.hidden = n === 0; b.textContent = n > 99 ? '99+' : String(n); }
+    const hint = document.querySelector('#nav-studydocs');
+    if (hint) hint.setAttribute('title', n ? n + ' new' : '');
+    return n;
+  },
+
+  /* Called when the app opens: refresh the badge without touching the screen. */
+  async refreshBadge(){
+    if (!this._user() || !this._online() || (Date.now() - this._at) < this.STALE_MS) return;
+    try { await this._fetchList(); this._updateBadge(); } catch(e){ /* the badge is a nicety */ }
+  },
+
+  async load(force){
+    const box = $('studydocs-body');
+    if (!box) return;
+    if (this.loading) return;
+    const fresh = this.loaded && (Date.now() - this._at) < this.STALE_MS;
+    let offlineNote = '';
+    if (!(fresh && !force)) {
+      this.loading = true;
+      if (!this.loaded) box.innerHTML = '<div class="card"><div class="skel w80"></div><div class="skel w60"></div><div class="skel w100"></div></div>';
+      try {
+        if (!this._online()) throw Object.assign(new Error('offline'), { offline: true });
+        await this._fetchList();
+      } catch(e){
+        if (e.needsPayment) {
+          box.innerHTML = '<div class="card"><div class="banner banner-warning"><i class="ph ph-lock"></i><span>' + esc(e.message) + '</span></div></div>';
+          this.loading = false; return;
+        }
+        const saved = this._read(this.LIST_KEY, null);
+        if (saved && saved.length) { this.docs = saved; this.loaded = true; offlineNote = e.offline ? 'You are offline. Showing the list from your last visit.' : (e.message || 'Could not refresh.') + ' Showing the list from your last visit.'; }
+        else {
+          box.innerHTML = '<div class="card"><div class="banner banner-' + (e.offline ? 'warning' : 'danger') + '"><i class="ph ph-' + (e.offline ? 'wifi-slash' : 'warning-circle') + '"></i><span>' +
+            esc(e.offline ? 'You are offline. Connect once to download the list; PDFs you open are kept for offline reading.' : (e.message || 'Could not load.')) +
+            ' <button class="btn btn-sm btn-quiet" onclick="STUDYDOCS.load(true)">Try again</button></span></div></div>';
+          this.loading = false; return;
+        }
+      }
+      this.loading = false;
+    }
+    /* Which are new is decided BEFORE marking them seen, so the tags show on this visit. */
+    const seen = this._read(this.SEEN_KEY, null);
+    this.newIds = new Set(seen === null ? [] : studyDocsNewIds(this.docs, seen));
+    this.render(offlineNote);
+    this._write(this.SEEN_KEY, this.docs.map(d => d.id));
+    this._updateBadge();
+  },
+
+  /* Quiet load for other screens (My submissions) that only need to know what exists. */
+  async ensureLoaded(){
+    if (this.loaded && (Date.now() - this._at) < this.STALE_MS) return this.docs;
+    if (!this._user() || !this._online()) { const saved = this._read(this.LIST_KEY, null); if (saved && !this.loaded) { this.docs = saved; this.loaded = true; } return this.docs; }
+    try { await this._fetchList(); } catch(e){}
+    return this.docs;
+  },
+
+  /* Jump to the list showing only one written-answer chapter's PDFs; one PDF opens straight away. */
+  showChapter(chapterId){
+    const docs = studyDocsForChapter(this.docs, chapterId);
+    if (docs.length === 1) { this.open(docs[0].id); return; }
+    this.chapter = chapterId || ''; this.cat = 'all'; this.q = '';
+    const q = $('sd-q'); if (q) q.value = '';
+    UI.go('studydocs');
+  },
+  clearChapter(){ this.chapter = ''; this.render(); },
+
+  setCat(c){ this.cat = c || 'all'; this.render(); },
+  setQuery(v){ this.q = String(v || ''); clearTimeout(this._qt); this._qt = setTimeout(() => this.render(), 120); },
+
+  _cacheIndex(){ return this._read(this.CACHE_KEY, []); },
+  _isCached(d){ const e = this._cacheIndex().find(x => x.id === d.id); return !!(e && e.updatedAt === d.updatedAt); },
+
+  render(note){
+    const box = $('studydocs-body'), chips = $('sd-chips');
+    if (!box) return;
+    const cats = studyDocsCategories(this.docs);
+    if (this.cat !== 'all' && !cats.some(c => c.category === this.cat)) this.cat = 'all';
+    if (chips) {
+      chips.innerHTML = cats.length < 2 ? '' :
+        '<button type="button" class="sd-chip' + (this.cat === 'all' ? ' on' : '') + '" onclick="STUDYDOCS.setCat(\'all\')">All<small>' + this.docs.length + '</small></button>' +
+        cats.map(c => '<button type="button" class="sd-chip' + (this.cat === c.category ? ' on' : '') + '" onclick="STUDYDOCS.setCat(\'' + c.category + '\')">' + esc(c.label) + '<small>' + c.count + '</small></button>').join('');
+    }
+    const chapBar = this.chapter
+      ? '<div class="banner" style="margin-bottom:var(--sp-2)"><i class="ph ph-funnel"></i><span>Showing PDFs for <b>' + esc(subjChapterName(this.chapter) || 'this chapter') + '</b>. <button class="btn btn-sm btn-quiet" onclick="STUDYDOCS.clearChapter()">Show all</button></span></div>' : '';
+    const banner = chapBar + (note ? '<div class="banner banner-warning" style="margin-bottom:var(--sp-2)"><i class="ph ph-wifi-slash"></i><span>' + esc(note) + '</span></div>' : '');
+    if (!this.docs.length) {
+      box.innerHTML = banner + '<div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-file-pdf"></i></div><p>No PDFs yet</p><p>When your teacher adds model answers or notes, they will appear here.</p></div></div>';
+      return;
+    }
+    let list = studyDocsFilter(this.docs, { cat: this.cat, q: this.q });
+    if (this.chapter) list = list.filter(d => d.chapterId === this.chapter);
+    if (!list.length) {
+      box.innerHTML = banner + '<div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-magnifying-glass"></i></div><p>Nothing matches</p><p>Try a different word, or choose All.</p></div></div>';
+      return;
+    }
+    box.innerHTML = banner + '<div class="sd-list">' + list.map(d => {
+      const off = this._isCached(d);
+      return '<div class="card sd-card">' +
+        '<div class="sd-ic"><i class="ph ph-file-pdf"></i></div>' +
+        '<div class="sd-main">' +
+          '<div class="sd-title">' + esc(d.title) + '</div>' +
+          (d.description ? '<div class="sd-desc">' + esc(d.description) + '</div>' : '') +
+          '<div class="sd-meta"><span class="sd-tag">' + esc(STUDYDOC_LABELS[d.category] || 'Other') + '</span>' +
+            (d.chapterId && subjChapterName(d.chapterId) ? '<span class="sd-tag">' + esc(subjChapterName(d.chapterId)) + '</span>' : '') +
+            (this.newIds.has(d.id) ? '<span class="sd-new">New</span>' : '') +
+            '<span>' + esc(formatBytes(d.sizeBytes)) + '</span>' +
+            (off ? '<span class="sd-off"><i class="ph ph-check-circle"></i> Works offline</span>' : '') + '</div>' +
+          '<div class="sd-acts"><button class="btn btn-solid btn-sm" onclick="STUDYDOCS.open(\'' + escAttrJs(d.id) + '\')"><i class="ph ph-book-open"></i> Read</button>' +
+            (off ? '<button class="btn btn-quiet btn-sm" onclick="STUDYDOCS.removeOffline(\'' + escAttrJs(d.id) + '\')"><i class="ph ph-trash"></i> Free up space</button>' : '') +
+          '</div>' +
+        '</div></div>';
+    }).join('') + '</div>';
+  },
+
+  async _cacheSet(d, res){
+    try {
+      if (typeof QDB === 'undefined' || !res.base64) return;
+      if (res.base64.length * 0.75 > this.MAX_CACHE_BYTES) return;
+      if (!(await QDB.set('studydoc:' + d.id, { base64: res.base64, filename: res.filename || d.fileName || 'study.pdf' }))) return;
+      let idx = this._cacheIndex().filter(x => x.id !== d.id);
+      idx.push({ id: d.id, at: Date.now(), updatedAt: d.updatedAt, size: Math.round(res.base64.length * 0.75) });
+      idx.sort((a, b) => b.at - a.at);
+      idx.slice(this.MAX_CACHED).forEach(x => { try { QDB.del('studydoc:' + x.id); } catch(e){} });
+      this._write(this.CACHE_KEY, idx.slice(0, this.MAX_CACHED));
+      this.render();
+    } catch(e){}
+  },
+
+  /* Drop offline copies of documents the admin hid or deleted. */
+  _purgeStale(){
+    try {
+      const live = new Set(this.docs.map(d => d.id));
+      const idx = this._cacheIndex();
+      idx.filter(x => !live.has(x.id)).forEach(x => { try { QDB.del('studydoc:' + x.id); } catch(e){} });
+      const keep = idx.filter(x => live.has(x.id));
+      if (keep.length !== idx.length) this._write(this.CACHE_KEY, keep);
+    } catch(e){}
+  },
+
+  async removeOffline(id){
+    try { await QDB.del('studydoc:' + id); } catch(e){}
+    this._write(this.CACHE_KEY, this._cacheIndex().filter(x => x.id !== id));
+    this.render();
+    toast('Removed from this device');
+  },
+
+  open(id){
+    const d = this.docs.find(x => x.id === id);
+    if (!d) { toast('That PDF is no longer available.'); return; }
+    if (!window.PDFVIEW) { toast('The PDF reader did not load. Reload the page and try again.', 5000); return; }
+    PDFVIEW.open({
+      title: d.title,
+      load: async () => {
+        if (this._isCached(d)) {
+          const hit = await QDB.get('studydoc:' + d.id);
+          if (hit && hit.base64) return { base64: hit.base64, filename: hit.filename || d.fileName };
+        }
+        if (!this._online()) throw new Error('You are offline and this PDF was not saved on this device yet. Open it once while online.');
+        const res = await this._post({ action:'getStudyDocPdf', id: d.id });
+        this._cacheSet(d, res);
+        return { base64: res.base64, filename: res.filename || d.fileName };
+      }
+    });
+  }
+};
+
+UI.onEnter('studydocs', () => STUDYDOCS.load(false));
+UI.onEnterAny(v => { if (v !== 'studydocs') STUDYDOCS.chapter = ''; });
+UI.onEnter('home', () => { try { STUDYDOCS.refreshBadge(); } catch(e){} });
+
+/* ═══════════════════════════════════════════════════════════════════
+   SPRINT — the 60-day plan. One card, one clear job for today:
+   how many topics, how many questions, how much time, and whether you
+   are ahead or behind. Plan maths lives in shared.js (sprintPlan).
+   ═══════════════════════════════════════════════════════════════════ */
+window.SPRINT = {
+  KEY: 'abhyas_sprint_start',
+
+  _start(){ try { return localStorage.getItem(this.KEY) || ''; } catch(e){ return ''; } },
+
+  _iso(d){
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  },
+
+  begin(){
+    try { localStorage.setItem(this.KEY, this._iso(new Date())); } catch(e){}
+    toast('\ud83d\ude80 Day 1 of your 60-day sprint. Let\u2019s go!');
+    this.render();
+  },
+
+  reset(){
+    if (!confirm('Restart your 60-day sprint from today?')) return;
+    this.begin();
+  },
+
+  _questionsToday(){
+    const t = new Date().toDateString();
+    const fromSessions = ((S.prog && S.prog.sessions) || [])
+      .filter(s => s && s.at && new Date(s.at).toDateString() === t)
+      .reduce((n, s) => n + (Number(s.total) || 0), 0);
+    return fromSessions;
+  },
+
+  _minutesToday(){
+    const t = new Date().toDateString();
+    const secs = ((S.prog && S.prog.sessions) || [])
+      .filter(x => x && x.at && new Date(x.at).toDateString() === t)
+      .reduce((n, x) => n + (Number(x.durationSec) || 0), 0);
+    return Math.round(secs / 60);
+  },
+
+  _inputs(){
+    let total = 0, covered = 0;
+    try {
+      const refs = ChapterData.allFileRefs();
+      total = refs.length;
+      covered = refs.filter(r => { const c = (S.cov || {})[r.fid]; return c && c.a > 0; }).length;
+    } catch(e){}
+    let due = 0;
+    try { due = REV.dueWrong().length; } catch(e){}
+    return {
+      startISO: this._start(), now: new Date(),
+      totalTopics: total, coveredTopics: covered,
+      dueReview: due, questionsToday: this._questionsToday()
+    };
+  },
+
+  render(){
+    const box = $('sprint-card');
+    if (!box) return;
+    const plan = sprintPlan(this._inputs());
+    box.style.display = '';
+
+    if (plan.state === 'notstarted') {
+      box.innerHTML =
+        '<div class="sprint-head"><span><i class="ph ph-rocket-launch"></i>60-day PSC sprint</span>' +
+        '<button class="btn btn-sm btn-a" onclick="SPRINT.begin()">Start</button></div>' +
+        '<div class="sprint-meta">A fixed daily plan: learn every topic, drill weak chapters, then full mock papers.</div>';
+      return;
+    }
+    if (plan.state === 'finished') {
+      box.innerHTML =
+        '<div class="sprint-head"><span><i class="ph ph-trophy"></i>Sprint complete</span>' +
+        '<button class="btn btn-sm btn-a" onclick="SPRINT.reset()">Start another</button></div>' +
+        '<div class="sprint-meta">Keep taking full mock papers and clearing your review queue until exam day.</div>';
+      return;
+    }
+
+    const paceTxt = plan.pace === 'ahead' ? 'Ahead' : plan.pace === 'behind' ? 'Behind' : 'On track';
+    const paceCls = plan.pace === 'behind' ? 'low' : plan.pace === 'ahead' ? 'ok' : 'mid';
+    const dayPct = Math.round(plan.day / SPRINT_DAYS * 100);
+    const bits = [];
+    if (plan.due > 0)       bits.push(plan.due + ' to review');
+    if (plan.newTopics > 0) bits.push(plan.newTopics + ' new topic' + (plan.newTopics === 1 ? '' : 's'));
+    bits.push(plan.doneQ + '/' + plan.qTarget + (plan.mock ? ' paper' : ' questions'));
+    bits.push(this._minutesToday() + '/' + plan.mins + ' min');
+    bits.push(plan.coveragePct + '% covered');
+    box.innerHTML =
+      '<div class="sprint-head"><span><i class="ph ph-rocket-launch"></i>Day ' + plan.day + ' of ' + SPRINT_DAYS + ' \u00b7 ' + esc(plan.label) + '</span>' +
+      '<span class="pct ' + paceCls + '">' + paceTxt + (plan.goalMet ? ' \u00b7 goal done \u2705' : '') + '</span></div>' +
+      '<div class="sprint-bar"><div style="width:' + dayPct + '%"></div></div>' +
+      '<div class="sprint-meta">' + bits.map(esc).join(' \u00b7 ') +
+      ' <button class="linkish" type="button" onclick="SPRINT.reset()" title="Restart the 60 days from today">restart</button></div>';
+  },
+
+  go(){
+    const plan = sprintPlan(this._inputs());
+    if (plan.state === 'active' && plan.mock) {
+      try { if (typeof SYLLABUS_MOCK !== 'undefined' && SYLLABUS_MOCK.start) { SYLLABUS_MOCK.start(); return; } } catch(e){}
+    }
+    TODAY_PLAN.start();
+  }
+};
 
 /* ═══════════════════════════════════════════════════════════════════
    TODAY_PLAN — what should I do right now?
@@ -1834,7 +2186,7 @@ window.STREAK_INSURANCE = {
    ═══════════════════════════════════════════════════════════════════ */
 window.BADGES_UI = {
   DEFS: [
-    { id:'first_100',   icon:'ph-seedling',  name:'First 100',  need:s => (s.prog.total||0) >= 100 },
+    { id:'first_100',   icon:'ph-plant',     name:'First 100',  need:s => (s.prog.total||0) >= 100 },
     { id:'half_500',    icon:'ph-books',     name:'500 answered', need:s => (s.prog.total||0) >= 500 },
     { id:'streak_7',    icon:'ph-fire',      name:'7-day streak', need:() => STREAK.currentStreak() >= 7 },
     { id:'streak_30',   icon:'ph-mountains', name:'30-day streak', need:() => STREAK.currentStreak() >= 30 },
@@ -4726,42 +5078,9 @@ window.HOURLY = {
 
 /* ══ HOURLY wiring ══════════════════════════════════════════════════ */
 (function(){
-  // Route UI.go('hourly') into HOURLY.mount(); tear the timers down otherwise.
-  const _prevGoRaw = UI._goRaw.bind(UI);
-  UI._goRaw = function(v){
-    _prevGoRaw(v);
-    if (v === 'hourly'){
-      document.querySelectorAll('.bn-item').forEach(e => e.classList.remove('active'));
-      const b = document.getElementById('bn-study');
-      if (b) b.classList.add('active');
-      setTimeout(() => { try { HOURLY.mount(); } catch(e){} }, 30);
-    } else {
-      try { HOURLY.unmount(); } catch(e){}
-    }
-  };
-
-  // Add the hourly entry to the mobile "Study" sheet.
-  const _prevBnOpen = BN.open.bind(BN);
-  BN.open = function(key){
-    _prevBnOpen(key);
-    if (key === 'study'){
-      const grid = document.getElementById('bn-sheet-grid');
-      if (grid && !document.getElementById('bn-hourly-item')){
-        const btn = document.createElement('button');
-        btn.id = 'bn-hourly-item';
-        btn.className = 'bn-sheet-item';
-        btn.innerHTML =
-          '<span class="bn-sheet-ic"><i class="ph ph-clock-countdown"></i></span>' +
-          '<span class="bn-sheet-info">' +
-            '<span class="bn-sheet-name">Hourly challenge</span>' +
-            '<span class="bn-sheet-sub">This hour\'s written + 50-question set</span>' +
-          '</span>' +
-          '<i class="ph ph-caret-right bn-sheet-arrow"></i>';
-        btn.onclick = () => { BN.close(); setTimeout(() => UI.go('hourly'), 100); };
-        grid.insertBefore(btn, grid.firstChild);
-      }
-    }
-  };
+  // Route UI.go('hourly') into HOURLY.mount(); tear the timers down on every other screen.
+  UI.onEnter('hourly', () => setTimeout(() => { try { HOURLY.mount(); } catch(e){} }, 30));
+  UI.onEnterAny(v => { if (v !== 'hourly') { try { HOURLY.unmount(); } catch(e){} } });
 
   // Honour scope.timeLimitSec on exam start (default is 90s per question,
   // which would be 75 minutes for a 50-question sprint — we want 60).
@@ -4817,53 +5136,10 @@ window.HOURLY = {
     if (origClear) QDB.clear = async function(){ const r = await origClear(); drop(); return r; };
   })();
 
-  /* ── 2. Live Loksewa score in the exam bar. Painted whenever an answer
-     changes and whenever the exam bar is rendered. Hidden on every other
-     exam type so the bar stays clean. */
-  function paintLoksewa(){
-    const tile = document.getElementById('ex-lok-tile');
-    const val  = document.getElementById('ex-lok');
-    if (!tile || !val) return;
-
-    if (!S.quiz || S.quiz.mode !== 'exam' || !S.quiz.scope || !S.quiz.scope.loksewaMock){
-      tile.style.display = 'none';
-      return;
-    }
-    tile.style.display = '';
-
-    let correct = 0, wrong = 0, skipped = 0;
-    (S.quiz.qs || []).forEach((q, i) => {
-      const a = S.quiz.ans ? S.quiz.ans[i] : null;
-      if (a === null || a === undefined) { skipped++; return; }
-      if (isOk(a, q.correct)) correct++; else wrong++;
-    });
-    const score = correct - wrong * 0.2;
-    val.textContent = score.toFixed(1);
-
-    const pct = S.quiz.qs.length ? (score / S.quiz.qs.length) * 100 : 0;
-    tile.classList.remove('warn', 'low');
-    if (pct < 30) tile.classList.add('low');
-    else if (pct < 50) tile.classList.add('warn');
-  }
-
-  /* Hook into every path that changes answers or (re)paints the exam bar. */
-  if (typeof QUIZ !== 'undefined') {
-    const origRenderExam = QUIZ._renderExam.bind(QUIZ);
-    QUIZ._renderExam = function(){ origRenderExam(); try { paintLoksewa(); } catch(e){} };
-
-    const origExAnswer = QUIZ.exAnswer.bind(QUIZ);
-    QUIZ.exAnswer = function(qi, oi){ origExAnswer(qi, oi); try { paintLoksewa(); } catch(e){} };
-
-    const origDoStart = QUIZ._doStart.bind(QUIZ);
-    QUIZ._doStart = function(){
-      const r = origDoStart.apply(QUIZ, arguments);
-      try { setTimeout(paintLoksewa, 30); } catch(e){}
-      return r;
-    };
-
-    const origResume = QUIZ._resumeSnapshot ? QUIZ._resumeSnapshot.bind(QUIZ) : null;
-    if (origResume) QUIZ._resumeSnapshot = function(){ const r = origResume.apply(QUIZ, arguments); try { setTimeout(paintLoksewa, 30); } catch(e){} return r; };
-  }
+  /* ── 2. (removed in v1.32) Live Loksewa score in the exam bar.
+     It showed a running score while the exam was in progress, so a student
+     could watch it move after each answer and learn which ones were right.
+     Marks, with negative marking, now appear only on the result page. */
 
   /* ── 3. REV filter persistence ──
      v1.27 moved this into objective.js itself (REV._loadFilters / _saveFilters),
@@ -4871,4 +5147,33 @@ window.HOURLY = {
 
 })();
 
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PERF — v1.32. Must stay the LAST thing in the last script.
+   HOME.render and HOME.updateBadges were being called dozens of times in a
+   burst (submitting a 75-question exam called updateBadges 117 times). The
+   first call still runs immediately; the rest of that frame collapse into one.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function hookInsights(){
+  try {
+    if (typeof PROG === 'undefined' || typeof PROG.render !== 'function' || PROG.render.__ins) return;
+    const base = PROG.render.bind(PROG);
+    PROG.render = function(){ const r = base.apply(this, arguments); try { INSIGHTS.render(); } catch (e) { console.error(e); } return r; };
+    PROG.render.__ins = true;
+  } catch (e) { console.error('insights hook skipped:', e); }
+})();
+
+(function coalesceHomeRenders(){
+  try {
+    if (typeof HOME === 'undefined' || typeof frameThrottle !== 'function') return;
+    ['render', 'updateBadges'].forEach(function(k){
+      if (typeof HOME[k] === 'function' && !HOME[k].__throttled) {
+        const t = frameThrottle(HOME[k].bind(HOME));
+        t.__throttled = true;
+        HOME[k] = t;
+      }
+    });
+  } catch (e) { console.error('perf coalescing skipped:', e); }
 })();

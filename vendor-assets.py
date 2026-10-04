@@ -153,7 +153,7 @@ def main():
         (r'src="https://cdnjs\.cloudflare\.com/ajax/libs/KaTeX/0\.16\.9/contrib/auto-render\.min\.js"', 'src="vendor/katex/auto-render.min.js"'),
         (r'src="https://cdn\.jsdelivr\.net/npm/canvas-confetti@1\.9\.3/dist/confetti\.browser\.min\.js"', 'src="vendor/confetti/confetti.browser.js"'),
     ])
-    changed += sub_file("subjective.js", [
+    changed += sub_file("js/app/subjective.js", [
         (r"https://cdnjs\.cloudflare\.com/ajax/libs/pdf-lib/1\.17\.1/pdf-lib\.min\.js", "vendor/pdf-lib/pdf-lib.min.js"),
     ])
 

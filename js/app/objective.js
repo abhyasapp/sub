@@ -612,14 +612,15 @@ const REV = {
     if(isCorrect){
       const item = S.wr.find(x=>x.uid===question.uid);
       if(!item) return;
-      if(item._nextDue && item._nextDue > Date.now()) return;
-      item._streak = (item._streak||0) + 1;
-      if(item._streak >= SR_INTERVALS.length){ REV.removeWrong(question.uid); }
-      else {
-        const days = SR_INTERVALS[item._streak - 1];
-        item._nextDue = Date.now() + days*24*60*60*1000;
-        _save(LS.WR, S.wr);
-      }
+      if(item._nextDue && item._nextDue > Date.now()) return;   /* not due yet: extra practice doesn't count */
+      const prev = item._streak || 0;
+      /* Reviews happen after 1, 3, 7 and 14 days. The question graduates only
+         once the 14-day review has been answered correctly. */
+      if(prev >= SR_INTERVALS.length){ REV.removeWrong(question.uid); return; }
+      item._streak = prev + 1;
+      item._nextDue = Date.now() + SR_INTERVALS[prev]*24*60*60*1000;
+      _save(LS.WR, S.wr);
+      HOME.updateBadges?.();
     } else {
       REV.addWrong(question);
     }
@@ -1568,12 +1569,15 @@ const QUIZ = {
   exAnswer(qi, oi){
     if(!S.quiz.active)return;
     S.quiz.ans[qi]=oi;
-    document.querySelectorAll(`#eqc-${qi} .eo`).forEach((e,i)=>{
+    const card = document.getElementById(`eqc-${qi}`);
+    if(!card) return;
+    /* v1.32: query inside the one card instead of searching the whole document on every tap */
+    card.querySelectorAll('.eo').forEach((e,i)=>{
       const sel = i===oi;
       e.classList.toggle('sel', sel);
       e.setAttribute('aria-pressed', String(sel));
     });
-    document.getElementById(`eqc-${qi}`).classList.add('answered');
+    card.classList.add('answered');
     const answered = S.quiz.ans.filter(a=>a!==null).length;
     document.getElementById('ex-ctr').textContent = `${answered}/${S.quiz.qs.length}`;
     document.getElementById('ex-ans').textContent = answered;
@@ -1671,17 +1675,19 @@ const QUIZ = {
     const wrong = S.quiz.ans.filter((a,i)=> a!==null && !isOk(a,S.quiz.qs[i].correct)).length;
     const skipped = S.quiz.ans.filter(a=>a===null).length;
 
-    /* v1.33: weekly tests use Loksewa negative marking. Every other quiz
-       type (chapter practice, daily, mock, review) keeps the plain
-       percentage, so this check is scoped to weeklyId only. The single
-       `isWeekly` here is reused further down when recording the attempt,
-       to avoid a duplicate-const syntax error. */
+    /* Weekly tests and the daily Loksewa paper are marked the Loksewa way (+1 right,
+       -0.2 wrong, 0 skipped), and that is the number the headline shows, so it matches
+       the score line below it and what the server ranks. Every other quiz type
+       (chapter practice, mixed, review) keeps the plain percentage. `isWeekly` is
+       reused further down when recording the attempt (declaring it twice with
+       `const` is a syntax error that stops this whole file from loading). */
     const rawPct = total ? Math.round((correct/total)*100) : 0;
     const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
-    const loksewa = (isWeekly && total)
+    const isLoksewaPaper = !!(S.quiz.scope && S.quiz.scope.loksewaMock);
+    const marked = ((isWeekly || isLoksewaPaper) && total)
       ? Math.round(((correct - wrong * 0.2) / total) * 1000) / 10
       : null;
-    const pct = (loksewa !== null) ? loksewa : rawPct;
+    const pct = (marked !== null) ? Math.max(0, marked) : rawPct;   /* 0 floor keeps the ring sane; the score line shows the exact marks */
 
     document.getElementById('res-ring').style.setProperty('--p', pct+'%');
     document.getElementById('res-pct').textContent = pct+'%';

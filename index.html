@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="Abhyas">
 <meta name="format-detection" content="telephone=no">
 <meta name="color-scheme" content="light dark">
-<script src="config.js"></script>
+<script src="js/core/config.js"></script>
 <script>(function(){
   try{
     var raw = localStorage.getItem('abhyas_theme');
@@ -26,7 +26,7 @@
       if (m) m.setAttribute('content', '#080B14');
     }
   } catch(e) {}
-})();<\/script>
+})();</script>
 <script>(function(){
   /* A returning student with a saved session should never see the sign-in
      form flash before the redirect. Mark the document now; APP.setMode()
@@ -35,8 +35,8 @@
     var s = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
     if (s && s.type && s.username) document.documentElement.classList.add('boot-session');
   }catch(e){}
-})();<\/script>
-<script>if(window.top!==window.self){window.top.location=window.self.location;}<\/script>
+})();</script>
+<script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
@@ -609,7 +609,6 @@ details.faq p{
       </div>
       <div class="link-right"><button type="button" onclick="APP.setMode('forgot')">Forgot your password?</button></div>
       <button class="btn" id="btn-login" type="submit">Sign in</button>
-      <div class="link-row"><span>New to Abhyas?</span><button type="button" onclick="APP.setMode('signup')">Create an account</button></div>
     </form>
 
     <!-- ── Forgot ── -->
@@ -633,7 +632,7 @@ details.faq p{
       <div class="field">
         <label for="rs-pass">New password</label>
         <div class="pw-field">
-          <input class="input" type="password" id="rs-pass" placeholder="At least 6 characters" autocomplete="new-password" enterkeyhint="go">
+          <input class="input" type="password" id="rs-pass" placeholder="At least 8 characters" autocomplete="new-password" enterkeyhint="go">
           <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
         </div>
       </div>
@@ -666,7 +665,7 @@ details.faq p{
         <div class="field">
           <label for="su-pass">Password</label>
           <div class="pw-field">
-            <input class="input" type="password" id="su-pass" placeholder="At least 6 characters" autocomplete="new-password">
+            <input class="input" type="password" id="su-pass" placeholder="At least 8 characters" autocomplete="new-password">
             <button type="button" onclick="togglePw(this)" aria-label="Show password" aria-pressed="false"><i class="ph ph-eye"></i></button>
           </div>
         </div>
@@ -680,7 +679,6 @@ details.faq p{
       </div>
       <p class="field-hint" style="margin:0 0 var(--sp-3)">By creating an account you agree to the <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
       <button class="btn" id="btn-signup" type="submit">Create my account</button>
-      <div class="link-row"><span>Already registered?</span><button type="button" onclick="APP.setMode('login')">Sign in</button></div>
     </form>
 
     <!-- ── Trial ── -->
@@ -870,8 +868,8 @@ details.faq p{
   <button class="btn" onclick="COOKIE_NOTICE.accept()">Got it</button>
 </div>
 
-<script src="version.js"></script>
-<script src="shared.js"></script>
+<script src="js/core/version.js"></script>
+<script src="js/core/shared.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas — front door.
@@ -1067,7 +1065,10 @@ const APP = {
     this._bootQueue();
 
     const params = new URLSearchParams(window.location.search);
-    const urlToken = params.get('resetToken') || params.get('reset');
+    /* v1.32: the emailed link carries the token in the #fragment (never sent to servers or
+       in Referer headers). The old ?query form is still accepted for links already sent. */
+    const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+    const urlToken = hashParams.get('resetToken') || hashParams.get('reset') || params.get('resetToken') || params.get('reset');
     if (urlToken) {
       history.replaceState(null, '', window.location.pathname);
       this.setMode('reset');
@@ -1434,7 +1435,7 @@ const APP = {
     const code = $('rs-code').value.trim();
     const newPass = $('rs-pass').value;
     if (!code) return this.showErr('Paste the reset code from your email.');
-    if (!newPass || newPass.length < 6) return this.showErr('Use at least 6 characters for the new password.');
+    if (!newPass || newPass.length < 8) return this.showErr('Use at least 8 characters for the new password.');
     this.setLoading('btn-reset', true);
     const res = await this.api('resetPassword', { token:code, newPassword:newPass }, 'POST');
     this.setLoading('btn-reset', false);
@@ -1458,7 +1459,7 @@ const APP = {
 
     if (!name || !email || !mobile || !user || !pass) return this.showErr('Fill in every field.');
     if (user.length < 3) return bad('su-user', 'Your username needs at least 3 characters.');
-    if (pass.length < 6) return bad('su-pass', 'Your password needs at least 6 characters.');
+    if (pass.length < 8) return bad('su-pass', 'Your password needs at least 8 characters.');
     if (pass !== cpass)  return bad('su-cpass', 'The two passwords don\u2019t match.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad('su-email', 'That email address doesn\u2019t look right.');
     if (!/^(98|97|96|99)\d{8}$/.test(mobile)) return bad('su-mobile', 'Use a 10-digit Nepali mobile number starting 98, 97, 96 or 99.');

@@ -629,6 +629,13 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   font-size:var(--fs-cap);font-weight:650;color:var(--ink-4);
   padding:var(--sp-3) var(--sp-2) var(--sp-1)
 }
+
+.sb-lbl-btn{display:flex;align-items:center;justify-content:space-between;width:100%;background:none;border:0;cursor:pointer;font-family:var(--font);text-align:left;border-radius:var(--r-input)}
+.sb-lbl-btn:hover{color:var(--ink-2)}
+.sb-caret{font-size:.8em;transition:transform var(--dur-fast) var(--ease)}
+.sb-sec.shut .sb-caret{transform:rotate(-90deg)}
+.sb-sec.shut .sb-items{display:none}
+.g2-grid{align-items:start}
 .sb-item{
   display:flex;align-items:center;gap:var(--sp-2);width:100%;text-align:left;
   padding:var(--sp-2);border-radius:var(--r-input);margin-bottom:1px;
@@ -748,6 +755,8 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 }
 .bn-sheet-title i{color:var(--accent);font-size:1.1rem}
 .bn-sheet-grid{display:flex;flex-direction:column;gap:var(--sp-2)}
+.bn-sheet-lbl{font-size:var(--fs-cap);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:var(--sp-2) var(--sp-1) 0}
+.bn-sheet-lbl:first-child{margin-top:0}
 .bn-sheet-item{
   display:flex;align-items:center;gap:var(--sp-3);width:100%;text-align:left;
   padding:var(--sp-3);border-radius:var(--r-card);
@@ -762,6 +771,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   background:var(--bg-sunken);color:var(--ink-2)
 }
 .bn-sheet-info{flex:1;min-width:0}
+.bn-sheet-name,.bn-sheet-sub{display:block}
 .bn-sheet-name{font-size:var(--fs-callout);font-weight:650;line-height:1.25}
 .bn-sheet-sub{font-size:var(--fs-cap);color:var(--ink-3);margin-top:1px}
 .bn-sheet-arrow{color:var(--ink-4);font-size:.9rem;flex-shrink:0}
@@ -852,6 +862,43 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   text-align:center;letter-spacing:-.02em;line-height:1;padding:var(--sp-2) 0
 }
 .home-date{text-align:center;font-size:var(--fs-foot);color:var(--ink-3);margin-bottom:var(--sp-3)}
+
+/* v1.32 study PDFs */
+.sd-bar{display:flex;flex-direction:column;gap:var(--sp-2)}
+.sd-chips{display:flex;flex-wrap:wrap;gap:6px}
+.sd-chip{border:1px solid var(--sep);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 12px;font:inherit;font-size:var(--fs-cap);font-weight:600;cursor:pointer}
+.sd-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.sd-chip small{opacity:.75;margin-left:4px;font-weight:500}
+.sd-list{display:flex;flex-direction:column;gap:var(--sp-2)}
+.sd-card{display:flex;gap:var(--sp-3);align-items:flex-start;padding:var(--sp-3)}
+.sd-ic{flex:none;width:40px;height:40px;border-radius:10px;background:var(--danger-soft,#fde8e8);color:var(--danger,#c0392b);display:grid;place-items:center;font-size:1.3rem}
+.sd-main{flex:1;min-width:0}
+.sd-title{font-weight:650;font-size:var(--fs-callout);line-height:1.3;overflow-wrap:anywhere}
+.sd-desc{color:var(--ink-3);font-size:var(--fs-cap);margin-top:2px}
+.sd-meta{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:var(--fs-cap);color:var(--ink-3);margin-top:6px}
+.sd-tag{background:var(--bg-sunken);border-radius:999px;padding:1px 8px;font-weight:600}
+.sd-new{background:var(--accent);color:#fff;border-radius:999px;padding:1px 8px;font-weight:700}
+.sd-off{color:var(--accent);font-weight:600}
+.sd-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:var(--sp-2)}
+
+/* v1.32 Home: one Today card (greeting + sprint + plan + starts) */
+.home-hero{border-color:var(--accent-line)}
+.home-hero .greet-line{margin-bottom:2px}
+.home-hero #greeting{margin-bottom:var(--sp-3)}
+.sprint-strip{margin:0 0 var(--sp-3);padding:var(--sp-3);background:var(--bg-sunken);border-radius:var(--r2)}
+.sprint-head{display:flex;align-items:center;justify-content:space-between;gap:var(--sp-2);font-weight:650;font-size:var(--fs-callout)}
+.sprint-head i{color:var(--accent);margin-right:6px}
+.sprint-bar{height:6px;border-radius:3px;background:var(--sep);margin:8px 0;overflow:hidden}
+.sprint-bar>div{height:100%;background:var(--accent);border-radius:3px}
+.sprint-meta{font-size:var(--fs-cap);color:var(--ink-3);display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center}
+.sprint-meta .linkish{background:none;border:0;padding:0;color:var(--ink-3);text-decoration:underline;cursor:pointer;font:inherit}
+.home-hero .start-alt{margin-top:var(--sp-2)}
+.home-hero .home-foot{margin-top:var(--sp-3);margin-bottom:0}
+.goal-card #readiness-card{margin:var(--sp-3) 0 0;padding:var(--sp-3);border:0;background:var(--bg-sunken);border-radius:var(--r2)}
+.home-now{display:flex;align-items:baseline;gap:var(--sp-3);margin-bottom:var(--sp-2)}
+.home-now .home-clock{font-size:var(--fs-t2,1.25rem);text-align:left;padding:0}
+.home-now .home-date{text-align:left;margin:0}
+
 
 .marquee-bar{
   display:flex;align-items:center;gap:var(--sp-2);
@@ -1708,13 +1755,7 @@ html.focus-mode .marquee-bar{display:none!important}
 }
 </style>
 <style id="patch-122">
-/* v1.22 — live Loksewa score tile + exam copy protection */
-.qtile.qt-lok { background: var(--success-soft); border-color: var(--success-line); }
-.qtile.qt-lok .qt-num, .qtile.qt-lok .qt-lbl { color: var(--success); }
-.qtile.qt-lok.warn { background: var(--warning-soft); border-color: var(--warning-line); }
-.qtile.qt-lok.warn .qt-num, .qtile.qt-lok.warn .qt-lbl { color: var(--warning); }
-.qtile.qt-lok.low { background: var(--danger-soft); border-color: var(--danger-line); }
-.qtile.qt-lok.low .qt-num, .qtile.qt-lok.low .qt-lbl { color: var(--danger); }
+/* v1.22 exam copy protection (the live score tile was removed in v1.32) */
 /* Disable text selection while an exam is open so a student cannot
    Ctrl+A / Ctrl+C the whole paper into WhatsApp in one go. */
 #ex-wrap { user-select: none; -webkit-user-select: none; }
@@ -1771,7 +1812,6 @@ html.focus-mode .marquee-bar{display:none!important}
           <div id="sb-uname">Student</div>
           <div id="sb-ustatus">—</div>
         </div>
-        <button class="ib" onclick="AUTH.logout()" title="Log out" aria-label="Log out"><i class="ph ph-sign-out"></i></button>
       </div>
 
       <div class="sb-admin-card" id="sb-admin-promo" hidden>
@@ -1780,98 +1820,7 @@ html.focus-mode .marquee-bar{display:none!important}
         <button onclick="APP_SWITCH.toAdmin()"><i class="ph ph-arrow-square-out"></i> Open admin console</button>
       </div>
 
-      <div class="sb-sec">
-        <div class="sb-lbl">Study</div>
-        <button type="button" class="sb-item active" id="nav-home" onclick="UI.go('home')">
-          <span class="sb-ic"><i class="ph ph-house"></i></span>Home
-        </button>
-        <button type="button" class="sb-item" id="nav-online" onclick="UI.go('online')">
-          <span class="sb-ic"><i class="ph ph-books"></i></span>Chapters
-        </button>
-                <button type="button" class="sb-item" id="nav-hourly" onclick="UI.go('hourly')">
-          <span class="sb-ic"><i class="ph ph-clock-countdown"></i></span>
-          <span class="grow">
-            <span style="display:flex;align-items:center;gap:.35rem">Hourly challenge<span class="sb-badge amb" id="hourly-badge" hidden>New</span></span>
-            <span class="sb-sub" id="hourly-hint">This hour's set</span>
-          </span>
-        </button>
-<button type="button" class="sb-item" id="nav-psycho" onclick="UI.go('psycho')">
-          <span class="sb-ic"><i class="ph ph-lightning"></i></span>Mixed practice
-        </button>
-        <button type="button" class="sb-item" id="nav-local" onclick="UI.go('local')">
-          <span class="sb-ic"><i class="ph ph-folder-open"></i></span>Open a file
-        </button>
-      </div>
-
-      <div class="sb-sec">
-        <div class="sb-lbl">Written answers</div>
-        <button type="button" class="sb-item" id="nav-subj-qotd" onclick="UI.go('subj-qotd')">
-          <span class="sb-ic"><i class="ph ph-sun-horizon"></i></span>
-          <span class="grow">
-            <span style="display:flex;align-items:center;gap:.35rem">Question of the day<span class="sb-badge amb" id="subj-qotd-badge" hidden>New</span></span>
-            <span class="sb-sub" id="subj-qotd-hint">Tap to begin</span>
-          </span>
-        </button>
-        <button type="button" class="sb-item" id="nav-subj-exam" onclick="UI.go('subj-exam')">
-          <span class="sb-ic"><i class="ph ph-note-pencil"></i></span>Full paper
-        </button>
-        <button type="button" class="sb-item" id="nav-subj-list" onclick="UI.go('subj-list')">
-          <span class="sb-ic"><i class="ph ph-list-dashes"></i></span>Browse questions
-        </button>
-        <button type="button" class="sb-item" id="nav-subj-mine" onclick="UI.go('subj-mine')">
-          <span class="sb-ic"><i class="ph ph-file-text"></i></span>
-          <span class="grow">
-            <span style="display:flex;align-items:center;gap:.35rem">My submissions<span class="sb-badge" id="subj-mine-badge" hidden>0</span></span>
-            <span class="sb-sub" id="subj-mine-hint">Nothing submitted yet</span>
-          </span>
-        </button>
-      </div>
-
-      <div class="sb-sec">
-        <div class="sb-lbl">Review</div>
-        <button type="button" class="sb-item" id="nav-weekly" onclick="UI.go('weekly')">
-          <span class="sb-ic"><i class="ph ph-calendar-check"></i></span>
-          <span class="grow">
-            <span style="display:flex;align-items:center;gap:.35rem">Weekly test<span class="sb-badge amb" id="weekly-badge" hidden>Live</span></span>
-            <span class="sb-sub" id="weekly-hint">No sets yet</span>
-          </span>
-        </button>
-        <button type="button" class="sb-item" id="nav-wrong" onclick="UI.go('wrong')">
-          <span class="sb-ic"><i class="ph ph-arrow-counter-clockwise"></i></span>Questions you missed<span class="sb-badge" id="wrc">0</span>
-        </button>
-        <button type="button" class="sb-item" id="nav-bookmarks" onclick="UI.go('bookmarks')">
-          <span class="sb-ic"><i class="ph ph-star"></i></span>Saved<span class="sb-badge ok" id="bkc">0</span>
-        </button>
-        <button type="button" class="sb-item" id="nav-flagged" onclick="UI.go('flagged')">
-          <span class="sb-ic"><i class="ph ph-flag"></i></span>Flagged<span class="sb-badge" id="flc">0</span>
-        </button>
-      </div>
-
-      <div class="sb-sec">
-        <div class="sb-lbl">Progress</div>
-        <button type="button" class="sb-item" id="nav-progress" onclick="UI.go('progress')">
-          <span class="sb-ic"><i class="ph ph-chart-bar"></i></span>Your progress
-        </button>
-        <button type="button" class="sb-item" id="nav-server-progress" onclick="UI.go('server-progress')">
-          <span class="sb-ic"><i class="ph ph-list-checks"></i></span>Coverage by file
-        </button>
-        <button type="button" class="sb-item" id="nav-timetable" onclick="UI.go('timetable')">
-          <span class="sb-ic"><i class="ph ph-calendar-blank"></i></span>Study plan
-        </button>
-      </div>
-
-      <div class="sb-sec">
-        <div class="sb-lbl">App</div>
-        <button type="button" class="sb-item" id="nav-offline" onclick="UI.go('offline')">
-          <span class="sb-ic"><i class="ph ph-download-simple"></i></span>Downloads
-        </button>
-        <button type="button" class="sb-item" id="nav-data" onclick="UI.go('data')">
-          <span class="sb-ic"><i class="ph ph-floppy-disk"></i></span>Backup
-        </button>
-        <button type="button" class="sb-item" id="nav-tutorial" onclick="TUTORIAL.open()">
-          <span class="sb-ic"><i class="ph ph-question"></i></span>How this works
-        </button>
-      </div>
+      <div id="sb-nav"></div>
 
       <div class="sb-foot"><div id="sb-version"></div><div class="t-cap" style="text-align:center;margin-top:.4rem"><a href="privacy.html" target="_blank" rel="noopener">Privacy</a> · <a href="terms.html" target="_blank" rel="noopener">Terms</a> · <a href="mailto:abhyasbymku@gmail.com">Help</a></div></div>
     </nav>
@@ -1910,8 +1859,14 @@ html.focus-mode .marquee-bar{display:none!important}
         <div id="practice-resume-slot"></div>
         <div id="daily10-slot"></div>
 
-        <section class="today-card" id="today-card">
-          <h3><i class="ph ph-list-checks"></i> Today's plan</h3>
+        <!-- TODAY: greeting, sprint progress, the plan, and every way to start, in one card -->
+        <section class="today-card home-hero" id="today-card">
+          <div class="greet-line">
+            <h1 id="greeting-title">Ready to study</h1>
+            <span id="greeting-icon" aria-hidden="true">🌅</span>
+          </div>
+          <p id="greeting">Loksewa Civil Engineering practice, online or off.</p>
+          <div id="sprint-card" class="sprint-strip" style="display:none"></div>
           <div id="today-body"></div>
           <div class="today-actions">
             <button class="btn btn-solid" id="today-start" onclick="TODAY_PLAN.start()">
@@ -1921,11 +1876,23 @@ html.focus-mode .marquee-bar{display:none!important}
               <i class="ph ph-lightning"></i> Just 5
             </button>
           </div>
+          <div class="start-alt">
+            <button class="btn btn-quiet" onclick="QUIZ.adaptive()"><i class="ph ph-target"></i> Weak topics</button>
+            <button class="btn btn-quiet" onclick="UI.go('online')"><i class="ph ph-books"></i> Pick a chapter</button>
+          </div>
+          <p class="t-foot home-foot"><i class="ph ph-clock"></i> <span id="hs-time">0m</span> studied in the last 7 days</p>
         </section>
 
         <div id="digest-slot"></div>
 
-        <section class="readiness" id="readiness-card" hidden>
+        <!-- GOAL: exam date and predicted readiness together -->
+        <section class="card goal-card" id="exam-card">
+          <div class="card-hd">
+            <h3><i class="ph ph-calendar-star"></i> Your exam</h3>
+            <button class="btn btn-sm btn-quiet" id="exam-date-edit" type="button" onclick="EXAM_DATE.edit()">Set date</button>
+          </div>
+          <div id="exam-card-body" class="t-callout">Set your exam date to see a countdown and how much to do each day.</div>
+          <section class="readiness" id="readiness-card" hidden>
           <div class="readiness-top">
             <div>
               <div class="t-cap" style="font-weight:700;color:var(--ink-2)">Exam readiness</div>
@@ -1936,20 +1903,6 @@ html.focus-mode .marquee-bar{display:none!important}
           <div class="readiness-bar"><div class="readiness-bar-fill" id="readiness-fill" style="width:0%"></div></div>
           <div class="readiness-detail" id="readiness-detail"></div>
         </section>
-
-        <section class="start-block">
-          <div class="greet-line">
-            <h1 id="greeting-title">Ready to study</h1>
-            <span id="greeting-icon" aria-hidden="true">🌅</span>
-          </div>
-          <p id="greeting">Loksewa Civil Engineering practice, online or off.</p>
-          <button class="btn-start" onclick="QUIZ.daily()">
-            <i class="ph ph-play-circle"></i> Start today's practice
-          </button>
-          <div class="start-alt">
-            <button class="btn btn-a" onclick="QUIZ.adaptive()"><i class="ph ph-target"></i> Weak topics</button>
-            <button class="btn btn-quiet" onclick="UI.go('online')"><i class="ph ph-books"></i> Pick a chapter</button>
-          </div>
         </section>
 
         <section class="streak-card">
@@ -1960,23 +1913,6 @@ html.focus-mode .marquee-bar{display:none!important}
           <div class="sk-bar" id="sk-bar"></div>
           <p class="t-cap" id="streak-insurance" style="text-align:center;margin-top:var(--sp-2);opacity:.75"></p>
         </section>
-
-        <section class="streak-card" id="exam-card">
-          <div class="streak-top">
-            <h3><i class="ph ph-calendar-star"></i> Your exam</h3>
-            <button class="btn btn-sm btn-quiet" id="exam-date-edit" type="button" onclick="EXAM_DATE.edit()">Set date</button>
-          </div>
-          <div id="exam-card-body" class="t-callout">Set your exam date to see a countdown and how much to do each day.</div>
-        </section>
-
-        <h2 class="t-t3 mb2">This week</h2>
-        <div class="stats-row">
-          <div class="scard"><div class="sv tcy" id="hs-tot">0</div><div class="stat-lbl">Answered</div></div>
-          <div class="scard"><div class="sv tc2" id="hs-cor">0</div><div class="stat-lbl">Correct</div></div>
-          <div class="scard"><div class="sv tb2" id="hs-wrg">0</div><div class="stat-lbl">Missed</div></div>
-          <div class="scard"><div class="sv ta2" id="hs-pct">0%</div><div class="stat-lbl">Accuracy</div></div>
-        </div>
-        <p class="t-foot mb4" style="margin-top:.5rem"><i class="ph ph-clock"></i> <span id="hs-time">0m</span> studied in the last 7 days</p>
 
         <section class="card">
           <div class="card-hd"><h3><i class="ph ph-target"></i> Chapter strength</h3><button class="btn btn-sm btn-quiet" onclick="UI.go('progress')">Full progress</button></div>
@@ -1992,9 +1928,8 @@ html.focus-mode .marquee-bar{display:none!important}
             <div id="recent-sessions"></div>
           </div>
           <div class="card">
-            <div class="card-hd"><h3><i class="ph ph-clock"></i> Right now</h3><button class="btn btn-sm btn-quiet" onclick="UI.go('timetable')">Study plan</button></div>
-            <div class="home-clock" id="hclock">00:00:00</div>
-            <div class="home-date" id="hdate"></div>
+            <div class="card-hd"><h3><i class="ph ph-clock"></i> Up next</h3><button class="btn btn-sm btn-quiet" onclick="UI.go('timetable')">Study plan</button></div>
+            <div class="home-now"><span class="home-clock" id="hclock">00:00:00</span><span class="home-date" id="hdate"></span></div>
             <div id="h-session"></div>
           </div>
         </div>
@@ -2002,10 +1937,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── WEEKLY ─────────────── -->
       <div class="view" id="view-weekly">
-        <div class="pg-head">
-          <h2><i class="ph ph-calendar-check"></i> Weekly test</h2>
-          <p>A new set unlocks on schedule and stays open for a limited window. You get one attempt; after that you can review your answers.</p>
-        </div>
+        <div class="pg-head" data-head="weekly"></div>
         <div class="card" id="weekly-sets-outer" style="display:none">
           <div class="card-hd"><h3>Scheduled and live</h3></div>
           <div id="weekly-sets-card" class="stack2"></div>
@@ -2020,10 +1952,7 @@ html.focus-mode .marquee-bar{display:none!important}
       </div>
       <!-- ─────────────── HOURLY CHALLENGE ─────────────── -->
       <div class="view" id="view-hourly">
-        <div class="pg-head">
-          <h2><i class="ph ph-clock-countdown"></i> Hourly challenge</h2>
-          <p>A fresh written question and a 50-question sprint, reset at the top of every hour. Pick your level to begin.</p>
-        </div>
+        <div class="pg-head" data-head="hourly"></div>
 
         <div class="card">
           <div class="card-hd">
@@ -2061,10 +1990,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── QUESTION OF THE DAY ─────────────── -->
       <div class="view" id="view-subj-qotd">
-        <div class="pg-head">
-          <h2><i class="ph ph-sun-horizon"></i> Question of the day</h2>
-          <p>Everyone gets the same question. Write it on paper against the clock, then photograph your answer and upload it as one PDF.</p>
-        </div>
+        <div class="pg-head" data-head="subj-qotd"></div>
         <div id="syllabus-mock-slot"></div>
         <div id="subj-qotd-body">
           <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading today's question…</p></div></div>
@@ -2073,10 +1999,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── MY SUBMISSIONS ─────────────── -->
       <div class="view" id="view-subj-mine">
-        <div class="pg-head">
-          <h2><i class="ph ph-file-text"></i> My submissions</h2>
-          <p>Everything you've sent for marking — with the PDF you uploaded, the score once it's marked, and any note from the marker.</p>
-        </div>
+        <div class="pg-head" data-head="subj-mine"></div>
         <div class="card" style="margin-bottom:var(--sp-3)">
           <div class="bg">
             <button class="btn btn-a" onclick="MY_SUBJ.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
@@ -2088,12 +2011,23 @@ html.focus-mode .marquee-bar{display:none!important}
         </div>
       </div>
 
+
+      <!-- ─────────────── MODEL ANSWERS & NOTES (admin-uploaded PDFs) ─────────────── -->
+      <div class="view" id="view-studydocs">
+        <div class="pg-head" data-head="studydocs"></div>
+        <div class="card sd-bar" style="margin-bottom:var(--sp-3)">
+          <div class="toolbar"><input type="search" id="sd-q" placeholder="Search by title or topic" autocomplete="off"
+                 oninput="STUDYDOCS.setQuery(this.value)" aria-label="Search study PDFs"></div>
+          <div class="sd-chips" id="sd-chips" role="group" aria-label="Filter by type"></div>
+        </div>
+        <div id="studydocs-body">
+          <div class="card"><div class="skel w80"></div><div class="skel w60"></div><div class="skel w100"></div></div>
+        </div>
+      </div>
+
       <!-- ─────────────── FULL PAPER ─────────────── -->
       <div class="view" id="view-subj-exam">
-        <div class="pg-head">
-          <h2><i class="ph ph-note-pencil"></i> Full paper</h2>
-          <p>A complete 100-mark paper, three hours, uploaded as a single PDF when you're done.</p>
-        </div>
+        <div class="pg-head" data-head="subj-exam"></div>
         
         <div id="subj-exam-body">
           <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading…</p></div></div>
@@ -2134,10 +2068,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── BROWSE QUESTIONS ─────────────── -->
       <div class="view" id="view-subj-list">
-        <div class="pg-head">
-          <h2><i class="ph ph-list-dashes"></i> Browse questions</h2>
-          <p>Every written question in the bank, grouped by chapter and topic.</p>
-        </div>
+        <div class="pg-head" data-head="subj-list"></div>
         <div class="toolbar">
           <input type="search" id="subj-list-search" placeholder="Search the question text" oninput="SUBJ._filterList(this.value)" aria-label="Search questions">
           <select id="subj-list-chapter" onchange="SUBJ._filterList()" aria-label="Filter by chapter">
@@ -2151,10 +2082,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── CHAPTERS (online study) ─────────────── -->
       <div class="view" id="view-online">
-        <div class="pg-head">
-          <h2><i class="ph ph-books"></i> Chapters</h2>
-          <p>Pick a chapter, then a set of questions. Anything you open is saved to this device for offline study.</p>
-        </div>
+        <div class="pg-head" data-head="online"></div>
         <div id="on-offline-warn" class="banner banner-danger" style="display:none">
           <i class="ph ph-wifi-slash"></i>
           <span><strong>You're offline.</strong> Only subtopics already downloaded will open. <a onclick="UI.go('offline')" style="cursor:pointer;text-decoration:underline">See what's downloaded</a></span>
@@ -2199,10 +2127,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── OPEN A FILE ─────────────── -->
       <div class="view" id="view-local">
-        <div class="pg-head">
-          <h2><i class="ph ph-folder-open"></i> Open a file</h2>
-          <p>Load a question bank saved on this device. Works with no connection at all.</p>
-        </div>
+        <div class="pg-head" data-head="local"></div>
         <div class="card">
           <div class="card-hd"><h3>Choose a JSON file</h3><span class="ctag tp">JSON</span></div>
           <p class="t-foot mb3">Each question needs <span class="mono">q</span>, <span class="mono">options</span> and <span class="mono">correct</span>. An <span class="mono">explanation</span> is optional.</p>
@@ -2222,10 +2147,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── MIXED PRACTICE ─────────────── -->
       <div class="view" id="view-psycho">
-        <div class="pg-head">
-          <h2><i class="ph ph-lightning"></i> Mixed practice</h2>
-          <p>Draw from several chapters at once — closer to what the real paper feels like.</p>
-        </div>
+        <div class="pg-head" data-head="psycho"></div>
         <div class="psy-hero">
           <span class="psy-hero-ic"><i class="ph ph-lightning"></i></span>
           <div class="psy-hero-text">
@@ -2254,7 +2176,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── SAVED ─────────────── -->
       <div class="view" id="view-bookmarks">
-        <div class="pg-head"><h2><i class="ph ph-star"></i> Saved</h2><p>Questions you starred to come back to.</p></div>
+        <div class="pg-head" data-head="bookmarks"></div>
         <div class="card">
           <div class="card-hd">
             <h3>Your saved questions</h3>
@@ -2273,7 +2195,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── FLAGGED ─────────────── -->
       <div class="view" id="view-flagged">
-        <div class="pg-head"><h2><i class="ph ph-flag"></i> Flagged</h2><p>Questions you marked to look at again later.</p></div>
+        <div class="pg-head" data-head="flagged"></div>
         <div class="card">
           <div class="card-hd">
             <h3>Your flagged questions</h3>
@@ -2292,10 +2214,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── QUESTIONS YOU MISSED ─────────────── -->
       <div class="view" id="view-wrong">
-        <div class="pg-head">
-          <h2><i class="ph ph-arrow-counter-clockwise"></i> Questions you missed</h2>
-          <p>These come back on a spacing schedule. <span id="wrc-due">0</span> are ready for you right now.</p>
-        </div>
+        <div class="pg-head" data-head="wrong"></div>
         <div class="card">
           <div class="card-hd">
             <h3>Your miss list</h3>
@@ -2315,10 +2234,11 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── PROGRESS ─────────────── -->
       <div class="view" id="view-progress">
-        <div class="pg-head"><h2><i class="ph ph-chart-bar"></i> Your progress</h2><p>How you're doing overall, and which chapters need the work.</p></div>
+        <div class="pg-head" data-head="progress"></div>
 
         <div class="g4" id="prog-stats" style="margin-bottom:var(--sp-4)"></div>
         <div id="predict-card" style="margin-bottom:var(--sp-4)"></div>
+        <section class="card" id="insights-card" style="margin-bottom:var(--sp-4)"></section>
 
         <div class="card">
           <div class="card-hd"><h3><i class="ph ph-wrench"></i> Your tools</h3></div>
@@ -2386,10 +2306,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── COVERAGE BY FILE ─────────────── -->
       <div class="view" id="view-server-progress">
-        <div class="pg-head">
-          <h2><i class="ph ph-list-checks"></i> Coverage by file</h2>
-          <p>How much of each question file you've worked through, pulled from your account rather than this device.</p>
-        </div>
+        <div class="pg-head" data-head="server-progress"></div>
 
         <div class="card">
           <div class="card-hd">
@@ -2415,19 +2332,13 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── SYLLABUS HEATMAP ─────────────── -->
       <div class="view" id="view-heatmap">
-        <div class="pg-head">
-          <h2><i class="ph ph-squares-four"></i> Syllabus heatmap</h2>
-          <p>Every chapter at a glance. Green is strong, amber is workable, red needs attention. Tap a cell to start.</p>
-        </div>
+        <div class="pg-head" data-head="heatmap"></div>
         <div id="heatmap-body"></div>
       </div>
 
       <!-- ─────────────── DOWNLOADS ─────────────── -->
       <div class="view" id="view-offline">
-        <div class="pg-head">
-          <h2><i class="ph ph-download-simple"></i> Downloads</h2>
-          <p>Save question sets to this device so they open during load-shedding or with no signal.</p>
-        </div>
+        <div class="pg-head" data-head="offline"></div>
         <div class="card">
           <div class="card-hd"><h3>What's on this device</h3><span class="ctag" id="cache-tag">Checking…</span></div>
           <div id="cache-txt" class="t-callout mb3"></div>
@@ -2449,7 +2360,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── BACKUP ─────────────── -->
       <div class="view" id="view-data">
-        <div class="pg-head"><h2><i class="ph ph-floppy-disk"></i> Backup</h2><p>Save everything on this device to a file, or load one back.</p></div>
+        <div class="pg-head" data-head="data"></div>
         <div class="card">
           <div class="card-hd"><h3>Backup file</h3></div>
           <p class="t-callout mb4">Progress, saved questions, flags, your miss list and your study plan all live on this device. Export keeps a copy you control.</p>
@@ -2489,7 +2400,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── STUDY PLAN ─────────────── -->
       <div class="view" id="view-timetable">
-        <div class="pg-head"><h2><i class="ph ph-calendar-blank"></i> Study plan</h2><p>Block out when you'll study, and get a nudge just before each session.</p></div>
+        <div class="pg-head" data-head="timetable"></div>
         <div class="g2-grid" style="align-items:start">
           <div>
             <div class="card">
@@ -2617,11 +2528,6 @@ html.focus-mode .marquee-bar{display:none!important}
               <div class="qbz qbz-c">
                 <div class="qb-tiles">
                   <div class="qtile qt-ans"><span class="qt-sym">✓</span><span class="qt-num" id="ex-ans">0</span><span class="qt-lbl">Answered</span></div>
-                  <div class="qtile qt-lok" id="ex-lok-tile" style="display:none" title="Loksewa score: +1 correct, −0.2 wrong, 0 skipped">
-                    <span class="qt-sym">★</span>
-                    <span class="qt-num" id="ex-lok">0.0</span>
-                    <span class="qt-lbl">Score</span>
-                  </div>
                 </div>
               </div>
               <div class="qbz qbz-r">
@@ -2669,7 +2575,7 @@ html.focus-mode .marquee-bar{display:none!important}
       <span class="bn-ic"><i class="ph ph-house"></i></span>Home
     </button>
     <button class="bn-item" id="bn-study" onclick="BN.open('study')">
-      <span class="bn-ic"><i class="ph ph-books"></i></span>Study
+      <span class="bn-ic"><i class="ph ph-books"></i></span>Practice
     </button>
     <button class="bn-item" id="bn-subjective" onclick="BN.open('subjective')">
       <span class="bn-ic"><i class="ph ph-note-pencil"></i></span>Written
@@ -2708,7 +2614,7 @@ html.focus-mode .marquee-bar{display:none!important}
 </div>
 
 <script src="vendor/confetti/confetti.browser.js" defer></script>
-<script src="firebase-config.js"></script>
+<script src="js/core/firebase-config.js"></script>
 <script>
 /* Firebase SDK is only needed once push is configured in firebase-config.js.
    v1.31: dynamic script creation instead of document.write, so no
@@ -2722,20 +2628,21 @@ if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
   });
 }
 </script>
-<script src="config.js"></script>
-<script src="version.js"></script>
-<script src="shared.js"></script>
-<script src="chapters-loader.js"></script>
-<script src="subjective_chapters.js"></script>
-<script src="subjective-data.js"></script>
-<script src="content-index.js"></script>
-<script src="app.js"></script>
-<script src="objective.js"></script>
-<script src="subjective.js"></script>
+<script src="js/core/config.js"></script>
+<script src="js/core/version.js"></script>
+<script src="js/core/shared.js"></script>
+<script src="js/core/nav.js"></script>
+<script src="js/data/chapters-loader.js"></script>
+<script src="js/data/subjective_chapters.js"></script>
+<script src="js/data/subjective-data.js"></script>
+<script src="js/data/content-index.js"></script>
+<script src="js/app/app.js"></script>
+<script src="js/app/objective.js"></script>
+<script src="js/app/subjective.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="cloud-sync.js"></script>
-<script src="pdf-viewer.js"></script>
-<script src="user-page.js"></script></body>
+<script src="js/app/cloud-sync.js"></script>
+<script src="js/app/pdf-viewer.js"></script>
+<script src="js/app/user-page.js"></script></body>
 </html>
 <!-- abhyas-hourly-challenge-v1 -->
 <!-- abhyas-hourly-sprint-loader-v2 -->

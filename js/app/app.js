@@ -818,7 +818,8 @@ const PSYNC = {
         action:'saveProgress',
         username: S.user.username,
         token: S.user.token,
-        data: this._syncPayload()
+        data: this._syncPayload(),
+        baseUpdatedAt: this._rev()
       });
       navigator.sendBeacon?.(APPS, new Blob([body], {type:'text/plain'}));
     }catch(e){ }
@@ -838,6 +839,11 @@ const PSYNC = {
     const CEIL = this._SYNC_PAYLOAD_CEILING;
     const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions.map(s => ({...s})) : [];
     const lim = { bk: this._MAX_SYNCED_LIST_ITEMS, fl: this._MAX_SYNCED_LIST_ITEMS, wr: this._MAX_SYNCED_LIST_ITEMS };
+    let qnotes = {};
+    try { const raw = localStorage.getItem('abhyas_qnotes'); qnotes = raw ? JSON.parse(raw) : {}; } catch(e){ qnotes = {}; }
+    if (!qnotes || typeof qnotes !== 'object' || Array.isArray(qnotes)) qnotes = {};
+    let sprint = '';
+    try { sprint = localStorage.getItem('abhyas_sprint_start') || ''; } catch(e){}
     const build = () => JSON.stringify({
       prog: { ...(S.prog || {}), sessions },
       chapStats: S.chapStats,
@@ -846,12 +852,8 @@ const PSYNC = {
       fl: this._capList(S.fl, lim.fl),
       wr: this._capList(S.wr, lim.wr),
       stk: S.stk,
-      qnotes: (function(){
-        try {
-          const raw = localStorage.getItem('abhyas_qnotes');
-          return raw ? JSON.parse(raw) : {};
-        } catch(e){ return {}; }
-      })()
+      qnotes,
+      sprint
     });
     let json = build();
     for(let i = sessions.length - 1; i >= 0 && json.length > CEIL; i--){
@@ -862,9 +864,43 @@ const PSYNC = {
       json = build();
     }
     while(json.length > CEIL && sessions.length > 10){ sessions.pop(); json = build(); }
+    /* v1.32: notes were never trimmed, so enough of them made every sync
+       fail permanently ("too large"). Drop the oldest notes last. */
+    if(json.length > CEIL){
+      const keys = Object.keys(qnotes);
+      while(json.length > CEIL && keys.length){
+        delete qnotes[keys.shift()];
+        json = build();
+      }
+    }
     return json;
   },
-  async pushNow(){
+  _REV_KEY: 'abhyas_progress_rev',
+  _rev(){ try { return localStorage.getItem(this._REV_KEY) || ''; } catch(e){ return ''; } },
+  _setRev(v){ try { if(v) localStorage.setItem(this._REV_KEY, String(v)); } catch(e){} },
+
+  /* Merge another device's copy into this one. Nothing is lost (see mergeSyncData). */
+  _applyMerged(remoteJson){
+    let remote;
+    try { remote = JSON.parse(remoteJson); } catch(e){ return false; }
+    const local = JSON.parse(this._syncPayload());
+    const m = mergeSyncData(local, remote);
+    S.prog = m.prog; if(typeof migrateSessionScopes === 'function') migrateSessionScopes(); _save(LS.PROG, S.prog);
+    S.chapStats = m.chapStats; _save(LS.CHAPSTATS, S.chapStats);
+    S.cov = m.cov; _save(LS.COV, S.cov);
+    S.bk = m.bk; _save(LS.BK, S.bk);
+    S.fl = m.fl; _save(LS.FL, S.fl);
+    S.wr = m.wr; _save(LS.WR, S.wr);
+    S.stk = m.stk; _save(LS.STK, S.stk);
+    try {
+      localStorage.setItem('abhyas_qnotes', JSON.stringify(m.qnotes));
+      if(typeof QNOTE !== 'undefined') QNOTE._cache = m.qnotes;
+      if(m.sprint) localStorage.setItem('abhyas_sprint_start', m.sprint);
+    } catch(e){}
+    return true;
+  },
+
+  async pushNow(_isRetry){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     clearTimeout(this._timer);
     this._timer = null;
@@ -874,12 +910,21 @@ const PSYNC = {
       const r = await netFetch(APPS, {
         method:'POST',
         headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({action:'saveProgress', username:S.user.username, token:S.user.token, data:payload})
+        body: JSON.stringify({action:'saveProgress', username:S.user.username, token:S.user.token, data:payload, baseUpdatedAt:this._rev()})
       }, 15000);
       const res = await r.json();
-      if(res && res.success){ this._setStatus('Last backed up: ' + new Date().toLocaleString()); this._setState('synced'); }
-      else { this._setStatus('Backup failed — will retry automatically.'); this._setState('error'); }
-    }catch(e){ this._setStatus('Backup failed (offline?) — will retry automatically.'); this._setState('error'); }
+      if(res && res.success){
+        this._setRev(res.updatedAt);
+        this._setStatus('Last backed up: ' + new Date().toLocaleString()); this._setState('synced');
+      } else if(res && res.conflict && !_isRetry && this._applyMerged(res.data)){
+        /* Another device saved first: its data is now merged into ours. Save the combined copy. */
+        this._setRev(res.updatedAt);
+        if(typeof HOME!=='undefined') HOME.render();
+        if(typeof PROG!=='undefined') PROG.render();
+        toast('\ud83d\udd04 Combined progress from your other device');
+        return this.pushNow(true);
+      } else { this._setStatus('Backup failed \u2014 will retry automatically.'); this._setState('error'); }
+    }catch(e){ this._setStatus('Backup failed (offline?) \u2014 will retry automatically.'); this._setState('error'); }
   },
   async pullIfEmpty(){
     if(!S.online || !S.user || !S.user.token) return;
@@ -904,6 +949,7 @@ const PSYNC = {
         return;
       }
       const data = JSON.parse(res.data);
+      this._setRev(res.updatedAt);
       if(data.prog){ S.prog=data.prog; if(typeof migrateSessionScopes === 'function') migrateSessionScopes(); _save(LS.PROG,S.prog); }
       if(data.chapStats){
         Object.entries(data.chapStats).forEach(([key, rec])=>{
@@ -927,6 +973,9 @@ const PSYNC = {
       if(data.fl){ S.fl=data.fl; _save(LS.FL,S.fl); }
       if(data.wr){ S.wr=data.wr; _save(LS.WR,S.wr); }
       if(data.stk){ S.stk=data.stk; _save(LS.STK,S.stk); }
+      if(typeof data.sprint === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.sprint)){
+        try { if(!localStorage.getItem('abhyas_sprint_start')) localStorage.setItem('abhyas_sprint_start', data.sprint); } catch(e){}
+      }
       toast('☁️ Restored your progress from a previous device');
       this._setStatus('Restored from cloud: ' + (res.updatedAt ? new Date(res.updatedAt).toLocaleString() : new Date().toLocaleString()));
       if(typeof HOME!=='undefined') HOME.render();
@@ -1572,7 +1621,17 @@ const WEEKLY = {
 
 const UI = {
   cur: 'home',
+  /* Screen lifecycle (v1.32). Features register what should happen when a screen
+     opens instead of wrapping UI._goRaw again and again:
+       UI.onEnter('heatmap', fn)   runs when that screen opens
+       UI.onEnterAny(fn)           runs on every screen change (fn receives the view id) */
+  ALIAS: { 'subjective':'subj-qotd' },
+  _enter: {},
+  _enterAny: [],
+  onEnter(view, fn){ (UI._enter[view] = UI._enter[view] || []).push(fn); },
+  onEnterAny(fn){ UI._enterAny.push(fn); },
   _goRaw(v){
+    v = UI.ALIAS[v] || v;
     document.getElementById('quiz-wrap').style.display='none';
     document.querySelectorAll('.view').forEach(e=>e.classList.remove('on'));
     const el=document.getElementById('view-'+v);
@@ -1580,6 +1639,7 @@ const UI = {
     document.querySelectorAll('.sb-item').forEach(e=>e.classList.remove('active'));
     const ni=document.getElementById('nav-'+v);
     if(ni)ni.classList.add('active');
+    if(typeof NAV!=='undefined' && NAV.reveal) NAV.reveal(v);
 
     if(UI.cur === 'home' && v !== 'home' && HOME._clockTimer){ clearInterval(HOME._clockTimer); HOME._clockTimer = null; }
     if(UI.cur === 'timetable' && v !== 'timetable' && TT._clockTimer){ clearInterval(TT._clockTimer); TT._clockTimer = null; }
@@ -1600,6 +1660,9 @@ const UI = {
       timetable:()=>TT.render(),
       psycho:()=>PSY.init()
     })[v]?.();
+
+    (UI._enter[v] || []).forEach(fn => { try { fn(v); } catch(e){ console.error('screen hook failed for', v, e); } });
+    UI._enterAny.forEach(fn => { try { fn(v); } catch(e){ console.error('screen hook failed', e); } });
   },
   go(v){
     if(S.quiz.active && document.getElementById('quiz-wrap').style.display !== 'none'){
@@ -3017,6 +3080,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
     last = now;
     try { if (typeof EXAM_DATE !== 'undefined' && EXAM_DATE.render) EXAM_DATE.render(); } catch (e) {}
     try { if (typeof DAILY10 !== 'undefined' && DAILY10.render) DAILY10.render(); } catch (e) {}
+    try { if (typeof SPRINT !== 'undefined' && SPRINT.render) SPRINT.render(); } catch (e) {}
     try { if (typeof TODAY_PLAN !== 'undefined' && TODAY_PLAN.render) TODAY_PLAN.render(); } catch (e) {}
     try { if (typeof SYLLABUS_MOCK !== 'undefined' && SYLLABUS_MOCK.render) SYLLABUS_MOCK.render(); } catch (e) {}
   }
@@ -3028,6 +3092,67 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 window.AUTH = AUTH;
 window.NET = NET;
+/* ═══════════════════════════════════════════════════════════════════════
+   MODAL (student page) — v1.32
+   WEEKLY._showRetakeModal called MODAL.sheet(), which only existed in
+   admin.html, so opening an already-attempted weekly test threw a
+   ReferenceError. This is a small self-building bottom sheet with the
+   same sheet()/close() API. Esc and backdrop-click close it, and focus
+   returns to the element that opened it.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.MODAL = window.MODAL || {
+  _el: null, _prevFocus: null, _onKey: null,
+  _build(){
+    if (this._el) return this._el;
+    const ov = document.createElement('div');
+    ov.id = 'ov-sheet';
+    ov.setAttribute('role', 'dialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'tt-sheet');
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9999;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)';
+    ov.innerHTML =
+      '<div class="dialog" style="background:var(--surface,var(--bg,#fff));color:var(--ink,inherit);width:100%;max-width:520px;max-height:90vh;overflow:auto;' +
+        'border-radius:16px 16px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px))">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<h3 id="tt-sheet" style="flex:1;margin:0;font-size:1rem"></h3>' +
+          '<button type="button" class="btn btn-quiet" aria-label="Close" data-modal-close>&times;</button>' +
+        '</div>' +
+        '<div id="bd-sheet"></div>' +
+      '</div>';
+    ov.addEventListener('click', e => {
+      if (e.target === ov || (e.target.closest && e.target.closest('[data-modal-close]'))) MODAL.close('sheet');
+    });
+    document.body.appendChild(ov);
+    return (this._el = ov);
+  },
+  sheet(title, html, opts){
+    const ov = this._build();
+    this._prevFocus = document.activeElement;
+    ov.querySelector('#tt-sheet').textContent = String(title == null ? '' : title);
+    ov.querySelector('#bd-sheet').innerHTML = html;
+    const wide = !opts || opts.wide !== false;
+    ov.querySelector('.dialog').style.maxWidth = wide ? '640px' : '520px';
+    ov.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    if (!this._onKey) {
+      this._onKey = e => { if (e.key === 'Escape') MODAL.close('sheet'); };
+      document.addEventListener('keydown', this._onKey);
+    }
+    const first = ov.querySelector('#bd-sheet button, [data-modal-close]');
+    if (first && first.focus) first.focus();
+  },
+  open(){ if (this._el) this._el.style.display = 'flex'; },
+  close(){
+    if (!this._el || this._el.style.display === 'none') return;
+    this._el.style.display = 'none';
+    document.body.style.overflow = '';
+    if (this._onKey) { document.removeEventListener('keydown', this._onKey); this._onKey = null; }
+    try { if (this._prevFocus && this._prevFocus.focus) this._prevFocus.focus(); } catch (e) {}
+    this._prevFocus = null;
+  },
+  closeAll(){ this.close(); }
+};
+
 window.UI = UI;
 window.PWA = PWA;
 window.PROG = PROG;

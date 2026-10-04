@@ -75,7 +75,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.31";
+const APP_VERSION = "1.32";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -94,6 +94,7 @@ const ALLOW_PASSWORD_PER_REQUEST_AUTH  = false;  // adminUser/adminPass on every
 const GETFILE_REQUIRES_AUTH            = true;   // getfile needs username+token (or adminToken)
 const ENFORCE_ACCESS_ON_CONTENT        = true;   // expired/unpaid users can't use paid endpoints even with a valid token
 const MIN_ADMIN_PASSWORD_LENGTH        = 8;
+const MIN_USER_PASSWORD_LENGTH         = 8;   /* v1.32: was 6 */
 const PRIVATE_SETTING_PREFIXES         = ["private_", "secret_"];
 const RESERVED_USERNAMES               = ["admin", "administrator", "root", "owner", "system", "support", "abhyas"];
 
@@ -112,6 +113,7 @@ const QREPORTS_SHEET         = "QuestionReports";
 const SUBJ_SUBMISSIONS_SHEET = "SubjectiveSubmissions";
 const ADMIN_PERMS_SHEET      = "AdminPermissions";
 const WEEKLYSTARTS_SHEET     = "WeeklyStarts";
+const STUDYDOCS_SHEET        = "StudyDocs";
 
 const USER_HEADERS = [
   "username","passHash","name","email","mobile",
@@ -148,6 +150,13 @@ const SUBJ_SUBMISSION_HEADERS = [
   "pdfReplacedAt","pdfReplacedBy","pdfOriginalBackupId"
 ];
 const ADMIN_PERM_HEADERS = ["username","featureKey","enabled","updatedAt","updatedBy"];
+/* v1.32: PDFs the admin uploads for students to study (model answers, notes, past papers). */
+const STUDYDOC_HEADERS = [
+  "id","title","category","chapterId","description","fileId","fileName",
+  "sizeBytes","status","sortOrder","uploadedBy","uploadedAt","updatedAt"
+];
+const STUDYDOC_CATEGORIES = ["model-answer","notes","past-paper","syllabus","other"];
+const MAX_STUDYDOC_DATA_CHARS = 14 * 1024 * 1024;   /* base64 text; about 10 MB of PDF */
 const WEEKLYSTART_HEADERS = ["username","weeklyId","startedAt"];
 /* Keep equal to WEEKLY_EXAM_WINDOW_HOURS (12) in app.js. */
 const WEEKLY_EXAM_WINDOW_MS = 12 * 60 * 60 * 1000;
@@ -250,6 +259,8 @@ const FEATURES = {
   screenshots:        "Download payment screenshots",
   weeklysets_view:    "View weekly sets",
   weeklysets_manage:  "Create / edit / delete weekly sets",
+  studydocs_view:     "View study PDFs",
+  studydocs_manage:   "Upload / edit / delete study PDFs",
   qreports_view:      "View question reports",
   qreports_manage:    "Update / dismiss question reports",
   subjective_view:    "View subjective submissions",
@@ -353,6 +364,8 @@ function doGet(e) {
       case "submitsubjectiveanswer":     result = submitSubjectiveAnswer(e.parameter); break;
       case "getmysubjectivesubmissions": result = getMySubjectiveSubmissions(e.parameter); break;
       case "getmysubmissionpdf":         result = getMySubmissionPdf(e.parameter); break;
+      case "liststudydocs":              result = listStudyDocs(e.parameter); break;
+      case "getstudydocpdf":             result = getStudyDocPdf(e.parameter); break;
 
       case "submitpayment":        result = submitPayment(e.parameter); break;
       case "getpaymentstatus":     result = getPaymentStatus(e.parameter); break;
@@ -408,6 +421,12 @@ function doGet(e) {
       case "admincommitsubjectiveimport":      result = adminCommitSubjectiveImport(e.parameter); break;
       case "adminreplacesubmissionpdf":        result = adminReplaceSubmissionPdf(e.parameter); break;
       case "admindownloadsubmissionpdf":       result = adminDownloadSubmissionPdf(e.parameter); break;
+
+      case "adminliststudydocs":     result = adminListStudyDocs(e.parameter); break;
+      case "adminaddstudydoc":       result = adminAddStudyDoc(e.parameter); break;
+      case "adminupdatestudydoc":    result = adminUpdateStudyDoc(e.parameter); break;
+      case "admindeletestudydoc":    result = adminDeleteStudyDoc(e.parameter); break;
+      case "admindownloadstudydoc":  result = adminDownloadStudyDoc(e.parameter); break;
 
       case "adminupdatesettings":      result = adminUpdateSettings(e.parameter); break;
       case "adminupdatesettingsbatch": result = adminUpdateSettingsBatch(e.parameter); break;
@@ -518,6 +537,36 @@ function recordLoginFailure_(kind, username) {
   state.at = Date.now();
   if (state.count >= MAX_LOGIN_ATTEMPTS) state.lockUntil = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
   props.setProperty(key, JSON.stringify(state));
+}
+function _ghostKey_(username) { return "ghostlock_" + hashPass_(String(username).toLowerCase().trim()).slice(0, 40); }
+function ghostLoginCheck_(username) {
+  let state = null;
+  try { const raw = CacheService.getScriptCache().get(_ghostKey_(username)); if (raw) state = JSON.parse(raw); } catch (e) {}
+  if (state && state.lockUntil && Date.now() < state.lockUntil) {
+    return { locked: true, minutesLeft: Math.ceil((state.lockUntil - Date.now()) / 60000) };
+  }
+  return { locked: false };
+}
+function ghostLoginFail_(username) {
+  const cache = CacheService.getScriptCache();
+  const key = _ghostKey_(username);
+  let state = { count: 0 };
+  try { const raw = cache.get(key); if (raw) state = JSON.parse(raw); } catch (e) {}
+  if (state.lockUntil && Date.now() >= state.lockUntil) state = { count: 0 };
+  state.count = (state.count || 0) + 1;
+  if (state.count >= MAX_LOGIN_ATTEMPTS) state.lockUntil = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
+  try { cache.put(key, JSON.stringify(state), LOCKOUT_MINUTES * 60); } catch (e) {}
+}
+/* v1.32: students could register with "123456". Reject the most-guessed
+   passwords and ones that just repeat the username. Returns "" when fine. */
+const COMMON_PASSWORDS_ = ["12345678","123456789","1234567890","password","password1","password123","qwerty123","qwertyuiop","11111111","00000000","12341234","abcd1234","iloveyou","admin123","letmein1","abhyas123","loksewa123","nepal123","987654321","asdfghjkl","1q2w3e4r","q1w2e3r4"];
+function weakPasswordReason_(password, username) {
+  const pw = String(password || "");
+  if (pw.length < MIN_USER_PASSWORD_LENGTH) return "Password must be at least " + MIN_USER_PASSWORD_LENGTH + " characters.";
+  const low = pw.toLowerCase();
+  if (COMMON_PASSWORDS_.indexOf(low) !== -1 || /^(.)\1+$/.test(pw)) return "That password is too easy to guess. Choose something less common.";
+  if (username && low.indexOf(String(username).toLowerCase()) !== -1 && String(username).length >= 4) return "Your password shouldn't contain your username.";
+  return "";
 }
 function clearLoginLock_(kind, username) {
   PropertiesService.getScriptProperties().deleteProperty("loginlock_" + kind + "_" + String(username).toLowerCase().trim());
@@ -708,6 +757,12 @@ function getSubjSubmissionsSheet_() {
   return sheet;
 }
 
+function getStudyDocsSheet_() {
+  const sheet = _getOrCreateSheet_(STUDYDOCS_SHEET, STUDYDOC_HEADERS, [1,4,6], "#dc2626", SpreadsheetApp.BandingTheme.LIGHT_GREY, 360);
+  _topUpHeaders_(sheet, STUDYDOC_HEADERS, "#dc2626");
+  return sheet;
+}
+
 function getAdminsSheet_() {
   if (_sheetRefCache[ADMINS_SHEET]) return _sheetRefCache[ADMINS_SHEET];
 
@@ -770,8 +825,26 @@ function getAdminsSheet_() {
 function _findRowFast_(sheet, col, value) {
   if (value === null || value === undefined || value === "") return null;
   const str = String(value);
+  const want = str.toLowerCase().trim();
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return null;
+  const lastCol = sheet.getLastColumn();
+
+  /* v1.32: remember WHERE a key lives (row number only, never the data).
+     The live row is always re-read and re-verified, so a stale hint (row
+     deleted / sheet re-sorted) just falls through to the slow search.
+     This removes the TextFinder scan from nearly every authenticated
+     request, which is the main cost of login + token checks. */
+  const cache = CacheService.getScriptCache();
+  let ck = "rix_" + sheet.getName() + "_" + col + "_" + want;
+  if (ck.length > 240) ck = "rix_" + hashPass_(ck).slice(0, 48);
+  const hint = Number(cache.get(ck)) || 0;
+  if (hint >= 2 && hint <= lastRow) {
+    const r = sheet.getRange(hint, 1, 1, lastCol).getValues()[0];
+    if (String(r[col - 1]).toLowerCase().trim() === want) return { rowIndex: hint, row: r };
+    cache.remove(ck);
+  }
+
   const hit = sheet.getRange(2, col, lastRow - 1, 1)
     .createTextFinder(str)
     .matchCase(false)
@@ -780,9 +853,10 @@ function _findRowFast_(sheet, col, value) {
   if (!hit) return null;
   const rowIndex = hit.getRow();
   if (rowIndex < 2) return null;
-  const cellVal = sheet.getRange(rowIndex, col).getValue();
-  if (String(cellVal).toLowerCase().trim() !== str.toLowerCase().trim()) return null;
-  const row = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+  /* One read instead of two: verify the key from the same row we return. */
+  const row = sheet.getRange(rowIndex, 1, 1, lastCol).getValues()[0];
+  if (String(row[col - 1]).toLowerCase().trim() !== want) return null;
+  try { cache.put(ck, String(rowIndex), 21600); } catch (e) {}
   return { rowIndex, row };
 }
 
@@ -914,7 +988,7 @@ function rowToWeeklyAttempt_(row) {
   const correct = Number(row[4] || 0);
   return {
     weeklyId: row[1] || "", answers, total, correct,
-    pct: total ? Math.round((correct / total) * 100) : 0,
+    pct: weeklyMarks_(correct, row[5], total).pct,
     skipped: Number(row[5] || 0),
     startedAt: Number(row[6] || 0),
     submittedAt: Number(row[7] || 0),
@@ -1143,9 +1217,16 @@ function handleLogin(p) {
     /* Never write per-username state for accounts that don't exist (that was
        an unbounded Script Properties DoS). A single shared bucket limits
        floods of unknown-username attempts instead. */
+    /* v1.32: unknown names now lock after the same number of failures as real
+       accounts (same message), so an attacker can no longer tell which usernames
+       exist by seeing who locks. State lives in the evicting cache, never in
+       Script Properties, so it stays bounded. */
+    const ghost = ghostLoginCheck_(username);
+    if (ghost.locked) return { success: false, error: `Too many failed attempts. Try again in ${ghost.minutesLeft} minute(s).` };
     if (!checkRateLimit_("login_unknown", UNKNOWN_LOGIN_LIMIT_PER_MINUTE, 60000, "Unknown-user Login Flood")) {
       return { success: false, error: "Too many login attempts. Please try again in a minute." };
     }
+    ghostLoginFail_(username);
     return { success: false, error: "Invalid username or password." };
   }
   const lock = checkLoginRateLimit_('user', username);
@@ -1342,7 +1423,8 @@ function handleSignup(p) {
 
   if (!username || !password || !nameRaw || !emailRaw || !mobile) return { success: false, error: "All fields required." };
   if (!/^[a-zA-Z0-9_.-]{3,30}$/.test(username)) return { success: false, error: "Username must be 3-30 characters: letters, numbers, dots, dashes, underscores only." };
-  if (password.length < 6) return { success: false, error: "Password must be at least 6 characters." };
+  const weakSignup = weakPasswordReason_(password, username);
+  if (weakSignup) return { success: false, error: weakSignup };
   if (password.length > MAX_PASSWORD_LEN) return { success: false, error: "Password is too long." };
   if (nameRaw.length > MAX_NAME_LEN) return { success: false, error: "Name is too long." };
   if (emailRaw.length > MAX_EMAIL_LEN) return { success: false, error: "Email address is too long." };
@@ -1563,7 +1645,8 @@ function requestPasswordReset(p) {
   const generic = { success: true, message: "If that account exists, a reset link has been sent to its email address." };
   if (identifier.length > MAX_EMAIL_LEN) return generic;
   /* Global cap protects the mail quota from being burned by a reset flood. */
-  if (!checkRateLimit_("pwreset_global", 10, 60 * 60 * 1000, "PasswordReset Rate Limited")) return generic;
+  if (!checkRateLimit_("pwreset_global", 40, 60 * 60 * 1000, "PasswordReset Rate Limited")) return generic;
+  try { if (MailApp.getRemainingDailyQuota() < 5) return generic; } catch (e) {}
 
   const sheet = getUsersSheet_();
   let found = findUserRow_(sheet, identifier);
@@ -1587,7 +1670,7 @@ function requestPasswordReset(p) {
     MailApp.sendEmail({
       to: email,
       subject: "Reset your Abhyas password",
-      body: `Hi ${found.row[2] || username},\n\nSomeone (hopefully you) requested a password reset for your Abhyas account (${username}).\n\nOpen this link on your phone to choose a new password:\n\n${getSettingValue_("appUrl", "https://app.mku.name.np/")}?resetToken=${token}\n\nOr paste this code into the app: ${token}\n\nThis code expires in 1 hour. If you didn't request this, you can safely ignore this email.\n`
+      body: `Hi ${found.row[2] || username},\n\nSomeone (hopefully you) requested a password reset for your Abhyas account (${username}).\n\nOpen this link on your phone to choose a new password:\n\n${getSettingValue_("appUrl", "https://app.mku.name.np/")}#resetToken=${token}\n\nOr paste this code into the app: ${token}\n\nThis code expires in 1 hour. If you didn't request this, you can safely ignore this email.\n`
     });
   } catch (err) { console.error("requestPasswordReset: MailApp send failed:", err); }
   return generic;
@@ -1598,7 +1681,9 @@ function resetPassword(p) {
   const newPassword = String(p.newPassword == null ? "" : p.newPassword);
   if (!token) return { success: false, error: "Reset code required." };
   if (token.length > 100) return { success: false, error: "This reset code is invalid or has already been used." };
-  if (!newPassword || newPassword.length < 6) return { success: false, error: "New password must be at least 6 characters." };
+  if (!newPassword) return { success: false, error: "New password required." };
+  const weakReset = weakPasswordReason_(newPassword, "");
+  if (weakReset) return { success: false, error: weakReset };
   if (newPassword.length > MAX_PASSWORD_LEN) return { success: false, error: "New password is too long." };
   if (!checkRateLimit_("resetpassword", 60, 60000)) return { success: false, error: "Too many attempts, please try again in a minute." };
 
@@ -2069,6 +2154,18 @@ function purgeAdminPermissions_(username) {
    PROGRESS SYNC
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* v1.32: two devices saving progress used to overwrite each other (last write
+   wins). A client that sends baseUpdatedAt (the revision it last saw) is now
+   told about a conflict, receives the newer copy, merges, and saves again.
+   Clients that do not send baseUpdatedAt keep the old behaviour. */
+function _isoOf_(v) {
+  if (v instanceof Date) return v.toISOString();
+  return String(v === null || v === undefined ? "" : v);
+}
+function _sameRevision_(a, b) {
+  return _isoOf_(a).slice(0, 19) === _isoOf_(b).slice(0, 19);   /* second precision: Sheets may drop milliseconds */
+}
+
 function saveProgress(p) {
   const auth = authUser_(p);
   if (!auth.ok) return auth.error;
@@ -2078,10 +2175,14 @@ function saveProgress(p) {
   if (!dataStr) return { success: false, error: "No data provided." };
   if (dataStr.length > 45000) return { success: false, error: "Progress data too large to sync." };
   try { JSON.parse(dataStr); } catch (e) { return { success: false, error: "Malformed progress data." }; }
+  const checkRevision = Object.prototype.hasOwnProperty.call(p, "baseUpdatedAt");
 
   return withLock_(() => {
     const sheet = getProgressSheet_();
     const found = findProgressRow_(sheet, username);
+    if (found && checkRevision && !_sameRevision_(p.baseUpdatedAt, found.row[2])) {
+      return { success: false, conflict: true, data: found.row[1], updatedAt: _isoOf_(found.row[2]) };
+    }
     const now = new Date().toISOString();
     if (found) sheet.getRange(found.rowIndex, 2, 1, 2).setValues([[dataStr, now]]);
     else sheet.appendRow([username, dataStr, now]);
@@ -2096,7 +2197,7 @@ function getProgress(p) {
 
   const found = findProgressRow_(getProgressSheet_(), auth.username);
   if (!found) return { success: true, data: null };
-  return { success: true, data: found.row[1], updatedAt: found.row[2] };
+  return { success: true, data: found.row[1], updatedAt: _isoOf_(found.row[2]) };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -2401,6 +2502,17 @@ function submitPayment(p) {
     if (!userFound) return { success: false, error: "Session expired. Please log in again.", sessionInvalid: true };
     if (!okStatus(userFound.row[7])) return { success: false, error: "Payment not required at this time." };
 
+    /* v1.32: the same transaction ID cannot back two different accounts. */
+    const payRows = getPaymentsSheet_().getDataRange().getValues();
+    const txKey = String(txId).toLowerCase().trim();
+    for (let i = 1; i < payRows.length; i++) {
+      const owner = String(payRows[i][0]).toLowerCase();
+      const st = String(payRows[i][6]).toLowerCase();
+      if (owner !== username.toLowerCase() && st !== "rejected" &&
+          String(payRows[i][4]).toLowerCase().trim() === txKey) {
+        return { success: false, error: "This transaction ID has already been used. Check it, or contact support." };
+      }
+    }
     userSheet.getRange(userFound.rowIndex, 8).setValue("payment_pending");
     userSheet.getRange(userFound.rowIndex, 13).setValue("pending");
     _invalidateSheet_(USERS_SHEET);
@@ -2545,7 +2657,45 @@ function handleGetFile(p) {
       }
     }
   }
+  const isAdminCaller = !!(p.adminToken && checkAdmin_({ adminToken: p.adminToken }));
+  if (!isContentFileAllowed_(fileId, isAdminCaller)) {
+    return { success: false, error: "That file is not available." };
+  }
   return readJsonFileById_(fileId);
+}
+
+/* v1.32: getFile used to open ANY Drive file the script owner can read.
+   Now only registered content is served: the CONTENT_FILE_IDS list, plus
+   files inside the WeeklySets / SubjectiveQuestions system folders.
+   Weekly-set files are only served to students once that set has been
+   released (admins can always preview). Positive results are cached. */
+function isContentFileAllowed_(fileId, isAdmin) {
+  const ids = (typeof CONTENT_FILE_IDS !== "undefined") ? CONTENT_FILE_IDS : [];
+  if (ids.indexOf(fileId) !== -1) return true;
+
+  const cache = CacheService.getScriptCache();
+  const ck = "cfa_" + fileId;
+  let kind = cache.get(ck);
+  if (!kind) {
+    let file;
+    try { file = DriveApp.getFileById(fileId); } catch (e) { return false; }
+    if (_isFileInFolderNamed_(file, "SubjectiveQuestions")) kind = "subj";
+    else if (_isFileInFolderNamed_(file, "WeeklySets")) kind = "weekly";
+    else return false;
+    try { cache.put(ck, kind, 21600); } catch (e) {}
+  }
+  if (kind === "subj" || isAdmin) return true;
+
+  /* weekly: students only after the release time of a set that uses it */
+  const data = _cachedSheetData_(WEEKLYSETS_SHEET, getWeeklySetsSheet_).data;
+  const now = Date.now();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][2]) === fileId) {
+      const rel = new Date(data[i][7]).getTime();
+      if (!isNaN(rel) && now >= rel) return true;
+    }
+  }
+  return false;
 }
 
 function adminDownloadScreenshot(p) {
@@ -2793,7 +2943,7 @@ function getWeeklyStanding(p) {
     if (String(data[i][1]).trim() !== weeklyId) continue;
     const total = Number(data[i][3] || 0);
     const correct = Number(data[i][4] || 0);
-    const pct = total ? (correct / total) * 100 : 0;
+    const pct = weeklyMarks_(correct, data[i][5], total).exactPct;
     scores.push(pct);
     if (String(data[i][0]).toLowerCase().trim() === me) mine = pct;
   }
@@ -2805,7 +2955,7 @@ function getWeeklyStanding(p) {
     success: true, ready: true, attempted: true,
     rank, total: scores.length,
     percentile: scores.length > 1 ? Math.round(((scores.length - rank) / (scores.length - 1)) * 100) : 100,
-    avgPct: Math.round(avg)
+    avgPct: Math.max(0, Math.round(avg))
   };
 }
 
@@ -2865,6 +3015,27 @@ function loadWeeklyCorrectAnswers_(fileId) {
   }
 }
 
+/* v1.32: weekly sets are marked the Loksewa way: +1 right, -0.2 wrong, 0 skipped.
+   The student's result page already showed this, but the server stored and ranked
+   plain correct/total, so the same attempt showed two different numbers. Every
+   weekly percentage now comes from this one function. `pct` is clamped at 0 for
+   display; `marks` is exact and is what rankings compare. Wrong answers are
+   derived (total - correct - skipped), so no sheet column is needed. */
+const WEEKLY_NEGATIVE_MARK = 0.2;
+function weeklyMarks_(correct, skipped, total) {
+  const t = Math.max(0, Number(total) || 0);
+  const c = Math.max(0, Math.min(t, Number(correct) || 0));
+  const sk = Math.max(0, Number(skipped) || 0);
+  const wrong = Math.max(0, t - c - sk);
+  const marks = c - wrong * WEEKLY_NEGATIVE_MARK;
+  return {
+    wrong,
+    marks: Math.round(marks * 10) / 10,
+    pct: t ? Math.max(0, Math.round((marks / t) * 1000) / 10) : 0,
+    exactPct: t ? (marks / t) * 100 : 0
+  };
+}
+
 function scoreAnswers_(answers, correctAnswers) {
   let correct = 0, wrong = 0, skipped = 0;
   answers.forEach((a, idx) => {
@@ -2910,7 +3081,10 @@ function submitWeeklyAttempt(p) {
      fallback when the answer key can't be matched to this submission. */
   const key = loadWeeklyCorrectAnswers_(ws.fileId);
   let correctFinal, serverScored = false;
-  if (key && key.length === total) {
+  if (key && key.length !== total) {
+    return { success: false, error: "Your answers don't match this set. Please reload the test and try again." };
+  }
+  if (key) {
     correctFinal = scoreAnswers_(normalized, key).correct;
     serverScored = true;
   } else {
@@ -2926,9 +3100,25 @@ function submitWeeklyAttempt(p) {
                error: "This weekly set has already been submitted." };
     }
 
-    const durationSec = Math.max(0, Math.min(6 * 60 * 60, Number(p.durationSec) || 0));
-    const startedAt = Number(p.startedAt) || Date.now();
     const submittedAt = Date.now();
+    /* v1.32: use the start time the SERVER recorded in startWeeklyAttempt.
+       Client values are only a fallback when no start record exists
+       (e.g. an attempt queued offline), and are clamped to sane bounds. */
+    let startedAt = 0;
+    const startRows = getWeeklyStartsSheet_().getDataRange().getValues();
+    const who = username.toLowerCase();
+    for (let i = 1; i < startRows.length; i++) {
+      if (String(startRows[i][0]).toLowerCase() === who && String(startRows[i][1]) === weeklyId) {
+        startedAt = Number(startRows[i][2]) || 0; break;
+      }
+    }
+    let durationSec;
+    if (startedAt > 0 && startedAt <= submittedAt) {
+      durationSec = Math.max(0, Math.min(6 * 60 * 60, Math.round((submittedAt - startedAt) / 1000)));
+    } else {
+      durationSec = Math.max(0, Math.min(6 * 60 * 60, Number(p.durationSec) || 0));
+      startedAt = submittedAt - durationSec * 1000;
+    }
 
     sheet.appendRow([
       username, weeklyId, JSON.stringify(normalized), total, correctFinal,
@@ -2941,7 +3131,7 @@ function submitWeeklyAttempt(p) {
       success: true,
       attempt: {
         weeklyId, answers: normalized, total, correct: correctFinal,
-        pct: total ? Math.round((correctFinal / total) * 100) : 0,
+        pct: weeklyMarks_(correctFinal, skipped, total).pct,
         skipped, startedAt, submittedAt, durationSec, synced: true
       }
     };
@@ -2972,12 +3162,12 @@ function adminWeeklySetResults(p) {
       const sc = scoreAnswers_(at.answers, correctAnswers);
       correct = sc.correct; wrong = sc.wrong; skipped = sc.skipped;
       const denom = at.total || correctAnswers.length;
-      pct = denom ? Math.round((correct / denom) * 100) : 0;
+      pct = weeklyMarks_(correct, skipped, denom).pct;
     } else {
       correct = at.correct;
       skipped = at.skipped;
       wrong = Math.max(0, at.total - correct - skipped);
-      pct = at.total ? Math.round((correct / at.total) * 100) : 0;
+      pct = weeklyMarks_(correct, skipped, at.total).pct;
     }
     attempts.push({
       username: String(data[i][0] || ""),
@@ -3143,6 +3333,174 @@ function adminDownloadSubmissionPdf(p) {
   const found = _findRowFast_(getSubjSubmissionsSheet_(), 1, id);
   if (!found) return { success: false, error: "Submission not found." };
   return _pdfPayload_(String(found.row[10] || "").trim(), "submission.pdf");
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   STUDY PDFs (v1.32). Admins upload model answers, notes and past papers; students
+   read them in the app. Files live in the private "StudyDocs" Drive folder and are
+   only ever served through these endpoints (so the paywall applies), never by link.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Pure: validate and clean the text fields of an upload or edit. Returns
+   { error } or { value: { title, category, chapterId, description, sortOrder } }. */
+function normalizeStudyDocMeta_(p, requireTitle) {
+  const title = String(p.title == null ? "" : p.title).replace(/\s+/g, " ").trim().slice(0, 120);
+  if (requireTitle && !title) return { error: "Give the PDF a title." };
+  const category = String(p.category == null ? "model-answer" : p.category).trim().toLowerCase();
+  if (STUDYDOC_CATEGORIES.indexOf(category) === -1) return { error: "Unknown category." };
+  const chapterId = String(p.chapterId == null ? "" : p.chapterId).trim().replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
+  const description = String(p.description == null ? "" : p.description).replace(/[\r\n]+/g, " ").trim().slice(0, 400);
+  const rawSort = (p.sortOrder === undefined || p.sortOrder === null || String(p.sortOrder).trim() === "") ? NaN : Number(p.sortOrder);
+  let sortOrder = isFinite(rawSort) ? rawSort : 100;
+  sortOrder = Math.max(0, Math.min(9999, Math.round(sortOrder)));
+  return { value: { title, category, chapterId, description, sortOrder } };
+}
+
+/* Pure: a sheet row as the object students see. The Drive file id never leaves the server. */
+function rowToStudyDoc_(row, forAdmin) {
+  const d = {
+    id: String(row[0] || ""), title: String(row[1] || ""), category: String(row[2] || "other"),
+    chapterId: String(row[3] || ""), description: String(row[4] || ""),
+    fileName: String(row[6] || ""), sizeBytes: Number(row[7]) || 0,
+    status: String(row[8] || "published"),
+    sortOrder: (row[9] === "" || row[9] === null || row[9] === undefined) ? NaN : Number(row[9]),
+    uploadedAt: Number(row[11]) || 0, updatedAt: Number(row[12]) || 0
+  };
+  if (!isFinite(d.sortOrder)) d.sortOrder = 100;
+  if (forAdmin) { d.uploadedBy = String(row[10] || ""); d.hasFile = !!String(row[5] || "").trim(); }
+  return d;
+}
+
+/* Pure: newest-first inside each sort order, so a new upload is easy to spot. */
+function sortStudyDocs_(docs) {
+  return docs.slice().sort((a, b) => (a.sortOrder - b.sortOrder) || (b.uploadedAt - a.uploadedAt));
+}
+
+function listStudyDocs(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const gate = requireAccess_(auth);
+  if (gate) return gate;
+  const data = _cachedSheetData_(STUDYDOCS_SHEET, getStudyDocsSheet_).data;
+  const docs = [];
+  for (let i = 1; i < data.length; i++) {
+    if (!String(data[i][0] || "").trim()) continue;
+    const d = rowToStudyDoc_(data[i], false);
+    if (d.status === "published" && String(data[i][5] || "").trim()) docs.push(d);
+  }
+  return { success: true, docs: sortStudyDocs_(docs) };
+}
+
+function getStudyDocPdf(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const gate = requireAccess_(auth);
+  if (gate) return gate;
+  const id = String(p.id || "").trim();
+  if (!id) return { success: false, error: "Document id required." };
+  if (!checkRateLimit_("studydoc_" + auth.username.toLowerCase(), 30, 60000)) {
+    return { success: false, error: "Too many requests — please slow down." };
+  }
+  const found = _findRowFast_(getStudyDocsSheet_(), 1, id);
+  if (!found || String(found.row[8] || "published") !== "published") return { success: false, error: "That document isn't available." };
+  const out = _pdfPayload_(String(found.row[5] || "").trim(), String(found.row[6] || "study.pdf"));
+  if (out.success) out.title = String(found.row[1] || "");
+  return out;
+}
+
+function adminListStudyDocs(p) {
+  const chk = checkAdminCan_(p, "studydocs_view");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const data = getStudyDocsSheet_().getDataRange().getValues();
+  const docs = [];
+  for (let i = 1; i < data.length; i++) { if (String(data[i][0] || "").trim()) docs.push(rowToStudyDoc_(data[i], true)); }
+  return { success: true, docs: sortStudyDocs_(docs), categories: STUDYDOC_CATEGORIES };
+}
+
+function adminAddStudyDoc(p) {
+  const chk = checkAdminCan_(p, "studydocs_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const meta = normalizeStudyDocMeta_(p, true);
+  if (meta.error) return { success: false, error: meta.error };
+  const pdfData = String(p.pdfData || "");
+  if (!pdfData.startsWith("data:")) return { success: false, error: "Choose a PDF file to upload." };
+  if (pdfData.length > MAX_STUDYDOC_DATA_CHARS) return { success: false, error: "PDF too large — keep it under about 10 MB." };
+  if (!checkRateLimit_("studydocadd_" + String(chk.actor).toLowerCase(), 30, 60 * 60 * 1000)) {
+    return { success: false, error: "Too many uploads — wait a little and try again." };
+  }
+  const parsed = parsePdfDataUrl_(pdfData, MAX_STUDYDOC_DATA_CHARS);
+  if (parsed.error) return { success: false, error: parsed.error };
+
+  const id = Utilities.getUuid();
+  const safeBase = meta.value.title.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "study";
+  const fileName = safeBase + ".pdf";
+  let fileId = "";
+  try {
+    const file = getOrCreateSystemFolder_("StudyDocs").createFile(Utilities.newBlob(parsed.bytes, "application/pdf", id.slice(0, 8) + "_" + fileName));
+    fileId = file.getId();
+  } catch (e) { return { success: false, error: "Drive upload failed: " + (e.message || e) }; }
+
+  return withLock_(() => {
+    const now = Date.now();
+    getStudyDocsSheet_().appendRow([
+      id, meta.value.title, meta.value.category, meta.value.chapterId, meta.value.description,
+      fileId, fileName, parsed.bytes.length, p.publish === false || p.publish === "false" ? "hidden" : "published",
+      meta.value.sortOrder, chk.actor, now, now
+    ]);
+    _invalidateSheet_(STUDYDOCS_SHEET);
+    logAction_(chk.actor, "Study PDF Added", meta.value.title, meta.value.category + " · " + parsed.bytes.length + " bytes");
+    return { success: true, id };
+  });
+}
+
+function adminUpdateStudyDoc(p) {
+  const chk = checkAdminCan_(p, "studydocs_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const id = String(p.id || "").trim();
+  if (!id) return { success: false, error: "Document id required." };
+  const meta = normalizeStudyDocMeta_(p, true);
+  if (meta.error) return { success: false, error: meta.error };
+  const status = String(p.status || "published") === "hidden" ? "hidden" : "published";
+  return withLock_(() => {
+    const sheet = getStudyDocsSheet_();
+    const found = _findRowFast_(sheet, 1, id);
+    if (!found) return { success: false, error: "Document not found." };
+    sheet.getRange(found.rowIndex, 2, 1, 4).setValues([[meta.value.title, meta.value.category, meta.value.chapterId, meta.value.description]]);
+    sheet.getRange(found.rowIndex, 9, 1, 2).setValues([[status, meta.value.sortOrder]]);
+    sheet.getRange(found.rowIndex, 13).setValue(Date.now());
+    _invalidateSheet_(STUDYDOCS_SHEET);
+    logAction_(chk.actor, "Study PDF Edited", meta.value.title, status);
+    return { success: true };
+  });
+}
+
+function adminDeleteStudyDoc(p) {
+  const chk = checkAdminCan_(p, "studydocs_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const id = String(p.id || "").trim();
+  if (!id) return { success: false, error: "Document id required." };
+  return withLock_(() => {
+    const sheet = getStudyDocsSheet_();
+    const found = _findRowFast_(sheet, 1, id);
+    if (!found) return { success: false, error: "Document not found." };
+    const fileId = String(found.row[5] || "").trim();
+    const title = String(found.row[1] || "");
+    sheet.deleteRow(found.rowIndex);
+    _invalidateSheet_(STUDYDOCS_SHEET);
+    if (fileId) { try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) { /* already gone */ } }
+    logAction_(chk.actor, "Study PDF Deleted", title, id);
+    return { success: true };
+  });
+}
+
+function adminDownloadStudyDoc(p) {
+  const chk = checkAdminCan_(p, "studydocs_view");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const id = String(p.id || "").trim();
+  if (!id) return { success: false, error: "Document id required." };
+  const found = _findRowFast_(getStudyDocsSheet_(), 1, id);
+  if (!found) return { success: false, error: "Document not found." };
+  return _pdfPayload_(String(found.row[5] || "").trim(), String(found.row[6] || "study.pdf"));
 }
 
 /* Accepts YYYY-MM-DD, an ISO string, or epoch milliseconds. */
@@ -3636,7 +3994,7 @@ function adminUpdateUser(p) {
     }
     if (p.password) {
       const pw = String(p.password);
-      if (pw.length < 6) return { success: false, error: "Password must be at least 6 characters." };
+      if (pw.length < MIN_USER_PASSWORD_LENGTH) return { success: false, error: "Password must be at least " + MIN_USER_PASSWORD_LENGTH + " characters." };
       if (pw.length > MAX_PASSWORD_LEN) return { success: false, error: "Password is too long." };
       /* A non-owner must not be able to reset the password of an account that
          also has an admin record. */

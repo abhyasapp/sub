@@ -2,8 +2,8 @@
 
 Offline-first study app for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam, plus Level 5 Engineering and General Knowledge. Built as a static PWA on top of Google Apps Script + Google Sheets + Google Drive. No build step, no bundler, no server to run.
 
-Client version: 1.31 (version.js)
-Backend version: 1.31 (code.gs)
+Client version: 1.32 (version.js)
+Backend version: 1.32 (code.gs)
 Both must match. tests/check.js fails if they drift.
 
 ---
@@ -15,6 +15,8 @@ For a student studying alone:
 - Chapters downloaded to the device, working with no connection during load-shedding or on the bus
 - Flashcard practice with instant feedback, and a timed exam mode
 - A wrong-answer bank using spaced repetition (1, 3, 7, 14-day intervals), so questions come back just before you would forget them
+- Study PDFs: admins upload model answers, notes and past papers (Admin > Study PDFs); students read them under Written answers > Model answers & notes, with search, type filters, a New badge, offline copies, and a button on marked written submissions that opens the model answers for that chapter
+- A 60-day sprint card on Home: Learn (days 1-35), Drill (36-52) and Mock (53-60) phases with daily topic, question and time targets, plus an ahead/behind pace indicator
 - A Today's plan card on Home: weakest chapters, spaced review due, and one new topic, in one tap
 - An exam readiness score with confidence, and per-chapter strength verdicts
 - Confidence rating after each answer (Sure / Not sure / Guessed), which surfaces misconceptions: things you were sure about and got wrong
@@ -44,42 +46,43 @@ For an admin:
 
 ## Layout
 
-index.html              Landing, sign in / sign up / reset, payment
-user.html               The student app
-admin.html              The admin console
-privacy.html            Privacy policy
-terms.html              Terms of use
+```
+index.html  user.html  admin.html  privacy.html  terms.html    Pages (stay at the root: URLs and the PWA depend on them)
+sw.js  manifest.json                                           Service worker and PWA manifest (must be at the root)
+icon-192.png  icon-512.png  favicon.png                        App icons (root, so existing installs and link previews keep working)
 
-app.js                  Core: state, auth, sync, offline, timetable, home
-objective.js            MCQ engine, chapter picker, mixed practice, review
-subjective.js           Written answers: QOTD, exam, Smart Paste parser
-cloud-sync.js           Optional backup to the student's own Google Drive
-pdf-viewer.js           Shared PDF reader and ink annotation layer
-shared.js               Tiny cross-page utilities
+js/
+  core/    config.js          GAS_URL, single source of truth for the backend
+           version.js         APP_VERSION (client)
+           shared.js          Cross-page utilities: sprint planner, progress insights,
+                              multi-device merge, frameThrottle
+           nav.js             Student navigation: sidebar, phone menus, page headers (one list)
+           admin-nav.js       Admin navigation: rail, titles, permissions (one list)
+           firebase-config.js Firebase Cloud Messaging config (optional)
+  app/     app.js             Core: state, auth, sync, offline, timetable, home
+           objective.js       MCQ engine, chapter picker, mixed practice, review
+           subjective.js      Written answers: QOTD, exam, Smart Paste parser
+           cloud-sync.js      Optional backup to the student's own Google Drive
+           pdf-viewer.js      Shared PDF reader and ink annotation layer
+           user-page.js       Student-page features: sprint card, insights charts, sidebar, tools
+  data/    chapters-loader.js     Loads chapters-data.js from Drive
+           subjective-data.js     Drive file IDs for the written-answer bank
+           subjective_chapters.js Written-answer syllabus
+           content-index.js       Question count per Drive file (progress bars)
 
-config.js               GAS_URL, single source of truth for the backend
-version.js              APP_VERSION (client)
-chapters-loader.js      Loads chapters-data.js from Drive
-subjective-data.js      Drive file IDs for the written-answer bank
-subjective_chapters.js  Written-answer syllabus
-content-index.js        Question count per Drive file (progress bars)
-firebase-config.js      Firebase Cloud Messaging config (optional)
-design-system.css       Shared theme across all three pages
-sw.js                   Service worker
-manifest.json           PWA manifest
+css/       design-system.css      Shared theme tokens
+vendor/    Self-hosted fonts, KaTeX, pdf.js, pdf-lib, confetti
+gas/       Apps Script files (pasted into the editor, not loaded by the browser)
+  code.gs             Backend, all endpoints
+  setup.gs            Run-once setup
+  private-files.gs    Content file ID list and makeContentFilesPrivate()
+  content-index.gs    buildContentIndex() which generates js/data/content-index.js
+  debug.gs            Diagnostics (do NOT add to the production project)
+tests/check.js        Syntax, links, file references, versions, behaviour, CSP, handlers
+vendor-assets.py      Re-download vendor/ from npm
+```
 
-gas/                    Apps Script files (pasted into the editor, not loaded by the browser)
-  code.gs               Backend, all endpoints
-  setup.gs              Run-once setup
-  private-files.gs      Content file ID list and makeContentFilesPrivate()
-  content-index.gs      buildContentIndex() which generates content-index.js
-  debug.gs              Diagnostics (do NOT add to the production project)
-
-tests/check.js          Syntax, links, versions, behaviour, CSP, handlers
-vendor/                 Self-hosted fonts, KaTeX, pdf.js, pdf-lib, confetti
-repo_tidy.py            Organise the repo, purge backups
-vendor-assets.py        Re-download vendor/ from npm
-setup_chapters_loader.py  One-shot migration (already applied, safe to delete)
+Script load order is set in each page. user.html loads core, then data, then app files, so keep that order when adding a file. The test "File references resolve" fails if any page, the service worker or the manifest points at a file that is missing.
 
 ---
 
@@ -201,7 +204,7 @@ v1.16   Question editor, growth panel, announcements, tests
 v1.15   Weekly test start/resume/rank recorded on the server, cached settings, nightly backup, crash reports
 v1.14   Self-service data control, offline hardening
 
-Tests: 59 passing, 0 failing.
+Tests: 222 passing, 0 failing.
 
 ---
 
