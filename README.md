@@ -16,6 +16,8 @@ For a student studying alone:
 - Flashcard practice with instant feedback, and a timed exam mode
 - A wrong-answer bank using spaced repetition (1, 3, 7, 14-day intervals), so questions come back just before you would forget them
 - Study PDFs: admins upload model answers, notes and past papers (Admin > Study PDFs); students read them under Written answers > Model answers & notes, with search, type filters, a New badge, offline copies, and a button on marked written submissions that opens the model answers for that chapter
+- Question reports and corrections: a report button wherever a question appears; the admin sees the options, the marked answer, what the student picked, the section and how many students reported it; fixing a question replaces it on every phone within minutes, including the copies saved in Missed / Saved / Flagged and weekly papers
+- Loksewa mark scheme (Admin > Settings): the daily 75-mark paper is built to the groups and marks you enter; Loksewa marking and the group / chapter tables show only on the weekly test, the daily paper and the hourly 50
 - A 60-day sprint card on Home: Learn (days 1-35), Drill (36-52) and Mock (53-60) phases with daily topic, question and time targets, plus an ahead/behind pace indicator
 - A Today's plan card on Home: weakest chapters, spaced review due, and one new topic, in one tap
 - An exam readiness score with confidence, and per-chapter strength verdicts
@@ -78,7 +80,8 @@ gas/       Apps Script files (pasted into the editor, not loaded by the browser)
   private-files.gs    Content file ID list and makeContentFilesPrivate()
   content-index.gs    buildContentIndex() which generates js/data/content-index.js
   debug.gs            Diagnostics (do NOT add to the production project)
-tests/check.js        Syntax, links, file references, versions, behaviour, CSP, handlers
+tests/check.js        Syntax, links, file references, versions, behaviour, CSP, handlers, navigation, auth audit, contrast, offline cache
+tests/browser/        Real-browser checks (accessibility audit, offline start); need `npm i --no-save puppeteer-core @sparticuz/chromium axe-core`, see its README
 vendor-assets.py      Re-download vendor/ from npm
 ```
 
@@ -204,7 +207,7 @@ v1.16   Question editor, growth panel, announcements, tests
 v1.15   Weekly test start/resume/rank recorded on the server, cached settings, nightly backup, crash reports
 v1.14   Self-service data control, offline hardening
 
-Tests: 222 passing, 0 failing.
+Tests: 383 passing, 0 failing.
 
 ---
 

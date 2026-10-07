@@ -276,6 +276,12 @@ function qSearchHtml(q){
        + `aria-label="Ask Google AI to analyse this question">`
        + `<i class="ph ph-magnifying-glass"></i></a>`;
 }
+/* The "report a problem with this question" button. Shown wherever a question appears, except for questions
+   from a bank the student made on their own device (there is nothing for the admin to correct). */
+function qReportHtml(q, call, label){
+  if(!q || !q.uid || q.fileId === 'local' || String(q.uid).indexOf('local_') === 0) return '';
+  return `<button type="button" class="ib" onclick="${call}" title="Report an issue with this question" aria-label="${label || 'Report an issue with this question'}"><i class="ph ph-warning-circle"></i></button>`;
+}
 function normQ(raw,fid){
   if(raw && typeof raw === 'object' && !Array.isArray(raw) && raw.success === false){
     console.warn('[normQ] Server error for', fid, '—', raw.error);
@@ -681,7 +687,12 @@ const AUTH = {
   },
   _resetUserScopedLocalDataIfDifferentUser(username){
     const lastUser = _load(LS.LAST_USER, '');
-    if(lastUser && lastUser !== username){
+    /* Compared case-insensitively and trimmed: "Sita" and "sita" are the same account (a Google sign-in and a password
+       sign-in can differ only in capitals) and must never wipe this device's data. */
+    const norm = v => String(v || '').trim().toLowerCase();
+    if(lastUser && norm(lastUser) !== norm(username)){
+      /* keep a copy for the PREVIOUS student, recoverable only when they sign in again */
+      try { const keepUser = S.user; S.user = { username: lastUser }; PSYNC._snapshot('before-account-switch'); S.user = keepUser; } catch(e){}
       [LS.PROG, LS.BK, LS.FL, LS.WR, LS.STK, LS.CHAPSTATS, LS.TT, LS.COV].forEach(k=>{
         try{ localStorage.removeItem(k); }catch(e){}
       });
@@ -814,13 +825,11 @@ const PSYNC = {
   _beaconSync(){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     try{
-      const body = JSON.stringify({
-        action:'saveProgress',
-        username: S.user.username,
-        token: S.user.token,
-        data: this._syncPayload(),
-        baseUpdatedAt: this._rev()
-      });
+      /* The page is closing, so nothing can be compressed or awaited here. Only a copy that fits as it is
+         is sent; otherwise the next normal save (which compresses) does it. The device always keeps everything. */
+      const json = JSON.stringify(this._fullLocal());
+      if(json.length > this._SYNC_PAYLOAD_CEILING) return;
+      const body = JSON.stringify({ action:'saveProgress', username: S.user.username, token: S.user.token, data: json, baseUpdatedAt: this._rev() });
       navigator.sendBeacon?.(APPS, new Blob([body], {type:'text/plain'}));
     }catch(e){ }
   },
@@ -830,61 +839,62 @@ const PSYNC = {
     this._timer = null;
     this._beaconSync();
   },
-  _MAX_SYNCED_LIST_ITEMS: 300,
   _SYNC_PAYLOAD_CEILING: 44000,
-  _capList(arr, max){
-    return Array.isArray(arr) && arr.length > max ? arr.slice(-max) : arr;
-  },
-  _syncPayload(){
-    const CEIL = this._SYNC_PAYLOAD_CEILING;
-    const sessions = (S.prog && Array.isArray(S.prog.sessions)) ? S.prog.sessions.map(s => ({...s})) : [];
-    const lim = { bk: this._MAX_SYNCED_LIST_ITEMS, fl: this._MAX_SYNCED_LIST_ITEMS, wr: this._MAX_SYNCED_LIST_ITEMS };
+  _SNAP_KEY: 'abhyas_presync_backup',
+
+  /* The COMPLETE state of this device. Nothing here is ever cut down: merges start from this,
+     and the cloud copy is made from it (compressed when large). */
+  _fullLocal(){
     let qnotes = {};
     try { const raw = localStorage.getItem('abhyas_qnotes'); qnotes = raw ? JSON.parse(raw) : {}; } catch(e){ qnotes = {}; }
     if (!qnotes || typeof qnotes !== 'object' || Array.isArray(qnotes)) qnotes = {};
     let sprint = '';
     try { sprint = localStorage.getItem('abhyas_sprint_start') || ''; } catch(e){}
-    const build = () => JSON.stringify({
-      prog: { ...(S.prog || {}), sessions },
-      chapStats: S.chapStats,
-      cov: S.cov || {},
-      bk: this._capList(S.bk, lim.bk),
-      fl: this._capList(S.fl, lim.fl),
-      wr: this._capList(S.wr, lim.wr),
-      stk: S.stk,
-      qnotes,
-      sprint
-    });
-    let json = build();
-    for(let i = sessions.length - 1; i >= 0 && json.length > CEIL; i--){
-      if(sessions[i].qres){ delete sessions[i].qres; json = build(); }
-    }
-    while(json.length > CEIL && lim.bk > 20){
-      lim.bk = lim.fl = lim.wr = Math.max(20, Math.floor(lim.bk / 2));
-      json = build();
-    }
-    while(json.length > CEIL && sessions.length > 10){ sessions.pop(); json = build(); }
-    /* v1.32: notes were never trimmed, so enough of them made every sync
-       fail permanently ("too large"). Drop the oldest notes last. */
-    if(json.length > CEIL){
-      const keys = Object.keys(qnotes);
-      while(json.length > CEIL && keys.length){
-        delete qnotes[keys.shift()];
-        json = build();
-      }
-    }
-    return json;
+    return {
+      prog: S.prog || {total:0,correct:0,sessions:[]}, chapStats: S.chapStats || {}, cov: S.cov || {},
+      bk: S.bk || [], fl: S.fl || [], wr: S.wr || [], stk: S.stk || {days:[],last:''}, qnotes, sprint
+    };
   },
-  _REV_KEY: 'abhyas_progress_rev',
-  _rev(){ try { return localStorage.getItem(this._REV_KEY) || ''; } catch(e){ return ''; } },
-  _setRev(v){ try { if(v) localStorage.setItem(this._REV_KEY, String(v)); } catch(e){} },
+  _counts(d){
+    d = d || {};
+    return { wr:(d.wr||[]).length, bk:(d.bk||[]).length, fl:(d.fl||[]).length, sessions:((d.prog&&d.prog.sessions)||[]).length, notes:Object.keys(d.qnotes||{}).length };
+  },
 
-  /* Merge another device's copy into this one. Nothing is lost (see mergeSyncData). */
-  _applyMerged(remoteJson){
-    let remote;
-    try { remote = JSON.parse(remoteJson); } catch(e){ return false; }
-    const local = JSON.parse(this._syncPayload());
-    const m = mergeSyncData(local, remote);
+  /* A merge only ever ADDS. This is the last line of defence: if a merged result is ever smaller than what
+     this device already had, it is thrown away and nothing is changed. */
+  _mergeKeepsEverything(local, merged){
+    const a = this._counts(local), b = this._counts(merged);
+    return b.wr >= a.wr && b.bk >= a.bk && b.fl >= a.fl && b.notes >= a.notes && b.sessions >= Math.min(a.sessions, 50)
+      && (Number(merged.prog.total)||0) >= (Number((local.prog||{}).total)||0)
+      && (Number(merged.prog.correct)||0) >= (Number((local.prog||{}).correct)||0);
+  },
+
+  /* Rolling safety copies (the last 3) of this device's data taken just before any sync changes it,
+     so any sync can be undone from Data > Recover. They belong to the signed-in student only. */
+  _snapshot(reason){
+    try {
+      const full = this._fullLocal();
+      const c = this._counts(full);
+      if(!c.wr && !c.bk && !c.fl && !c.sessions && !c.notes) return false;       // nothing worth keeping
+      const user = (S.user && S.user.username) ? String(S.user.username).toLowerCase() : '';
+      let list = []; try { list = JSON.parse(localStorage.getItem(this._SNAP_KEY) || '[]'); } catch(e){ list = []; }
+      if(!Array.isArray(list)) list = [];
+      const json = JSON.stringify(full);
+      if(list[0] && list[0].user === user && JSON.stringify(list[0].data) === json) return true;   // unchanged since last copy
+      list.unshift({ at: Date.now(), reason: String(reason||'sync'), user, counts: c, data: full });
+      for(let keep = Math.min(list.length, 3); keep >= 1; keep--){
+        try { localStorage.setItem(this._SNAP_KEY, JSON.stringify(list.slice(0, keep))); return true; } catch(e){ /* storage full: keep fewer */ }
+      }
+    } catch(e){}
+    return false;     /* merging is additive, so it is still safe to carry on without a snapshot */
+  },
+  listSnapshots(){
+    const user = (S.user && S.user.username) ? String(S.user.username).toLowerCase() : '';
+    try { return (JSON.parse(localStorage.getItem(this._SNAP_KEY) || '[]') || []).filter(x => x && x.user === user); } catch(e){ return []; }
+  },
+
+  /* Write a merged result into the app and onto the device. */
+  _applyMergedObject(m){
     S.prog = m.prog; if(typeof migrateSessionScopes === 'function') migrateSessionScopes(); _save(LS.PROG, S.prog);
     S.chapStats = m.chapStats; _save(LS.CHAPSTATS, S.chapStats);
     S.cov = m.cov; _save(LS.COV, S.cov);
@@ -897,15 +907,45 @@ const PSYNC = {
       if(typeof QNOTE !== 'undefined') QNOTE._cache = m.qnotes;
       if(m.sprint) localStorage.setItem('abhyas_sprint_start', m.sprint);
     } catch(e){}
-    return true;
+    try { if(typeof WRONGBY !== 'undefined') WRONGBY._missCache = null; if(typeof QHIST !== 'undefined') QHIST._cache = null; } catch(e){}
+    if(typeof HOME!=='undefined') HOME.render();
+    if(typeof PROG!=='undefined') PROG.render();
+    if(typeof HOME!=='undefined' && HOME.updateBadges) HOME.updateBadges();
   },
+
+  /* Add another copy (cloud, other device, snapshot) to this device's data. Returns { ok, added } and
+     never removes anything. `remote` may be an object, a JSON string or a compressed "gz1:" string. */
+  async mergeIn(remote, reason){
+    let r = remote;
+    try { if(typeof r === 'string') r = await syncDecode(r); } catch(e){ return { ok:false, error:'That copy could not be read.' }; }
+    if(!r || typeof r !== 'object') return { ok:false, error:'That copy is empty.' };
+    const local = this._fullLocal();
+    const merged = mergeSyncData(local, r);
+    if(!this._mergeKeepsEverything(local, merged)) return { ok:false, error:'The merge was cancelled because it would have removed data. Nothing was changed.' };
+    this._snapshot(reason || 'before-merge');
+    const before = this._counts(local);
+    this._applyMergedObject(merged);
+    const after = this._counts(merged);
+    return { ok:true, added:{ wr:after.wr-before.wr, bk:after.bk-before.bk, fl:after.fl-before.fl, sessions:after.sessions-before.sessions, notes:after.notes-before.notes } };
+  },
+
+  _REV_KEY: 'abhyas_progress_rev',
+  _rev(){ try { return localStorage.getItem(this._REV_KEY) || ''; } catch(e){ return ''; } },
+  _setRev(v){ try { if(v) localStorage.setItem(this._REV_KEY, String(v)); } catch(e){} },
 
   async pushNow(_isRetry){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     clearTimeout(this._timer);
     this._timer = null;
     this._setState('syncing');
-    const payload = this._syncPayload();
+    /* The cloud copy is the COMPLETE state, compressed when it is large. If it still does not fit, nothing is
+       cut down and nothing is sent: the data stays whole on this device. */
+    const payload = await syncEncode(JSON.stringify(this._fullLocal()), this._SYNC_PAYLOAD_CEILING);
+    if(payload === null){
+      this._setStatus('Your data is too large for the cloud copy right now. It is safe on this device; export a backup file from Data.');
+      this._setState('error');
+      return;
+    }
     try{
       const r = await netFetch(APPS, {
         method:'POST',
@@ -916,12 +956,13 @@ const PSYNC = {
       if(res && res.success){
         this._setRev(res.updatedAt);
         this._setStatus('Last backed up: ' + new Date().toLocaleString()); this._setState('synced');
-      } else if(res && res.conflict && !_isRetry && this._applyMerged(res.data)){
-        /* Another device saved first: its data is now merged into ours. Save the combined copy. */
+      } else if(res && res.conflict && !_isRetry){
+        /* Another device saved first. Its copy is ADDED to this device's data (nothing is removed),
+           and the combined copy is saved back. */
+        const out = await this.mergeIn(res.data, 'before-sync');
+        if(!out.ok){ this._setStatus('Sync paused: ' + out.error); this._setState('error'); return; }
         this._setRev(res.updatedAt);
-        if(typeof HOME!=='undefined') HOME.render();
-        if(typeof PROG!=='undefined') PROG.render();
-        toast('\ud83d\udd04 Combined progress from your other device');
+        toast('\ud83d\udd04 Combined with your other device. Nothing was removed.');
         return this.pushNow(true);
       } else { this._setStatus('Backup failed \u2014 will retry automatically.'); this._setState('error'); }
     }catch(e){ this._setStatus('Backup failed (offline?) \u2014 will retry automatically.'); this._setState('error'); }
@@ -934,9 +975,10 @@ const PSYNC = {
     await this._pull(false);
   },
   async forceRestore(){
-    if(!S.online || !S.user || !S.user.token){ toast('❌ Need internet to restore'); return; }
+    if(!S.online || !S.user || !S.user.token){ toast('Need internet to check your cloud backup'); return; }
     await this._pull(true);
   },
+  /* "Restore" now ADDS the cloud copy to this device. It never replaces or removes anything here. */
   async _pull(force){
     try{
       const r = await netFetch(APPS, {
@@ -945,44 +987,44 @@ const PSYNC = {
       }, 15000);
       const res = await r.json();
       if(!res.success || !res.data){
-        if(force) toast('ℹ️ No cloud backup found for this account yet.');
+        if(force) toast('No cloud backup found for this account yet.');
         return;
       }
-      const data = JSON.parse(res.data);
+      const out = await this.mergeIn(res.data, 'before-restore');
+      if(!out.ok){ if(force) toast(out.error, 6000); return; }
       this._setRev(res.updatedAt);
-      if(data.prog){ S.prog=data.prog; if(typeof migrateSessionScopes === 'function') migrateSessionScopes(); _save(LS.PROG,S.prog); }
-      if(data.chapStats){
-        Object.entries(data.chapStats).forEach(([key, rec])=>{
-          const existing = S.chapStats[key];
-          if(!existing || rec.attempted > existing.attempted) S.chapStats[key] = JSON.parse(JSON.stringify(rec));
-        });
-        _save(LS.CHAPSTATS, S.chapStats);
-      }
-      if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
-      if(data.qnotes && typeof data.qnotes === 'object' && !Array.isArray(data.qnotes)){
-        try {
-          const KEY = 'abhyas_qnotes';
-          const localRaw = localStorage.getItem(KEY);
-          const local = localRaw ? JSON.parse(localRaw) : {};
-          const merged = Object.assign({}, data.qnotes, local);
-          localStorage.setItem(KEY, JSON.stringify(merged));
-          if (typeof QNOTE !== 'undefined') QNOTE._cache = merged;
-        } catch(e){}
-      }
-      if(data.bk){ S.bk=data.bk; _save(LS.BK,S.bk); }
-      if(data.fl){ S.fl=data.fl; _save(LS.FL,S.fl); }
-      if(data.wr){ S.wr=data.wr; _save(LS.WR,S.wr); }
-      if(data.stk){ S.stk=data.stk; _save(LS.STK,S.stk); }
-      if(typeof data.sprint === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.sprint)){
-        try { if(!localStorage.getItem('abhyas_sprint_start')) localStorage.setItem('abhyas_sprint_start', data.sprint); } catch(e){}
-      }
-      toast('☁️ Restored your progress from a previous device');
-      this._setStatus('Restored from cloud: ' + (res.updatedAt ? new Date(res.updatedAt).toLocaleString() : new Date().toLocaleString()));
-      if(typeof HOME!=='undefined') HOME.render();
-      if(typeof PROG!=='undefined') PROG.render();
+      const a = out.added, n = a.wr + a.bk + a.fl + a.sessions + a.notes;
+      toast(n > 0 ? '\u2705 Added your saved progress from the cloud. Nothing on this device was removed.' : '\u2705 Already up to date. Nothing was removed.', 5000);
+      this._setStatus('Checked cloud backup: ' + new Date().toLocaleString());
+      if(n >= 0) this.scheduleSync();     // save the combined copy back so every device gets it
     }catch(e){
-      if(force) toast('❌ Restore failed — check your connection and try again.');
+      if(force) toast('Could not reach your cloud backup. Check your connection and try again.');
     }
+  },
+
+  /* ── Recovery (Data > Recover): add back an earlier copy. Always additive. ── */
+  async listCloudHistory(){
+    const r = await netFetch(APPS, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'getProgressHistory', username:S.user.username, token:S.user.token}) }, 15000);
+    const res = await r.json();
+    if(!res || !res.success) throw new Error((res && res.error) || 'Could not load earlier cloud copies.');
+    return res.entries || [];
+  },
+  async recoverCloud(slot){
+    const r = await netFetch(APPS, { method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({action:'getProgressHistory', username:S.user.username, token:S.user.token, slot}) }, 15000);
+    const res = await r.json();
+    if(!res || !res.success || !res.data) return { ok:false, error:(res && res.error) || 'That copy is not available.' };
+    const out = await this.mergeIn(res.data, 'before-recover');
+    if(out.ok) this.scheduleSync();
+    return out;
+  },
+  async recoverSnapshot(i){
+    const snap = this.listSnapshots()[i];
+    if(!snap) return { ok:false, error:'That copy is no longer on this device.' };
+    const out = await this.mergeIn(snap.data, 'before-recover');
+    if(out.ok) this.scheduleSync();
+    return out;
   }
 };
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') PSYNC.flushOnHide(); });
@@ -2501,21 +2543,15 @@ const DATA = {
     inp.click();
   },
 
-  _applyImport(data){
-    if(data.prog){ S.prog = data.prog; if(typeof migrateSessionScopes==='function') migrateSessionScopes(); _save(LS.PROG,S.prog); }
-    if(data.chapStats){
-      Object.entries(data.chapStats).forEach(([key, rec])=>{
-        const existing = S.chapStats[key];
-        if(!existing || rec.attempted > existing.attempted) S.chapStats[key] = JSON.parse(JSON.stringify(rec));
-      });
-      _save(LS.CHAPSTATS, S.chapStats);
+  /* Loading a backup file ADDS it to what is on this device. It never replaces or removes anything:
+     an older file loaded by mistake can no longer wipe newer progress. */
+  async _applyImport(data){
+    const out = await PSYNC.mergeIn(data, 'before-import');
+    if(!out.ok){ toast(out.error, 6000); return; }
+    /* the study plan is not part of cloud sync, so a file only fills it in when this device has none */
+    if(data.tt && (!S.tt || !(S.tt.sessions || []).length)){
+      S.tt = data.tt; if(!S.tt.reminders) S.tt.reminders = {enabled:false,leadMinutes:5}; _save(LS.TT, S.tt);
     }
-    if(data.cov && typeof data.cov === 'object') COV.merge(data.cov);
-    if(data.bk){ S.bk = data.bk; _save(LS.BK, S.bk); }
-    if(data.fl){ S.fl = data.fl; _save(LS.FL, S.fl); }
-    if(data.wr){ S.wr = data.wr; _save(LS.WR, S.wr); }
-    if(data.stk){ S.stk = data.stk; _save(LS.STK, S.stk); }
-    if(data.tt){ S.tt = data.tt; if(!S.tt.reminders) S.tt.reminders = {enabled:false,leadMinutes:5}; _save(LS.TT, S.tt); }
     if(data.weeklyAttempts && typeof data.weeklyAttempts === 'object'){
       Object.entries(data.weeklyAttempts).forEach(([wid, a])=>{
         if(!S.weeklyAttempts[wid]) S.weeklyAttempts[wid] = a;
@@ -2523,10 +2559,11 @@ const DATA = {
       if(typeof WEEKLY !== 'undefined') WEEKLY.attempts = S.weeklyAttempts;
       _save(LS.WK_ATTEMPTS, S.weeklyAttempts);
     }
-    toast('✅ Backup imported');
-    HOME.render();
-    PROG.render();
+    const a = out.added, n = a.wr + a.bk + a.fl + a.sessions + a.notes;
+    toast(n > 0 ? '\u2705 Backup added to this device. Nothing was removed.' : '\u2705 That backup had nothing new. Nothing was removed.', 5000);
+    PSYNC.scheduleSync();
     if(typeof WEEKLY !== 'undefined') WEEKLY._renderHomeCard();
+    if(typeof RECOVER !== 'undefined') RECOVER.render();
   },
 
   async syncNow(){
@@ -2536,10 +2573,10 @@ const DATA = {
   },
 
   async restoreCloud(){
-    if(!S.online){ toast('❌ Need internet to restore'); return; }
-    if(!(await ASK.confirm({title:'Restore from your backup?', body:'This replaces the progress, saved questions, flags and miss list on THIS device with your last cloud backup. It cannot be undone.', ok:'Restore', danger:true}))) return;
-    PSYNC._setStatus('Restoring…');
+    if(!S.online){ toast('Need internet to check your cloud backup'); return; }
+    PSYNC._setStatus('Checking your cloud backup\u2026');
     await PSYNC.forceRestore();
+    if(typeof RECOVER !== 'undefined') RECOVER.render();
   },
 
   async clearQ(){

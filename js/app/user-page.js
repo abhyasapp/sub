@@ -1136,6 +1136,7 @@ window.ANNOUNCE = {
       if (res && res.success) {
         this._text = String(res.announcement || '').trim();
         try { localStorage.setItem('abhyas_announce', this._text); } catch(e){}
+        try { localStorage.setItem('abhyas_lscheme', String(res.loksewaScheme || '')); } catch(e){}
         const cv = String(res.contentVersion || '');
         if (cv) {
           try {
@@ -1795,6 +1796,176 @@ UI.onEnter('studydocs', () => STUDYDOCS.load(false));
 UI.onEnterAny(v => { if (v !== 'studydocs') STUDYDOCS.chapter = ''; });
 UI.onEnter('home', () => { try { STUDYDOCS.refreshBadge(); } catch(e){} });
 
+/* ═══════════════════════════════════════════════════════════════════════
+   RECOVER — Data > Recover data. Lists the safety copies this device took just before a
+   sync, a restore or a file import changed anything, and the earlier cloud copies the server
+   keeps. "Add back" ADDS a copy to the data on this device (PSYNC.mergeIn); it never deletes.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.RECOVER = {
+  REASONS: {
+    'before-sync': 'Before combining with another device', 'before-restore': 'Before adding your cloud backup',
+    'before-merge': 'Before a merge', 'before-import': 'Before loading a backup file',
+    'before-recover': 'Before adding back a copy', 'before-account-switch': 'Before signing in as someone else', 'test': 'Test'
+  },
+  _msg(t, bad){ const m = $('recover-msg'); if (m) { m.textContent = t || ''; m.style.color = bad ? 'var(--danger)' : ''; } },
+  _when(ms){ const d = new Date(ms); return isNaN(d) ? '' : d.toLocaleString([], { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); },
+  _line(c){ return [c.wr + ' missed', c.bk + ' saved', c.fl + ' flagged', c.sessions + ' sessions'].join(' \u00b7 '); },
+
+  render(){
+    const box = $('recover-local');
+    if (!box) return;
+    const snaps = (typeof PSYNC !== 'undefined') ? PSYNC.listSnapshots() : [];
+    box.innerHTML = snaps.length ? snaps.map((s, i) =>
+      '<div class="rec-row"><div class="rec-main"><div class="rec-t">' + esc(this._when(s.at)) + '</div>' +
+      '<div class="rec-s">' + esc(this.REASONS[s.reason] || 'Before a sync') + '<br>' + esc(this._line(s.counts || {wr:0,bk:0,fl:0,sessions:0})) + '</div></div>' +
+      '<button class="btn btn-a btn-sm" onclick="RECOVER.addLocal(' + i + ')">Add back</button></div>').join('')
+      : '<div class="t-foot">Nothing yet. A copy is saved here automatically before any sync changes your data.</div>';
+  },
+
+  async addLocal(i){
+    this._msg('Adding\u2026');
+    const out = await PSYNC.recoverSnapshot(i);
+    this._done(out);
+  },
+
+  async loadCloud(){
+    const box = $('recover-cloud');
+    if (!S.online) { this._msg('Connect to the internet to see earlier cloud copies.', true); return; }
+    box.innerHTML = '<div class="t-foot">Checking\u2026</div>';
+    try {
+      const entries = await PSYNC.listCloudHistory();
+      box.innerHTML = entries.length ? entries.map(e =>
+        '<div class="rec-row"><div class="rec-main"><div class="rec-t">' + esc(this._when(new Date(e.savedAt).getTime())) + '</div>' +
+        '<div class="rec-s">Earlier cloud copy \u00b7 ' + esc(formatBytes(e.chars)) + '</div></div>' +
+        '<button class="btn btn-a btn-sm" onclick="RECOVER.addCloud(' + Number(e.slot) + ')">Add back</button></div>').join('')
+        : '<div class="t-foot">No earlier cloud copies yet. The server starts keeping them from your next backup.</div>';
+    } catch (e) {
+      box.innerHTML = '<button class="btn btn-quiet btn-sm" onclick="RECOVER.loadCloud()"><i class="ph ph-cloud-arrow-down"></i> Check earlier cloud copies</button>';
+      this._msg(e.message || 'Could not load earlier cloud copies.', true);
+    }
+  },
+
+  async addCloud(slot){
+    this._msg('Adding\u2026');
+    this._done(await PSYNC.recoverCloud(slot));
+  },
+
+  _done(out){
+    if (!out || !out.ok) { this._msg((out && out.error) || 'That copy could not be added.', true); return; }
+    const a = out.added, n = a.wr + a.bk + a.fl + a.sessions + a.notes;
+    this._msg(n > 0 ? 'Added ' + [a.wr && a.wr + ' missed', a.bk && a.bk + ' saved', a.fl && a.fl + ' flagged', a.sessions && a.sessions + ' sessions', a.notes && a.notes + ' notes'].filter(Boolean).join(', ') + '. Nothing was removed.' : 'That copy had nothing new. Nothing was removed.');
+    this.render();
+  }
+};
+UI.onEnter('data', () => RECOVER.render());
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CORRECTIONS — when the admin fixes a question, this phone must stop showing the old one.
+   Every few minutes (and when the app opens, and when it comes back online) it asks which question
+   files were corrected, then for each one:
+     1. throws away its downloaded copy of the file (chapter sets, hourly/daily pools, weekly set),
+     2. downloads the corrected file once,
+     3. updates the copies saved for review (Missed, Saved, Flagged) and weekly papers,
+        keeping streaks, due dates, tags and notes.
+   A saved question that is no longer in the file is marked "Withdrawn" and left out of practice; nothing is
+   deleted. Matching rules are in shared.js (applyCorrectionsToList) and are unit-tested.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.CORRECTIONS = {
+  SEEN_KEY: 'abhyas_corr_seen', CHECK_KEY: 'abhyas_corr_checked',
+  MIN_GAP: 10 * 60 * 1000, FIRST_WINDOW: 30 * 24 * 60 * 60 * 1000, running: false,
+
+  _num(k){ try { return Number(localStorage.getItem(k)) || 0; } catch(e){ return 0; } },
+  _set(k, v){ try { localStorage.setItem(k, String(v)); } catch(e){} },
+
+  async check(force){
+    if (this.running) return;
+    if (!S.user || !S.user.token || !S.online || S.forcedOffline) return;
+    if (!force && Date.now() - this._num(this.CHECK_KEY) < this.MIN_GAP) return;
+    this.running = true;
+    try {
+      const since = this._num(this.SEEN_KEY) || (Date.now() - this.FIRST_WINDOW);
+      const r = await netFetch(APPS, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'getCorrections', username: S.user.username, token: S.user.token, since }) }, 15000);
+      const res = await r.json();
+      if (!res || !res.success) return;
+      const tot = { purged: 0, updated: 0, moved: 0, merged: 0, withdrawn: 0 };
+      let failed = false;
+      for (const fid of Object.keys(res.files || {})) {
+        try { const o = await this.apply(fid); Object.keys(tot).forEach(k => { tot[k] += (o[k] || 0); }); }
+        catch (e) { failed = true; }
+      }
+      this._set(this.CHECK_KEY, Date.now());
+      if (!failed) this._set(this.SEEN_KEY, res.now || Date.now());    /* a file that could not be refreshed is tried again next time */
+      if (tot.updated || tot.moved) toast('\u2705 ' + (tot.updated || tot.moved) + ' saved question' + ((tot.updated || tot.moved) === 1 ? '' : 's') + ' updated: your teacher corrected ' + ((tot.updated || tot.moved) === 1 ? 'it' : 'them') + '.', 5000);
+      if (tot.withdrawn) toast(tot.withdrawn + ' saved question' + (tot.withdrawn === 1 ? ' was' : 's were') + ' withdrawn from the question bank.', 5000);
+      const mine = (res.resolvedMine || []).length;
+      if (mine) toast('\u2705 Thanks! ' + mine + ' question' + (mine === 1 ? '' : 's') + ' you reported ' + (mine === 1 ? 'was' : 'were') + ' corrected.', 6000);
+    } catch (e) { /* offline or busy: tried again later */ }
+    finally { this.running = false; }
+  },
+
+  async _keysFor(fid){
+    const keys = new Set();
+    try { ChapterData.allFileRefs().forEach(r => { if (r.fid === fid && r.key) keys.add(r.key); }); } catch (e) {}
+    try { (WEEKLY.sets || []).forEach(s => { if (s.fileId === fid) { keys.add('weekly_' + s.id); keys.add('weekly_' + s.id + '_retake'); } }); } catch (e) {}
+    try { (await QDB.keys()).forEach(k => { if (String(k).indexOf(fid) !== -1) keys.add(k); }); } catch (e) {}
+    return [...keys];
+  },
+
+  async apply(fid){
+    const out = { purged: 0, updated: 0, moved: 0, merged: 0, withdrawn: 0 };
+    const keys = await this._keysFor(fid);
+    const isMine = it => it && (it.fileId === fid || String(it.uid || '').indexOf(fid + '_') === 0);
+    const weeklySets = (typeof WEEKLY !== 'undefined' ? (WEEKLY.sets || []) : []).filter(s => s.fileId === fid);
+    const hasSaved = [S.wr, S.bk, S.fl].some(l => (l || []).some(isMine));
+    const hasPaper = weeklySets.some(s => { try { return !!WEEKLY._loadPaper(s.id); } catch (e) { return false; } });
+
+    /* 1. drop the downloaded copy, and the "checked recently" stamp so it is not served stale again */
+    const stamps = _load('abhyas_qts', {});
+    for (const k of keys) { try { await QDB.del(k); out.purged++; } catch (e) {} delete stamps[k]; }
+    _save('abhyas_qts', stamps);
+    if (!hasSaved && !hasPaper) return out;
+
+    /* 2. download the corrected file once (it is cached again under its usual key) */
+    const raw = await QUIZ._fetch(fid, keys[0] || fid, 1, 'bg');
+    const fresh = normQ(raw, fid);
+    if (!fresh.length) throw new Error('corrected file could not be read');
+    const now = Date.now();
+
+    /* 3a. saved copies */
+    [['wr', LS.WR], ['bk', LS.BK], ['fl', LS.FL]].forEach(([kind, lsKey]) => {
+      const r = applyCorrectionsToList(S[kind], fid, fresh, now);
+      if (r.updated || r.moved || r.merged || r.withdrawn) { S[kind] = r.list; _save(lsKey, S[kind]); }
+      out.updated += r.updated; out.moved += r.moved; out.merged += r.merged; out.withdrawn += r.withdrawn;
+    });
+
+    /* 3b. weekly papers kept for review (same length, so the saved answers still line up) */
+    if (hasPaper) {
+      try {
+        const all = _load(WEEKLY.LS_PAPERS, {}) || {};
+        let changed = false;
+        weeklySets.forEach(s => {
+          const p = all[s.id];
+          if (!p || !Array.isArray(p.qs)) return;
+          const r = applyCorrectionsToList(p.qs, fid, fresh, now, { keepAll: true });
+          if (r.updated || r.moved || r.withdrawn) { p.qs = r.list; changed = true; out.updated += r.updated; }
+        });
+        if (changed) localStorage.setItem(WEEKLY.LS_PAPERS, JSON.stringify(all));
+      } catch (e) {}
+    }
+
+    if (out.updated || out.moved || out.merged || out.withdrawn) {
+      try { ['wrong', 'bookmarks', 'flagged'].forEach(v => { if (UI.cur === v) REV.renderList(v === 'wrong' ? 'wr' : v === 'bookmarks' ? 'bk' : 'fl'); }); } catch (e) {}
+      try { HOME.updateBadges(); } catch (e) {}
+      try { PSYNC.scheduleSync(); } catch (e) {}
+    }
+    return out;
+  }
+};
+UI.onEnter('home', () => { try { CORRECTIONS.check(); } catch (e) {} });
+window.addEventListener('online', () => { setTimeout(() => { try { CORRECTIONS.check(true); } catch (e) {} }, 2500); });
+setTimeout(() => { try { CORRECTIONS.check(true); } catch (e) {} }, 6000);
+
 /* ═══════════════════════════════════════════════════════════════════
    SPRINT — the 60-day plan. One card, one clear job for today:
    how many topics, how many questions, how much time, and whether you
@@ -2213,11 +2384,12 @@ window.BADGES_UI = {
     slot.innerHTML =
       '<div class="card"><div class="card-hd"><h3><i class="ph ph-medal"></i> Achievements</h3>' +
         '<span class="t-cap">' + earned + ' / ' + this.DEFS.length + '</span></div>' +
-        '<div style="display:flex;gap:var(--sp-3);overflow-x:auto;padding-bottom:var(--sp-2)">' +
+        '<div tabindex="0" role="group" aria-label="Achievements" style="display:flex;gap:var(--sp-3);overflow-x:auto;padding-bottom:var(--sp-2)">' +
           this.DEFS.map(d => {
             const got = !!S.prog.badges[d.id];
-            return '<div style="flex-shrink:0;width:82px;text-align:center;opacity:' + (got ? 1 : 0.32) + '">' +
-              '<div style="font-size:1.5rem;color:' + (got ? 'var(--accent)' : 'var(--ink-3)') + '">' +
+            /* Locked ones fade only the icon; the name stays at full contrast so it can be read. */
+            return '<div title="' + esc(d.name) + (got ? ' (earned)' : ' (locked)') + '" style="flex-shrink:0;width:82px;text-align:center">' +
+              '<div style="font-size:1.5rem;opacity:' + (got ? 1 : 0.4) + ';color:' + (got ? 'var(--accent)' : 'var(--ink-3)') + '">' +
                 '<i class="ph ' + d.icon + '"></i></div>' +
               '<div class="t-cap" style="margin-top:2px;line-height:1.25">' + esc(d.name) + '</div>' +
             '</div>';
@@ -3017,12 +3189,13 @@ window.SYLLABUS_PROGRESS = {
    Two pools, straight sample. Deterministic per day. Loksewa scoring:
    +1 correct, −0.2 wrong, 0 skipped.
    ═══════════════════════════════════════════════════════════════════════ */
-window.SYLLABUS_MOCK = {
-  GENERAL_COUNT: 25,
-  TECH_COUNT: 50,
-  TOTAL: 75,
-  TIME_LIMIT_SEC: 60 * 60,
+window.LKS = {
+  /* The admin's mark scheme (kept from the last time the app was online), or the default 25 + 50. */
+  scheme(){ let raw = ''; try { raw = localStorage.getItem('abhyas_lscheme') || ''; } catch(e){} return normalizeLoksewaScheme(raw); },
+  minutes(){ return Math.max(10, Math.round(this.scheme().total * 0.8)); }     /* 75 marks = 60 minutes */
+};
 
+window.SYLLABUS_MOCK = {
   _dateKey(){
     const d = new Date(), p = n => String(n).padStart(2, '0');
     return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
@@ -3032,65 +3205,56 @@ window.SYLLABUS_MOCK = {
     let a = seed >>> 0;
     return function(){ a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   },
-  _shuffle(arr, rng){
-    const a = arr.slice();
-    for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
-    return a;
-  },
   _allRefs(){ return (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : []; },
-  async _pool(refs){
-    const all = [];
-    for (const ref of refs){
+  /* Every question from every chapter the scheme draws on, remembered with its level and chapter. */
+  async _pool(scheme){
+    const pool = [];
+    for (const ref of this._allRefs()){
+      if (!loksewaGroupFor(scheme, ref.lv, ref.ch)) continue;
       try {
         const raw = await QUIZ._fetch(ref.fid, ref.key);
-        const qs = normQ(raw, ref.fid);
-        for (const q of qs) all.push(q);
+        normQ(raw, ref.fid).forEach(q => pool.push({ q, lv: ref.lv, ch: ref.ch }));
       } catch(e){}
     }
-    return all;
+    return pool;
   },
+  /* The paper follows the scheme exactly: each group contributes its marks, chapters take turns inside a group,
+     and the same paper is built for everyone all day (seeded by the date). */
   async build(){
-    const rng = this._rng(this._seed());
-    const refs = this._allRefs();
-    const gkRefs = refs.filter(r => r.lv === 'gk');
-    const l7Refs = refs.filter(r => r.lv === 'level7');
-    if (!gkRefs.length && !l7Refs.length) return { papers: [] };
-    const gkPool = await this._pool(gkRefs);
-    const l7Pool = await this._pool(l7Refs);
-    const general = this._shuffle(gkPool, rng).slice(0, this.GENERAL_COUNT);
-    const tech    = this._shuffle(l7Pool, rng).slice(0, this.TECH_COUNT);
-    return { papers: general.concat(tech) };
+    const scheme = LKS.scheme();
+    const pool = await this._pool(scheme);
+    const r = composeLoksewaPaper(scheme, pool, this._rng(this._seed()));
+    return { papers: r.questions, shortfalls: r.shortfalls, scheme, total: r.total };
   },
   async start(){
-    QUIZ._showLoader('Building today\u2019s 75-mark paper\u2026');
-    let built = { papers: [] };
+    QUIZ._showLoader('Building today\u2019s ' + LKS.scheme().total + '-mark paper\u2026');
+    let built = { papers: [], shortfalls: [], total: 75 };
     try { built = await this.build(); } catch(e){}
     QUIZ._hideLoader();
     if (built.papers.length < 10){ toast('Not enough chapters cached yet. Open a few chapters in Chapters first.', 6000); return; }
-    if (built.papers.length < this.TOTAL){ toast('Running a ' + built.papers.length + '-question paper \u2014 the full 75 aren\'t available yet.', 6000); }
+    if (built.shortfalls.length){
+      toast('Short of questions for ' + built.shortfalls.map(s => s.name + ' (' + s.got + ' of ' + s.wanted + ')').join(', ') + '. Running a ' + built.papers.length + '-question paper.', 7000);
+    }
     QUIZ.startWith(
       built.papers, 'exam',
-      '\ud83d\udcdd Daily 75-mark Loksewa paper \u2014 ' + this._dateKey(),
-      { loksewaMock: true, timeLimitSec: this.TIME_LIMIT_SEC }
+      '\ud83d\udcdd Daily ' + built.total + '-mark Loksewa paper \u2014 ' + this._dateKey(),
+      { loksewaMock: true, timeLimitSec: LKS.minutes() * 60 }
     );
   },
   render(){
     const box = document.getElementById('syllabus-mock-slot');
     if (!box) return;
+    const scheme = LKS.scheme();
     const refs = this._allRefs();
-    const gkCount = refs.filter(r => r.lv === 'gk').length;
-    const l7Count = refs.filter(r => r.lv === 'level7').length;
-    if (!gkCount && !l7Count){ box.innerHTML = ''; return; }
+    if (!refs.some(r => loksewaGroupFor(scheme, r.lv, r.ch))){ box.innerHTML = ''; return; }
     box.innerHTML =
       '<section class="card" style="border-color:var(--accent-line)">' +
-        '<div class="card-hd"><h3><i class="ph ph-note-pencil"></i> Today\u2019s 75-mark Loksewa paper</h3>' +
-          '<span class="ctag ta">75 marks \u00b7 60 min</span></div>' +
+        '<div class="card-hd"><h3><i class="ph ph-note-pencil"></i> Today\u2019s ' + scheme.total + '-mark Loksewa paper</h3>' +
+          '<span class="ctag ta">' + scheme.total + ' marks \u00b7 ' + LKS.minutes() + ' min</span></div>' +
         '<p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55">' +
-          '25 marks General Knowledge, 50 marks Level 7 Civil Engineering. ' +
-          'Same paper all day; new one tomorrow. ' +
+          'Built to the syllabus mark scheme. Same paper all day; new one tomorrow. ' +
           'Loksewa scoring: <b>+1</b> correct, <b>\u22120.2</b> wrong, <b>0</b> skipped.</p>' +
-        '<div class="syl-row"><span class="syl-label">General Knowledge</span><span class="syl-marks">25</span></div>' +
-        '<div class="syl-row"><span class="syl-label">Level 7 Civil Engineering</span><span class="syl-marks">50</span></div>' +
+        scheme.groups.map(g => '<div class="syl-row"><span class="syl-label">' + esc(g.name) + '</span><span class="syl-marks">' + g.marks + '</span></div>').join('') +
         '<button class="btn btn-solid btn-blk" style="margin-top:var(--sp-3)" onclick="SYLLABUS_MOCK.start()">' +
           '<i class="ph ph-play-circle"></i> Start today\u2019s paper</button>' +
       '</section>';
@@ -3717,6 +3881,7 @@ window.WRONGBY = {
   groups(){
     const byFid = {};
     (S.wr || []).forEach(q => {
+      if (q._withdrawn) return;          /* removed from the question bank: listed in the flat list only, never practised */
       const fid = this._fidOf(q);
       const ref = this._ref(fid);
       if (!ref) return;
@@ -3755,7 +3920,7 @@ window.WRONGBY = {
   },
 
   async start(fids, dueOnly, mode){
-    let items = (S.wr || []).filter(q => fids.indexOf(this._fidOf(q)) !== -1);
+    let items = (S.wr || []).filter(q => !q._withdrawn && fids.indexOf(this._fidOf(q)) !== -1);     /* a withdrawn question is never practised */
     if (dueOnly) items = items.filter(q => this._due(q));
     if (!items.length) { toast(dueOnly ? 'Nothing due here right now.' : 'No missed questions here.'); return; }
     QUIZ._showLoader('Getting your missed questions…');
@@ -3771,7 +3936,9 @@ window.WRONGBY = {
     QUIZ._hideLoader();
     const merged = items.map(q => {
       const f = fresh[q.uid];
-      if (!f) return q;
+      /* only take the downloaded text when it really is the same question: if questions were deleted or reordered in the
+         file, the one at this position can be a different question, and the saved copy must not be swapped for it */
+      if (!f || !sameQuestionAfterCorrection(q, f, 0.6)) return q;
       return Object.assign({}, f, {
         _streak: q._streak, _nextDue: q._nextDue,
         _reason: q._reason, _misconception: q._misconception, _note: q._note
@@ -3887,6 +4054,7 @@ window.WRONGBY = {
     const dueTotal = this._last.reduce((n, c) => n + c.due, 0);
     const careless = this._last.reduce((n, c) => n + c.careless, 0);
     const concept = this._last.reduce((n, c) => n + c.concept, 0);
+    const withdrawn = (S.wr || []).filter(x => x._withdrawn).length;
 
     const head =
       '<div class="card" style="margin-bottom:var(--sp-3);background:var(--accent-soft);border-color:var(--accent-line)">' +
@@ -3900,6 +4068,7 @@ window.WRONGBY = {
               (concept ? '<i class="ph ph-book"></i> ' + concept + ' concept gap' : '') +
             '</div>'
           : '') +
+        (withdrawn ? '<div class="t-foot mt2" style="color:var(--ink-2)"><i class="ph ph-prohibit"></i> ' + withdrawn + ' withdrawn question' + (withdrawn === 1 ? '' : 's') + ' (removed from the question bank) ' + (withdrawn === 1 ? 'is' : 'are') + ' kept in the full list and left out of practice.</div>' : '') +
         (dueTotal ? '<button class="btn btn-solid btn-blk mt3" onclick="WRONGBY.dueAll()"><i class="ph ph-repeat"></i> Review all ' + dueTotal + ' due now</button>' : '') +
       '</div>';
 
@@ -3926,7 +4095,7 @@ window.WRONGBY = {
         '</div>' +
         files +
       '</div>';
-    }).join('') + '<button class="btn btn-quiet btn-blk" onclick="WRONGBY._plain(\'wr\')">Show the old flat list</button>';
+    }).join('') + '<button class="btn btn-quiet btn-blk" onclick="WRONGBY._plain(\'wr\')">Show every question (to report or remove one)</button>';
   }
 };
 

@@ -12,6 +12,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 let PASS = 0, FAIL = 0;
+const PENDING = [];   /* async test groups: the summary waits for these */
 const FAILURES = [];
 
 function pass(msg) { PASS++; console.log('  ✓ ' + msg); }
@@ -200,7 +201,7 @@ group('v1.20 markers');
   ['user-page.js',  'window.WRONGBY'],
   ['user-page.js',  'window.HEATMAP'],
   ['user-page.js',  'window.HARDQ'],
-  ['objective.js',  'LOKSEWA_GROUPS'],
+  ['objective.js',  'loksewaGroupRows'],
   ['admin.html',   'const SUBJ_HOURLY'],
   ['gas/code.gs',  'getHardQuestionsCache_']
 ].forEach(([f, marker]) => {
@@ -313,35 +314,105 @@ group('Student MODAL API');
 
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Behaviour: progress sync payload stays under the server limit (45,000)
+   SYNC MUST NEVER REMOVE DATA. It only adds, and the result is the combined copy.
+   (A merge that started from a size-trimmed copy once cut a bank of 250 missed
+   questions down to 21 on the device. These tests load the real PSYNC code.)
    ═══════════════════════════════════════════════════════════════════════ */
-group('Progress sync payload');
-(function syncTests(){
-  const src = readFile('app.js');
-  if (!src) { fail('app.js missing'); return; }
-  const start = src.indexOf('const PSYNC = {');
+group('Sync never removes data');
+PENDING.push((async function syncSafetyTests(){
+  const vm = require('vm');
+  const app = readFile('app.js') || '';
+  const start = app.indexOf('const PSYNC = {');
   if (start === -1) { fail('PSYNC not found'); return; }
   let depth = 0, end = -1;
-  for (let i = src.indexOf('{', start); i < src.length; i++) {
-    if (src[i] === '{') depth++;
-    else if (src[i] === '}' && --depth === 0) { end = i + 1; break; }
-  }
-  const notes = {};
-  for (let i = 0; i < 4000; i++) notes['q' + i] = 'note text number ' + i + ' '.repeat(20);
-  const store = { abhyas_qnotes: JSON.stringify(notes), abhyas_sprint_start: '2026-10-01' };
-  const S = { prog: { sessions: [] }, chapStats: {}, cov: {}, bk: [], fl: [], wr: [], stk: {} };
-  let P;
-  try {
-    P = new Function('S', 'localStorage', src.slice(start, end) + '; return PSYNC;')(S, { getItem: k => store[k] || null });
-  } catch (e) { fail('could not load PSYNC: ' + e.message); return; }
-  const json = P._syncPayload();
-  json.length <= 45000 ? pass('huge notes are trimmed to fit (' + json.length + ' chars)') : fail('payload too large: ' + json.length);
-  let parsed; try { parsed = JSON.parse(json); } catch (e) { fail('payload is not valid JSON'); return; }
-  parsed.sprint === '2026-10-01' ? pass('sprint start date is synced') : fail('sprint start missing from payload');
-  const kept = Object.keys(parsed.qnotes);
-  (kept.length > 0 && kept[kept.length - 1] === 'q3999') ? pass('newest notes are kept, oldest dropped') : fail('wrong notes were dropped');
-})();
+  for (let i = app.indexOf('{', start); i < app.length; i++) { if (app[i] === '{') depth++; else if (app[i] === '}' && --depth === 0) { end = i + 1; break; } }
+  const sharedCtx = { window: { addEventListener(){}, removeEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} }, console, btoa, atob, Response, Blob, TextEncoder, TextDecoder, CompressionStream, DecompressionStream, Uint8Array, String };
+  vm.runInNewContext(readFile('shared.js') + '\nthis.mergeSyncData=mergeSyncData;this.syncEncode=syncEncode;this.syncDecode=syncDecode;', sharedCtx);
 
+  const mk = (n, p) => Array.from({ length: n }, (_, i) => ({ uid: p + i, q: 'A fairly long civil engineering question number ' + i + ' about soil bearing capacity and settlement of footings?', options: ['Option one is this long sentence', 'Option two is that long sentence', 'Option three another long one', 'Option four final long sentence'], exp: 'Explanation text explaining the reasoning so the stored item has a realistic size.', _streak: i % 3, _nextDue: 1760000000000 + i * 1000 }));
+  function world(opts) {
+    const store = {}; if (opts.notes) store.abhyas_qnotes = JSON.stringify(opts.notes);
+    const S = { user: { username: 'Sita', token: 't' }, online: true, forcedOffline: false, prog: opts.prog || { total: 100, correct: 60, sessions: [] }, chapStats: {}, cov: {}, bk: opts.bk || [], fl: opts.fl || [], wr: opts.wr || [], stk: { days: [], last: '' } };
+    const LS = { PROG: 'p', CHAPSTATS: 'c', COV: 'v', BK: 'b', FL: 'f', WR: 'w', STK: 's' };
+    const sent = []; const toasts = [];
+    const netFetch = async (url, o) => { const b = JSON.parse(o.body); sent.push(b); return { json: async () => opts.reply(b) }; };
+    const env = { S, LS, _save: (k, v) => { store[k] = JSON.stringify(v); }, localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+      mergeSyncData: sharedCtx.mergeSyncData, syncEncode: sharedCtx.syncEncode, syncDecode: sharedCtx.syncDecode, toast: m => toasts.push(m), netFetch, APPS: 'x',
+      document: { getElementById(){ return null; } }, HOME: { render(){}, updateBadges(){} }, PROG: { render(){} }, navigator: {}, Blob, setTimeout: () => 0, clearTimeout(){}, console, JSON, Date, Object, Array, Math, Number, String, Set };
+    const P = new Function(...Object.keys(env), app.slice(start, end) + '; return PSYNC;')(...Object.values(env));
+    return { P, S, store, sent, toasts };
+  }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const small = JSON.stringify({ prog: { total: 10, correct: 5, sessions: [] }, wr: [{ uid: 'r_1', q: 'x' }], bk: [], fl: [], stk: { days: ['2026-10-01'], last: '2026-10-01' }, cov: {}, chapStats: {}, qnotes: {} });
+
+  /* 1. the exact failure: a large bank meets a small cloud copy */
+  let w = world({ wr: mk(250, 'w_'), bk: mk(60, 'b_'), fl: mk(20, 'f_'), reply: () => ({ success: true }) });
+  let out = await w.P.mergeIn(small, 'test');
+  eq('250 missed questions + 1 from the cloud = 251 (was 21)', [out.ok, w.S.wr.length], [true, 251]);
+  eq('60 saved questions are all kept (was cut to 20)', w.S.bk.length, 60);
+  eq('20 flagged questions are all kept', w.S.fl.length, 20);
+  eq('what is written to the device matches', JSON.parse(w.store.w).length, 251);
+  eq('the study day from the other copy is added', w.S.stk.days, ['2026-10-01']);
+
+  /* 2. the cloud copy is the COMPLETE state, never cut down */
+  const full = w.P._fullLocal();
+  eq('nothing is trimmed from the device state', [full.wr.length, full.bk.length, full.fl.length], [251, 60, 20]);
+  const enc = await sharedCtx.syncEncode(JSON.stringify(full), 44000);
+  eq('a big bank still fits the cloud cell (compressed)', enc !== null && enc.length <= 44000 && enc.indexOf('gz1:') === 0, true);
+  eq('and comes back complete', (await sharedCtx.syncDecode(enc)).wr.length, 251);
+
+  /* 3. conflict while saving: the other device's copy is ADDED, then the combined copy is saved */
+  w = world({ wr: mk(250, 'w_'), reply: b => (b.baseUpdatedAt === '' ? { success: false, conflict: true, data: small, updatedAt: '2026-10-03T10:00:00.000Z' } : { success: true, updatedAt: '2026-10-03T10:00:05.000Z' }) });
+  await w.P.pushNow();
+  eq('after a save conflict this device still has all 250 plus the other copy', w.S.wr.length, 251);
+  eq('two requests were made: the first rejected, the second with the combined copy', w.sent.length, 2);
+  const pushed = await sharedCtx.syncDecode(w.sent[1].data);
+  eq('the combined copy that was uploaded holds all 251', pushed.wr.length, 251);
+  eq('the reply told the user nothing was removed', w.toasts.some(t => /Nothing was removed/.test(t)), true);
+
+  /* 4. "Restore" adds; it never replaces */
+  w = world({ wr: mk(5, 'mine_'), bk: mk(3, 'mb_'), reply: () => ({ success: true, data: JSON.stringify({ wr: mk(3, 'cloud_'), bk: [], fl: [], prog: { total: 0, correct: 0, sessions: [] }, stk: { days: [], last: '' } }), updatedAt: '2026-10-03T10:00:00.000Z' }) });
+  await w.P.forceRestore();
+  eq('restore: 5 on the device + 3 from the cloud = 8', w.S.wr.length, 8);
+  eq('restore leaves the saved questions alone', w.S.bk.length, 3);
+  w = world({ wr: [], prog: { total: 0, correct: 0, sessions: [] }, reply: () => ({ success: true, data: JSON.stringify({ wr: mk(4, 'cloud_'), bk: mk(2, 'cb_'), fl: [], prog: { total: 50, correct: 30, sessions: [] }, stk: { days: [], last: '' } }), updatedAt: '2026-10-03T10:00:00.000Z' }) });
+  await w.P.pullIfEmpty();
+  eq('a fresh device gets the cloud copy', [w.S.wr.length, w.S.bk.length, w.S.prog.total], [4, 2, 50]);
+
+  /* 5. a merge that would remove anything is refused */
+  w = world({ wr: mk(10, 'w_'), reply: () => ({ success: true }) });
+  eq('the safety check refuses a smaller result', w.P._mergeKeepsEverything({ wr: mk(10, 'a'), bk: [], fl: [], qnotes: {}, prog: { total: 5, correct: 1, sessions: [] } }, { wr: mk(9, 'a'), bk: [], fl: [], qnotes: {}, prog: { total: 5, correct: 1, sessions: [] } }), false);
+  eq('and a lower running total', w.P._mergeKeepsEverything({ wr: [], bk: [], fl: [], qnotes: {}, prog: { total: 5, correct: 1, sessions: [] } }, { wr: [], bk: [], fl: [], qnotes: {}, prog: { total: 4, correct: 1, sessions: [] } }), false);
+  eq('and accepts a result that only adds', w.P._mergeKeepsEverything({ wr: mk(2, 'a'), bk: [], fl: [], qnotes: {}, prog: { total: 5, correct: 1, sessions: [] } }, { wr: mk(3, 'a'), bk: [], fl: [], qnotes: {}, prog: { total: 9, correct: 2, sessions: [] } }), true);
+  w = world({ wr: mk(10, 'w_'), reply: () => ({ success: true }) });
+  out = await w.P.mergeIn('{not json', 'x');
+  eq('an unreadable cloud copy changes nothing', [out.ok, w.S.wr.length], [false, 10]);
+
+  /* 6. safety copies: taken before every change, newest 3 kept, only for the signed-in student */
+  w = world({ wr: mk(7, 'w_'), reply: () => ({ success: true }) });
+  await w.P.mergeIn(small, 'one'); w.S.wr.push({ uid: 'x1' }); await w.P.mergeIn(small, 'two'); w.S.wr.push({ uid: 'x2' }); await w.P.mergeIn(small, 'three'); w.S.wr.push({ uid: 'x3' }); await w.P.mergeIn(small, 'four');
+  const snaps = w.P.listSnapshots();
+  eq('only the newest 3 safety copies are kept', snaps.length, 3);
+  eq('the oldest copy (reason "one") was dropped, newest first', snaps.map(x => x.reason), ['four', 'three', 'two']);
+  eq('a safety copy holds what the device had just before that change (7 + 1 from the cloud + 1 added = 9)', snaps[2].counts.wr, 9);
+  w.S.user = { username: 'Someone Else', token: 't' };
+  eq('another student never sees them', w.P.listSnapshots().length, 0);
+  w.S.user = { username: 'sita', token: 't' };
+  eq('the same student in different capitals does', w.P.listSnapshots().length, 3);
+  const rec = await w.P.recoverSnapshot(2);
+  eq('recovering a copy only adds', rec.ok && w.S.wr.length >= 8, true);
+
+  /* 7. page closing: a copy that does not fit is never cut down and sent */
+  w = world({ wr: mk(250, 'w_'), reply: () => ({ success: true }) });
+  w.P._beaconSync();
+  eq('no cut-down copy is sent when the page closes', w.sent.length, 0);
+
+  /* 8. a payload that cannot fit even compressed is not sent, and nothing is lost */
+  w = world({ wr: Array.from({ length: 400 }, (_, i) => ({ uid: 'r' + i, q: require('crypto').randomBytes(300).toString('base64') })), reply: () => ({ success: true }) });
+  await w.P.pushNow();
+  eq('an over-large copy is not uploaded', w.sent.length, 0);
+  eq('and the device still has every item', w.S.wr.length, 400);
+})());
 
 /* ═══════════════════════════════════════════════════════════════════════
    Behaviour: two-device progress merge (shared.js mergeSyncData)
@@ -595,7 +666,7 @@ group('Weekly negative marking');
   eq('correct is capped at the total', f(99, 0, 10).marks, 10);
   eq('raw percentage is no longer used for weekly rankings', /const pct = total \? \(correct \/ total\) \* 100 : 0;\s*\n\s*scores\.push/.test(src), false);
   const obj = readFile('objective.js') || '';
-  eq('daily Loksewa paper headline is negative-marked too', /isWeekly \|\| isLoksewaPaper/.test(obj), true);
+  eq('weekly, daily and hourly headlines are negative-marked', /const isLoksewa = isLoksewaFormat\(S\.quiz\.scope\)/.test(obj), true);
 })();
 
 
@@ -653,13 +724,15 @@ group('Study PDFs backend');
 (function studyDocTests(){
   const src = readFile('gas/code.gs') || '';
   const grab = re => { const m = src.match(re); return m ? m[0] : ''; };
-  const code = grab(/const STUDYDOC_CATEGORIES\s*=\s*\[[^\]]*\];/) + '\n' + grab(/function normalizeStudyDocMeta_[\s\S]*?\n}\n/) + '\n' +
+  const code = grab(/function sanitizeSheetField_[\s\S]*?\n}\n/) + '\n' + grab(/const STUDYDOC_CATEGORIES\s*=\s*\[[^\]]*\];/) + '\n' + grab(/function normalizeStudyDocMeta_[\s\S]*?\n}\n/) + '\n' +
     grab(/function rowToStudyDoc_[\s\S]*?\n}\n/) + '\n' + grab(/function sortStudyDocs_[\s\S]*?\n}\n/) +
     '\nreturn {norm: normalizeStudyDocMeta_, row: rowToStudyDoc_, sort: sortStudyDocs_, cats: STUDYDOC_CATEGORIES};';
   let f; try { f = new Function(code)(); } catch (e) { fail('study-doc helpers failed to load: ' + e.message); return; }
   const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 
   eq('an upload without a title is rejected', !!f.norm({ title: '   ' }, true).error, true);
+  eq('a title that looks like a spreadsheet formula is neutralised', f.norm({ title: '=HYPERLINK("http://x")' }, true).value.title.charAt(0), "'");
+  eq('so is a description', f.norm({ title: 'A', description: '+cmd' }, true).value.description.charAt(0), "'");
   eq('an unknown category is rejected', !!f.norm({ title: 'A', category: 'virus' }, true).error, true);
   eq('category defaults to model-answer', f.norm({ title: 'A' }, true).value.category, 'model-answer');
   eq('category is case-insensitive', f.norm({ title: 'A', category: 'NOTES' }, true).value.category, 'notes');
@@ -786,13 +859,385 @@ group('Study PDFs chapter links');
   eq('hiding or showing a PDF keeps its chapter', /chapterId: d\.chapterId, description: d\.description, sortOrder: d\.sortOrder, status/.test(adm), true);
 })();
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Backend authentication audit. Every action the dispatcher accepts must
+   call authUser_ / checkAdminCan_ / checkAdmin_ itself, except this short
+   list of public ones. A new endpoint cannot be added by accident without
+   either a check or a deliberate edit to this list.
+   ═══════════════════════════════════════════════════════════════════════ */
+group('Backend authentication audit');
+(function authAudit(){
+  const src = readFile('gas/code.gs') || '';
+  const PUBLIC = ['login', 'googlelogin', 'signup', 'logclienterror', 'requestpasswordreset', 'resetpassword', 'getpublicinfo', 'getsettings', 'adminlogin'];
+  const cases = [...src.matchAll(/case "([a-z]+)":\s*result = (\w+)\(/g)].map(m => ({ action: m[1], fn: m[2] }));
+  cases.length > 60 ? pass(cases.length + ' backend actions found') : fail('could not read the dispatcher');
+  const body = name => { const i = src.indexOf('function ' + name + '('); if (i < 0) return ''; let d = 0, j = src.indexOf('{', i); const st = j; for (; j < src.length; j++) { if (src[j] === '{') d++; else if (src[j] === '}' && --d === 0) break; } return src.slice(st, j + 1); };
+  const DIRECT = /\b(authUser_|checkAdminCan_|checkAdmin_)\s*\(/;
+  const open = cases.filter(c => PUBLIC.indexOf(c.action) === -1 && !DIRECT.test(body(c.fn))).map(c => c.action + ' -> ' + c.fn);
+  open.length === 0 ? pass('every non-public action checks who is calling') : open.forEach(o => fail('action without an auth check: ' + o));
+  const stale = PUBLIC.filter(a => !cases.some(c => c.action === a));
+  stale.length === 0 ? pass('the public list matches real actions') : fail('public list names missing actions: ' + stale.join(', '));
+  /* Self-service actions: any signed-in admin acts on their OWN account only, so they use
+     checkAdmin_ on purpose (checkAdminCan_ would also block the forced first-login password change). */
+  const SELF = ['adminswitchfromuser', 'adminchangepassword', 'adminlistadmins'];
+  const adminNoPerm = cases.filter(c => /^admin/.test(c.action) && PUBLIC.indexOf(c.action) === -1 && SELF.indexOf(c.action) === -1 && !/checkAdminCan_/.test(body(c.fn))).map(c => c.action);
+  adminNoPerm.length === 0 ? pass('every other admin action checks a specific permission') : fail('admin actions without a permission check: ' + adminNoPerm.join(', '));
+  const cp = body('adminChangePassword');
+  /verifyPassword_\(currentPassword/.test(cp) && /findAdminRow_\(sheet, actor\)/.test(cp)
+    ? pass('changing an admin password needs the current password and only touches your own account') : fail('adminChangePassword is not limited to the caller or skips the current password');
+  const la = body('adminListAdmins');
+  /!isOwner && uname\.toLowerCase\(\) !== actor\.toLowerCase\(\)\) continue/.test(la)
+    ? pass('non-owners only see their own row in the admin list') : fail('adminListAdmins shows every admin to non-owners');
+  const sw = body('adminSwitchFromUser');
+  /authUser_|checkSession|token/.test(sw) ? pass('the student-to-admin switch verifies the student session') : fail('adminSwitchFromUser does not verify the session');
+  const postOnly = (src.match(/const POST_ONLY_ACTIONS = \{([\s\S]*?)\};/) || [])[1] || '';
+  ['login', 'googlelogin', 'signup', 'resetpassword', 'adminlogin'].every(a => new RegExp('\\b' + a + ':').test(postOnly)) ? pass('credential actions are POST-only') : fail('a credential action can be sent by GET');
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Colour contrast of the theme tokens (WCAG AA: 4.5:1 for normal text).
+   Checked from the CSS itself, so no browser is needed. A real-browser axe
+   audit of every screen found no violations at v1.32; this keeps the tokens
+   from drifting back.
+   ═══════════════════════════════════════════════════════════════════════ */
+group('Colour contrast');
+(function contrastTests(){
+  const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const tokensOf = (html, theme) => {
+    const out = {};
+    const blocks = [...html.matchAll(/(:root[^{}]*|\.dark[^{}]*)\{([^{}]*)\}/g)];
+    const apply = sel => blocks.filter(b => sel(b[1].trim())).forEach(b => { for (const m of b[2].matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\b/g)) out[m[1]] = m[2]; });
+    if (theme === 'dark') { apply(sel => sel === ':root' ); apply(sel => /^\.dark\b/.test(sel) || /^:root\.dark\b/.test(sel)); }
+    else { apply(sel => sel === ':root'); apply(sel => sel === ':root:not(.dark)'); }
+    return out;
+  };
+  const bad = [], checked = [];
+  [['user.html'], ['admin.html'], ['index.html']].forEach(([f]) => {
+    const html = readFile(f) || '';
+    ['light', 'dark'].forEach(theme => {
+      const t = tokensOf(html, theme);
+      const bgs = ['--bg', '--surface', '--bg-sunken'].filter(k => t[k]);
+      ['--ink', '--ink-2', '--ink-3'].forEach(ink => {
+        if (!t[ink]) return;
+        bgs.forEach(bg => { const r = ratio(t[ink], t[bg]); checked.push(1); if (r < 4.5) bad.push(`${f} ${theme}: ${ink} ${t[ink]} on ${bg} ${t[bg]} = ${r.toFixed(2)}`); });
+      });
+      if (t['--on-accent'] && t['--accent']) { const r = ratio(t['--on-accent'], t['--accent']); checked.push(1); if (r < 4.5) bad.push(`${f} ${theme}: button text ${t['--on-accent']} on accent ${t['--accent']} = ${r.toFixed(2)}`); }
+      if (theme === 'dark' && t['--accent'] && t['--surface']) { const r = ratio(t['--accent'], t['--surface']); checked.push(1); if (r < 4.5) bad.push(`${f} dark: accent text on surface = ${r.toFixed(2)}`); }
+      /* status colours as text on their own tinted banner (the tint is rgba in the dark theme, so it is composited over the surface) */
+      const rgba = (name) => { const m = (html.match(new RegExp(name + '\\s*:\\s*rgba\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)\\)', 'g')) || []).pop(); if (!m) return null; const n = m.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/); return n ? [+n[1], +n[2], +n[3], +n[4]] : null; };
+      const over = (c, bgHex) => '#' + [0, 1, 2].map(i => Math.round(c[3] * c[i] + (1 - c[3]) * parseInt(bgHex.slice(1 + i * 2, 3 + i * 2), 16)).toString(16).padStart(2, '0')).join('');
+      ['danger', 'warning', 'success', 'violet'].forEach(k => {
+        const fg = t['--' + k + '-ink'] || t['--' + k]; if (!fg) return;
+        let soft = t['--' + k + '-soft'];
+        /* in the dark theme the tint is declared as rgba(), which the hex reader above skipped, so a light-theme hex may have been inherited: prefer the rgba tint */
+        if (theme === 'dark') { const c = rgba('--' + k + '-soft'); if (c && t['--surface']) soft = over(c, t['--surface']); }
+        if (!soft) return;
+        const r = ratio(fg, soft); checked.push(1);
+        if (r < 4.5) bad.push(`${f} ${theme}: ${k} text ${fg} on its tinted background ${soft} = ${r.toFixed(2)}`);
+      });
+      if (theme === 'light' && t['--accent-ink'] && t['--accent-soft']) { const r = ratio(t['--accent-ink'], t['--accent-soft']); checked.push(1); if (r < 4.5) bad.push(`${f} light: tinted-button text = ${r.toFixed(2)}`); }
+    });
+  });
+  checked.length > 30 ? pass(checked.length + ' text/background pairs checked across 3 pages x 2 themes') : fail('contrast test read too few tokens (' + checked.length + ')');
+  bad.length === 0 ? pass('every text token meets 4.5:1 on its backgrounds') : bad.forEach(b => fail('low contrast: ' + b));
+
+  const adm = readFile('js/core/admin-nav.js') || '';
+  /aria-label="' \+ esc\(it\.label\)/.test(adm) ? pass('icon-only admin rail buttons carry an accessible name') : fail('admin rail buttons have no aria-label');
+  const index = readFile('index.html') || '';
+  /\.foot a/.test(index) && /text-decoration:underline/.test(index) ? pass('links inside sentences are underlined') : fail('in-text links rely on colour alone');
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Offline: the service worker precaches only what is on its SHELL list. A page
+   that loads a script missing from that list breaks offline after a first
+   visit (user-page.js, the biggest student script, was missing).
+   ═══════════════════════════════════════════════════════════════════════ */
+group('Offline precache');
+(function shellTests(){
+  const sw = readFile('sw.js') || '';
+  const block = (sw.match(/const SHELL\s*=\s*\[([\s\S]*?)\n\];/) || [])[1] || '';
+  const shell = new Set([...block.matchAll(/'\.\/([^']+)'/g)].map(m => m[1]));
+  shell.size > 30 ? pass('the SHELL lists ' + shell.size + ' files') : fail('could not read SHELL');
+  const missing = [];
+  ['index.html', 'user.html', 'privacy.html', 'terms.html'].forEach(page => {
+    const html = (readFile(page) || '').replace(/<!--[\s\S]*?-->/g, '');
+    for (const m of html.matchAll(/<(?:script|link|img|source)\b[^>]*?\b(?:src|href)="([^"]+)"/gi)) {
+      const u = m[1];
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#|data:)/i.test(u)) continue;
+      const clean = u.split('#')[0].split('?')[0].replace(/^\.\//, '');
+      if (!clean || clean.endsWith('/') || /\.html$/.test(clean)) continue;
+      if (!shell.has(clean)) missing.push(page + ' loads ' + clean);
+    }
+  });
+  missing.length === 0 ? pass('every script, stylesheet and image the public pages load is precached') : missing.forEach(m => fail('not in the offline cache: ' + m));
+  /admin/.test(block) && /admin\.html'/.test(block) ? fail('admin.html must never be precached') : pass('admin.html is kept out of the offline cache');
+  /admin-nav\.js/.test(block) ? fail('admin-only script must not be precached') : pass('admin-only scripts are kept out of the offline cache');
+})();
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Apps Script: all .gs files share ONE global scope. A name defined twice
+   (a function in two files, or twice in one) silently overrides the first.
+   ═══════════════════════════════════════════════════════════════════════ */
+group('Apps Script global names');
+(function gasNames(){
+  const files = ['code.gs', 'setup.gs', 'private-files.gs', 'content-index.gs', 'debug.gs'];
+  const seen = {}; const dups = [];
+  files.forEach(f => {
+    const src = readFile('gas/' + f) || '';
+    for (const m of src.matchAll(/^(?:function\s+([A-Za-z_$][\w$]*)|(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=)/gm)) {
+      const name = m[1] || m[2];
+      if (seen[name]) dups.push(`${name} (${seen[name]} and ${f})`); else seen[name] = f;
+    }
+  });
+  Object.keys(seen).length > 300 ? pass(Object.keys(seen).length + ' global names across 5 files') : fail('could not read the .gs files');
+  dups.length === 0 ? pass('no global name is defined twice') : dups.forEach(d => fail('defined twice: ' + d));
+})();
+
+
+group('Backend: cloud copy rules');
+(function cloudRuleTests(){
+  const src = readFile('gas/code.gs') || '';
+  const grab = re => { const m = src.match(re); return m ? m[0] : ''; };
+  const code = grab(/const PROGRESS_HISTORY_MIN_GAP_MS\s*=\s*[^;]+;/) + '\n' + grab(/const PROGRESS_GZ_PREFIX\s*=\s*"[^"]+";/) + '\n' +
+    grab(/function isAcceptableProgressData_[\s\S]*?\n}\n/) + '\n' + grab(/function shouldArchiveProgress_[\s\S]*?\n}\n/) + '\nreturn {ok: isAcceptableProgressData_, arch: shouldArchiveProgress_};';
+  let f; try { f = new Function(code)(); } catch (e) { fail('cloud rule helpers failed to load: ' + e.message); return; }
+  const eq = (n, got, want) => got === want ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  eq('plain JSON is accepted', f.ok('{"wr":[]}'), true);
+  eq('a compressed copy is accepted', f.ok('gz1:H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTVWqBQBnqZ0nGQAAAA=='), true);
+  eq('text that is neither is refused', f.ok('hello'), false);
+  eq('a "gz1:" copy with junk characters is refused', f.ok('gz1:<script>alert(1)</script>xxxxxxxxxx'), false);
+  eq('an empty "gz1:" copy is refused', f.ok('gz1:'), false);
+  eq('empty is refused', f.ok(''), false);
+
+  const big = 'x'.repeat(1000), HOUR = 3600e3;
+  eq('the first replaced copy is always kept', f.arch(big, 10 * HOUR, big + 'y', '', 0), true);
+  eq('a copy only minutes after the newest kept one is not kept again', f.arch(big, 10 * HOUR + 5 * 60e3, big + 'y', 'older' + big, 10 * HOUR), false);
+  eq('a copy 30+ minutes after the newest kept one is kept', f.arch(big, 11 * HOUR, big + 'y', 'older' + big, 10 * HOUR), true);
+  eq('a copy about to be replaced by a much smaller one is kept, even if recent', f.arch(big, 10 * HOUR + 60e3, 'x'.repeat(300), 'older' + big, 10 * HOUR), true);
+  eq('the same copy is never stored twice', f.arch(big, 12 * HOUR, big + 'y', big, 10 * HOUR), false);
+  eq('tiny placeholder copies are ignored', f.arch('{}', 12 * HOUR, '{"a":1}', '', 0), false);
+
+  eq('saving archives the old copy BEFORE overwriting it', /_archivePreviousProgress_\(username, found\.row\[1\], found\.row\[2\], dataStr\);\s*\n\s*sheet\.getRange\(found\.rowIndex, 2, 1, 2\)/.test(src), true);
+  eq('a failing archive can never block a save', /function _archivePreviousProgress_[\s\S]*?catch \(e\) \{/.test(src), true);
+  eq('history endpoint is wired and asks who is calling', /case "getprogresshistory"/.test(src) && /function getProgressHistory\(p\) \{\s*const auth = authUser_\(p\);/.test(src), true);
+  eq('the history sheet is deleted with the account', /PROGRESS_HISTORY_SHEET, getProgressHistorySheet_/.test(src), true);
+})();
+
+
+group('Question corrections (pure rules)');
+(function correctionRuleTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){}, removeEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} }, console };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.m=matchCorrectedQuestion;this.l=applyCorrectionsToList;this.sim=qSimilarity;this.sec=reportSection;this.ch=questionContentChanged;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const Q = (i, text, correct, extra) => Object.assign({ uid: 'F_' + i, fileId: 'F', q: text, options: ['a', 'b', 'c', 'd'], correct, explanation: '' }, extra || {});
+  const T = ['Bearing capacity of a shallow footing depends on which soil property', 'The unit weight of water in kN per cubic metre is', 'Poisson ratio of concrete usually lies between', 'Slump test measures the workability of fresh concrete'];
+
+  /* 1. the answer key was corrected */
+  const fresh = [Q(0, T[0], 1), Q(1, T[1], 2), Q(2, T[2], 3), Q(3, T[3], 0)];
+  const saved = Q(1, T[1], 0, { _streak: 2, _nextDue: 777, tag: 'formula', _note: 'mine' });
+  let r = ctx.l([saved], 'F', fresh, 5000);
+  eq('a corrected answer replaces the old one in a saved copy', r.list[0].correct, 2);
+  eq('and the saved copy is counted as updated', [r.updated, r.moved, r.withdrawn], [1, 0, 0]);
+  eq('review progress is kept (streak, due date, tag, note)', [r.list[0]._streak, r.list[0]._nextDue, r.list[0].tag, r.list[0]._note], [2, 777, 'formula', 'mine']);
+  eq('it is marked as corrected so the student can be told', r.list[0]._corrected, 5000);
+  eq('the original list is not modified', saved.correct, 0);
+
+  /* 2. a typo fix in the question text still matches */
+  r = ctx.l([Q(0, 'Bearing capacity of a shalow footing depends on which soil property', 1)], 'F', fresh, 1);
+  eq('a small text fix is still the same question', [r.list[0].q, r.withdrawn], [T[0], 0]);
+
+  /* 3. questions inserted before it: found where it moved to */
+  const shifted = [Q(0, 'A brand new question about retaining walls and earth pressure', 0), Q(1, T[0], 1), Q(2, T[1], 2)];
+  r = ctx.l([Q(0, T[0], 3), Q(1, T[1], 0)], 'F', shifted, 1);
+  eq('a question that moved is found at its new place', r.list.map(x => x.uid + ':' + x.correct), ['F_1:1', 'F_2:2']);
+  eq('moves are counted', r.moved, 2);
+
+  /* 4. a different question at the same position is never overwritten */
+  r = ctx.l([Q(1, 'Which admixture is used to delay the setting of cement', 1)], 'F', [Q(0, T[0], 1), Q(1, T[1], 2)], 1);
+  eq('a saved question that is no longer in the file is marked withdrawn, not deleted', [r.list.length, r.list[0]._withdrawn, r.list[0].q], [1, true, 'Which admixture is used to delay the setting of cement']);
+  eq('and it keeps its old content', r.list[0].correct, 1);
+
+  /* 5. two saved copies that now point at one question are merged, nothing else is dropped */
+  r = ctx.l([Q(0, T[0], 3), Q(5, T[0], 3), Q(2, T[2], 0)], 'F', [Q(0, T[0], 1), Q(1, 'x', 0), Q(2, T[2], 3)], 1);
+  eq('duplicates collapse to one', r.list.map(x => x.uid), ['F_0', 'F_2']);
+  eq('and are counted', r.merged, 1);
+
+  /* 6. other files and bad downloads */
+  const other = Q(0, T[0], 3, { uid: 'G_0', fileId: 'G' });
+  eq('questions from other files are untouched', ctx.l([other], 'F', fresh, 1).list[0], other);
+  eq('an empty download changes nothing', ctx.l([saved], 'F', [], 1).list[0], saved);
+  eq('a failed download (not a list) changes nothing', ctx.l([saved], 'F', null, 1).list[0], saved);
+  const many = [0, 1, 2, 3, 4].map(i => Q(i, 'Some question number ' + i + ' about footings and piles', 0));
+  r = ctx.l(many, 'F', [Q(0, 'completely unrelated words here', 0)], 1);
+  eq('if most saved questions "vanish" it is treated as a bad download and nothing is marked', r.withdrawn, 0);
+
+  /* 7. weekly papers must keep their length so answers line up */
+  r = ctx.l([Q(0, T[0], 3), Q(5, T[0], 3)], 'F', [Q(0, T[0], 1)], 1, { keepAll: true });
+  eq('keepAll never merges or drops', r.list.length, 2);
+
+  /* 8. helpers */
+  eq('identical text is fully similar, unrelated text is not', [ctx.sim('a b c', 'a b c'), ctx.sim('a b c', 'x y z')], [1, 0]);
+  eq('empty text is never similar', ctx.sim('', 'a'), 0);
+  eq('Nepali text is compared too', ctx.sim('\u0928\u0947\u092a\u093e\u0932 \u0915\u094b \u0930\u093e\u091c\u0927\u093e\u0928\u0940', '\u0928\u0947\u092a\u093e\u0932 \u0915\u094b \u0930\u093e\u091c\u0927\u093e\u0928\u0940') , 1);
+  eq('only content changes count', [ctx.ch(Q(0, 'a', 1), Q(0, 'a', 1)), ctx.ch(Q(0, 'a', 1), Q(0, 'a', 2))], [false, true]);
+  eq('section: weekly, daily paper, hourly, exam, practice', [ctx.sec({ weeklyId: 'w' }, 'exam'), ctx.sec({ loksewaMock: true }, 'exam'), ctx.sec({ hourlySprint: true }, 'exam'), ctx.sec({}, 'exam'), ctx.sec({}, 'flashcard')], ['weekly', 'daily-paper', 'hourly', 'exam', 'practice']);
+  eq('section: results and review lists come from where the report was opened', [ctx.sec({}, 'exam', 'results'), ctx.sec(null, null, 'review-missed')], ['results', 'review-missed']);
+})();
+
+group('Question reports (backend rules)');
+(function reportRuleTests(){
+  const src = readFile('gas/code.gs') || '';
+  const grab = re => { const m = src.match(re); return m ? m[0] : ''; };
+  const code = grab(/function sanitizeSheetField_[\s\S]*?\n}\n/) + '\n' + grab(/const QREPORT_SECTIONS\s*=\s*\[[^\]]*\];/) + '\n' + grab(/function normalizeReportPayload_[\s\S]*?\n}\n/) + '\n' +
+    grab(/function updateCorrectionsMap_[\s\S]*?\n}\n/) + '\n' + grab(/function correctionsSince_[\s\S]*?\n}\n/) + '\nreturn {norm: normalizeReportPayload_, upd: updateCorrectionsMap_, since: correctionsSince_};';
+  let f; try { f = new Function(code)(); } catch (e) { fail('report helpers failed to load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const ok = { uid: 'FILE123_7', reason: 'wrong_answer', questionSnapshot: 'What?', optionsSnapshot: ['a', 'b', 'c', 'd'], correctIndex: 2, chosenIndex: 1, section: 'weekly', appVersion: '1.32' };
+  const r = f.norm(ok).value;
+  eq('a full report keeps the options, the marked answer, the student pick and the section', [r.fileId, JSON.parse(r.optionsSnapshot), r.correctIndex, r.chosenIndex, r.section], ['FILE123', ['a', 'b', 'c', 'd'], 2, 1, 'weekly']);
+  eq('an old app (no extra fields) still works', [!!f.norm({ uid: 'F_1', reason: 'typo' }).value, f.norm({ uid: 'F_1', reason: 'typo' }).value.section, f.norm({ uid: 'F_1', reason: 'typo' }).value.chosenIndex], [true, 'other', '']);
+  eq('a missing question reference is refused', !!f.norm({ reason: 'typo' }).error, true);
+  eq('a reference with odd characters is refused', !!f.norm({ uid: 'F_1<script>', reason: 'typo' }).error, true);
+  eq('an unknown reason is refused', !!f.norm({ uid: 'F_1', reason: 'spam' }).error, true);
+  eq('an unknown section becomes "other"', f.norm({ uid: 'F_1', reason: 'typo', section: 'x' }).value.section, 'other');
+  eq('a wild answer index is dropped', [f.norm({ uid: 'F_1', reason: 'typo', correctIndex: 99 }).value.correctIndex, f.norm({ uid: 'F_1', reason: 'typo', correctIndex: -1 }).value.correctIndex], ['', '']);
+  eq('option text is capped and kept on one line', JSON.parse(f.norm({ uid: 'F_1', reason: 'typo', optionsSnapshot: ['x'.repeat(500) + '\nz'] }).value.optionsSnapshot)[0].length <= 200, true);
+  eq('a note that looks like a formula is neutralised', f.norm({ uid: 'F_1', reason: 'typo', note: '=HYPERLINK("x")' }).value.note.charAt(0), "'");
+  eq('a local question bank id is still reported with its own id as the file', f.norm({ uid: 'local_3', reason: 'typo' }).value.fileId, 'local');
+
+  const m1 = f.upd({}, 'A', 100, 3); const m2 = f.upd(m1, 'B', 200, 3); const m3 = f.upd(m2, 'C', 300, 3); const m4 = f.upd(m3, 'D', 400, 3);
+  eq('the corrections list keeps only the newest files', Object.keys(m4).sort(), ['B', 'C', 'D'].sort());
+  eq('correcting a file again moves it forward in time', f.upd({ A: 1 }, 'A', 9, 5).A, 9);
+  eq('students only get files corrected after the last check', f.since({ A: 100, B: 200, C: 300 }, 150), { B: 200, C: 300 });
+  eq('a first check (since 0) gets everything', Object.keys(f.since({ A: 100, B: 200 }, 0)).length, 2);
+  eq('junk values are ignored', f.since({ A: 'x', B: 200 }, 0), { B: 200 });
+
+  eq('editing a question in the app tells devices which file changed', /markFileCorrected_\(fileId\);\s*\/\*[^*]*\*\/\s*\n\s*logAction_\(actor, "Edit Question"/.test(src), true);
+  eq('marking a report fixed tells devices, and closes other open reports on the same question', /adminUpdateQuestionReportStatus[\s\S]*?markFileCorrected_\(String\(found\.row\[2\]/.test(src) && /also closed/.test(src), true);
+  eq('the manual "refresh a file" action needs the manage permission', /function adminMarkFileCorrected\(p\) \{\s*const chk = checkAdminCan_\(p, "qreports_manage"\)/.test(src), true);
+  eq('getCorrections asks who is calling', /function getCorrections\(p\) \{\s*const auth = authUser_\(p\);/.test(src), true);
+  eq('the corrections list is private (not in the public settings)', /CORRECTIONS_SETTING_KEY = "private_corrections"/.test(src), true);
+})();
+
+
+group('Loksewa scheme and where it shows');
+(function loksewaTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){}, removeEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} }, console };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.fmt=isLoksewaFormat;this.norm=normalizeLoksewaScheme;this.dflt=defaultLoksewaScheme;this.grp=loksewaGroupFor;this.compose=composeLoksewaPaper;this.rows=loksewaGroupRows;this.conflict=loksewaSchemeConflict;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const rng = (() => { let a = 12345; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; });
+
+  /* 1. only three sections are Loksewa-formatted */
+  eq('weekly test, daily paper and hourly 50 are Loksewa-formatted', [ctx.fmt({ weeklyId: 'w1' }), ctx.fmt({ loksewaMock: true }), ctx.fmt({ hourlySprint: true })], [true, true, true]);
+  eq('chapter practice, mixed, review and the rest are not', [ctx.fmt({}), ctx.fmt({ fid: 'x' }), ctx.fmt({ reviewOnly: true }), ctx.fmt({ timeLimitSec: 600 }), ctx.fmt(null), ctx.fmt(undefined)], [false, false, false, false, false, false]);
+
+  /* 2. validation */
+  const d = ctx.dflt();
+  eq('the default is 25 General Knowledge + 50 Level 7 = 75', [d.total, d.groups.map(g => g.name + ':' + g.marks)], [75, ['General Knowledge:25', 'Level 7 Civil Engineering:50']]);
+  eq('nothing stored gives the default', [ctx.norm('').isDefault, ctx.norm(null).isDefault, ctx.norm('not json').isDefault, ctx.norm('{"groups":[]}').isDefault], [true, true, true, true]);
+  const good = { groups: [{ name: 'General', marks: 25, level: 'gk', chapters: [] }, { name: 'Structures', marks: 20, level: 'level7', chapters: ['c1', 'c2'] }, { name: 'Others', marks: 30, level: 'level7', chapters: [] }] };
+  const n = ctx.norm(JSON.stringify(good));
+  eq('a good scheme is kept as typed', [n.isDefault, n.total, n.groups.map(g => g.marks)], [false, 75, [25, 20, 30]]);
+  eq('bad groups are dropped, not trusted', ctx.norm({ groups: [{ name: '', marks: 5, level: 'gk' }, { name: 'x', marks: 0, level: 'gk' }, { name: 'y', marks: 999, level: 'gk' }, { name: 'ok', marks: 5, level: 'a b' }] }).isDefault, true);
+  eq('marks are whole numbers', ctx.norm({ groups: [{ name: 'a', marks: 12.6, level: 'gk', chapters: [] }] }).groups[0].marks, 13);
+  eq('chapter ids with odd characters are ignored', ctx.norm({ groups: [{ name: 'a', marks: 5, level: 'gk', chapters: ['ok', '<b>', 'also_ok'] }] }).groups[0].chapters, ['ok', 'also_ok']);
+  eq('a scheme over 200 marks is refused', ctx.norm({ groups: [{ name: 'a', marks: 100, level: 'x', chapters: [] }, { name: 'b', marks: 100, level: 'y', chapters: [] }, { name: 'c', marks: 5, level: 'z', chapters: [] }] }).isDefault, true);
+  eq('a stored scheme can be a string or an object', [ctx.norm(JSON.stringify(good)).total, ctx.norm(good).total], [75, 75]);
+
+  /* 3. which group a chapter belongs to */
+  eq('a named chapter goes to its own group', ctx.grp(n, 'level7', 'c1').name, 'Structures');
+  eq('any other chapter of the level goes to the catch-all', ctx.grp(n, 'level7', 'c9').name, 'Others');
+  eq('a level the scheme does not use belongs to no group', ctx.grp(n, 'level5', 'c1'), null);
+
+  /* 4. the daily paper follows the scheme exactly */
+  const mk = (lv, ch, count) => Array.from({ length: count }, (_, i) => ({ q: { uid: lv + ch + '_' + i }, lv, ch }));
+  const pool = [].concat(mk('gk', 'g1', 60), mk('gk', 'g2', 60), mk('level7', 'c1', 40), mk('level7', 'c2', 40), mk('level7', 'c3', 80), mk('level7', 'c4', 80));
+  let paper = ctx.compose(n, pool, rng());
+  eq('the paper has exactly the scheme\'s 75 questions', paper.questions.length, 75);
+  eq('and each group gets exactly its marks (25 / 20 / 30)', [paper.perGroup.g0, paper.perGroup.g1, paper.perGroup.g2], [25, 20, 30]);
+  const fromChapters = (ids, grp) => paper.questions.filter(q => ids.some(c => q.uid.indexOf(c + '_') !== -1));
+  eq('"Structures" only uses its own chapters (c1, c2): 20 questions', paper.questions.filter(q => /^level7c[12]_/.test(q.uid)).length, 20);
+  eq('chapters take turns: both of them appear equally (10 + 10)', [paper.questions.filter(q => /^level7c1_/.test(q.uid)).length, paper.questions.filter(q => /^level7c2_/.test(q.uid)).length], [10, 10]);
+  eq('the catch-all uses only the other chapters (c3, c4): 30 questions, 15 + 15', [paper.questions.filter(q => /^level7c3_/.test(q.uid)).length, paper.questions.filter(q => /^level7c4_/.test(q.uid)).length], [15, 15]);
+  eq('the two General Knowledge chapters are balanced too (13 + 12)', [paper.questions.filter(q => /^gkg1_/.test(q.uid)).length, paper.questions.filter(q => /^gkg2_/.test(q.uid)).length].sort(), [12, 13]);
+  eq('no question appears twice', new Set(paper.questions.map(q => q.uid)).size, 75);
+  eq('the same seed gives the same paper', JSON.stringify(ctx.compose(n, pool, rng()).questions.map(q => q.uid)) === JSON.stringify(paper.questions.map(q => q.uid)), true);
+  eq('a different day gives a different paper', JSON.stringify(ctx.compose(n, pool, (() => { let a = 999; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; })()).questions.map(q => q.uid)) === JSON.stringify(paper.questions.map(q => q.uid)), false);
+  /* 5. short of questions: honest, never padded from a different group */
+  const thin = [].concat(mk('gk', 'g1', 10), mk('level7', 'c1', 5), mk('level7', 'c2', 50), mk('level7', 'c3', 50));
+  paper = ctx.compose(n, thin, rng());
+  eq('General Knowledge is short (10 of 25)', paper.shortfalls.some(s => s.name === 'General' && s.got === 10 && s.wanted === 25), true);
+  eq('Structures has 55 available so is not short', paper.shortfalls.some(s => s.name === 'Structures'), false);
+  eq('chapters outside the scheme are never used', ctx.compose(n, mk('level5', 'z', 100), rng()).questions.length, 0);
+  eq('the default scheme gives 25 + 50 from a gk and a level7 pool', (() => { const r = ctx.compose(ctx.dflt(), [].concat(mk('gk', 'a', 40), mk('level7', 'b', 40), mk('level7', 'c', 40)), rng()); return [r.questions.length, r.perGroup.g0, r.perGroup.g1]; })(), [75, 25, 50]);
+
+  /* 6. result-page rows */
+  const items = [{ lv: 'gk', ch: 'g1', state: 'correct' }, { lv: 'gk', ch: 'g1', state: 'wrong' }, { lv: 'level7', ch: 'c1', state: 'correct' }, { lv: 'level7', ch: 'c9', state: 'skipped' }, { lv: 'level5', ch: 'x', state: 'wrong' }, { lv: null, ch: null, state: 'correct' }];
+  const rows = ctx.rows(n, items, true);
+  eq('rows follow the groups, then "Other"', rows.map(r => r.name), ['General', 'Structures', 'Others', 'Other']);
+  eq('wrong answers cost 0.2: 1 right + 1 wrong = 0.8', rows[0].score, 0.8);
+  eq('the daily paper scores each group out of its marks', [rows[0].outOf, rows[1].outOf, rows[2].outOf], [25, 20, 30]);
+  eq('weekly and hourly sets score out of their own questions', ctx.rows(n, items, false).map(r => r.outOf), [2, 1, 1, 2]);
+  eq('"Other" collects what is outside the scheme', [rows[3].total, rows[3].correct, rows[3].wrong], [2, 1, 1]);
+  eq('empty groups are left out', rows.length, 4);
+
+  /* 7. admin form rules */
+  const row = (name, marks, level, chapters) => ({ name, marks, level, chapters });
+  eq('a good form is accepted', ctx.conflict([row('A', 25, 'gk', []), row('B', 20, 'level7', ['c1']), row('C', 30, 'level7', [])]), '');
+  eq('the same chapter in two groups is refused', /only belong to one group/.test(ctx.conflict([row('A', 5, 'level7', ['c1']), row('B', 5, 'level7', ['c1', 'c2'])])), true);
+  eq('two catch-alls for one level are refused', /every chapter of the same level/.test(ctx.conflict([row('A', 5, 'level7', []), row('B', 5, 'level7', [])])), true);
+  eq('a catch-all in two DIFFERENT levels is fine', ctx.conflict([row('A', 5, 'gk', []), row('B', 5, 'level7', [])]), '');
+  eq('a name is needed', /needs a name/.test(ctx.conflict([row(' ', 5, 'gk', [])])), true);
+  eq('marks must be whole numbers 1 to 100', [/whole numbers/.test(ctx.conflict([row('A', 0, 'gk', [])])), /whole numbers/.test(ctx.conflict([row('A', 2.5, 'gk', [])])), /whole numbers/.test(ctx.conflict([row('A', 101, 'gk', [])]))], [true, true, true]);
+  eq('an empty form is refused', ctx.conflict([]).length > 0, true);
+
+  /* 8. wiring */
+  const obj = readFile('objective.js') || '', up = readFile('user-page.js') || '', gas = readFile('gas/code.gs') || '', adm = readFile('admin.html') || '';
+  eq('the Loksewa score line is only written for the three sections', /if \(isLoksewa\)\{\s*const score = correct - wrong \* LOKSEWA_NEGATIVE/.test(obj) && !/Loksewa-style score/.test(obj), true);
+  eq('the breakdown tables only appear for the three sections', /\n      if \(isLoksewa\) \{\s*\n\s*const groups = \{\};/.test(obj), true);
+  eq('the old group table that read an undefined map is gone', !/WEEKLY\.LOKSEWA_GROUPS/.test(obj), true);
+  eq('the daily paper is composed from the scheme', /composeLoksewaPaper\(scheme, pool/.test(up) && !/GENERAL_COUNT|TECH_COUNT/.test(up), true);
+  eq('students receive the scheme with the public info', /loksewaScheme: String\(all\.loksewaScheme/.test(gas) && /abhyas_lscheme/.test(up), true);
+  eq('the server refuses a malformed scheme', /key === "loksewaScheme"\) \{ const bad = loksewaSchemeProblem_\(value\)/.test(gas) && /key === "loksewaScheme" && loksewaSchemeProblem_\(value\)\) return;/.test(gas), true);
+  eq('admin has the editor and saves it as a setting', /id="lks-panel"/.test(adm) && /key: 'loksewaScheme', value/.test(adm), true);
+  eq('the daily-paper card lists the scheme groups, not fixed 25 and 50', /scheme\.groups\.map\(g => '<div class="syl-row">/.test(up) && !/General Knowledge<\/span><span class="syl-marks">25/.test(up), true);
+})();
+
+group('Loksewa scheme (backend check)');
+(function loksewaServerTests(){
+  const src = readFile('gas/code.gs') || '';
+  const m = src.match(/function loksewaSchemeProblem_[\s\S]*?\n}\n/);
+  let f; try { f = new Function(m[0] + '\nreturn loksewaSchemeProblem_;')(); } catch (e) { fail('could not load loksewaSchemeProblem_: ' + e.message); return; }
+  const eq = (n, got, want) => got === want ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const ok = JSON.stringify({ groups: [{ name: 'A', marks: 25, level: 'gk', chapters: [] }, { name: 'B', marks: 50, level: 'level7', chapters: ['c1'] }] });
+  eq('a good scheme is accepted', f(ok), '');
+  eq('empty clears the scheme', f(''), '');
+  eq('not JSON is refused', f('{nope') !== '', true);
+  eq('no groups is refused', f('{"groups":[]}') !== '', true);
+  eq('a group without a name is refused', f('{"groups":[{"name":"","marks":5,"level":"gk"}]}') !== '', true);
+  eq('marks out of range or fractional are refused', [f('{"groups":[{"name":"a","marks":0,"level":"gk"}]}') !== '', f('{"groups":[{"name":"a","marks":101,"level":"gk"}]}') !== '', f('{"groups":[{"name":"a","marks":2.5,"level":"gk"}]}') !== ''].join(), 'true,true,true');
+  eq('a level with odd characters is refused', f('{"groups":[{"name":"a","marks":5,"level":"a b"}]}') !== '', true);
+  eq('more than 200 marks is refused', f(JSON.stringify({ groups: [{ name: 'a', marks: 100, level: 'x' }, { name: 'b', marks: 100, level: 'y' }, { name: 'c', marks: 1, level: 'z' }] })) !== '', true);
+  eq('more than 20 groups is refused', f(JSON.stringify({ groups: Array.from({ length: 21 }, (_, i) => ({ name: 'g' + i, marks: 1, level: 'x' })) })) !== '', true);
+  eq('the scheme is a public setting (students must be able to read it)', /PRIVATE_SETTING_PREFIXES[^;]*;/.test(src) && !/private_loksewa/i.test(src), true);
+})();
+
 /* ═══════════════════════════════════════════════════════════════════════
    Summary
    ═══════════════════════════════════════════════════════════════════════ */
-console.log('\n' + '═'.repeat(60));
-console.log(`Tests: ${PASS} passing, ${FAIL} failing.`);
-if (FAIL) {
-  console.log('\nFailures:');
-  FAILURES.forEach(f => console.log('  • ' + f));
-  process.exit(1);
-}
+Promise.all(PENDING).then(() => {
+  console.log('\n' + '═'.repeat(60));
+  console.log(`Tests: ${PASS} passing, ${FAIL} failing.`);
+  if (FAIL) {
+    console.log('\nFailures:');
+    FAILURES.forEach(f => console.log('  • ' + f));
+    process.exit(1);
+  }
+});

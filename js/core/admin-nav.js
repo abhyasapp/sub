@@ -44,7 +44,9 @@ const TITLES = {}, FEATURES = {};
 ALL.forEach(it => { TITLES[it.view] = it.label; FEATURES[it.view] = it.feature; });
 
 function itemHtml(it, first){
-  return '<button class="rail-item' + (first ? ' active' : '') + '" id="nav-' + esc(it.view) + '" onclick="UI.nav(\'' + esc(it.view) + '\')">' +
+  /* The rail shows icons only, so the text label is hidden; aria-label gives screen-reader and
+     voice-control users the name, and title shows it on hover. */
+  return '<button class="rail-item' + (first ? ' active' : '') + '" id="nav-' + esc(it.view) + '" aria-label="' + esc(it.label) + '" title="' + esc(it.label) + '" onclick="UI.nav(\'' + esc(it.view) + '\')">' +
     '<i class="ph ' + esc(it.icon) + '"></i><span>' + esc(it.label) + '</span>' +
     (it.badge ? '<span class="rail-badge" id="' + esc(it.badge) + '" hidden>0</span>' : '') + '</button>';
 }

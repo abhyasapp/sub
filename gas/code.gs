@@ -114,6 +114,7 @@ const SUBJ_SUBMISSIONS_SHEET = "SubjectiveSubmissions";
 const ADMIN_PERMS_SHEET      = "AdminPermissions";
 const WEEKLYSTARTS_SHEET     = "WeeklyStarts";
 const STUDYDOCS_SHEET        = "StudyDocs";
+const PROGRESS_HISTORY_SHEET = "ProgressHistory";
 
 const USER_HEADERS = [
   "username","passHash","name","email","mobile",
@@ -141,8 +142,14 @@ const WEEKLYATTEMPT_HEADERS = [
   "correctClaimed","skippedCount","startedAt","submittedAt","durationSec"
 ];
 const QREPORT_HEADERS = [
-  "id","uid","fileId","questionSnapshot","reason","note","reportedBy","reportedAt","status"
+  "id","uid","fileId","questionSnapshot","reason","note","reportedBy","reportedAt","status",
+  /* v1.32: what the admin needs to judge a report without opening the file */
+  "optionsSnapshot","correctIndex","chosenIndex","section","appVersion","resolvedAt","resolvedBy","corrected"
 ];
+const QREPORT_SECTIONS = ["practice","exam","daily-paper","weekly","hourly","results","review-missed","review-saved","review-flagged","other"];
+/* fileId -> time (ms) the admin said that file was corrected. Private, so it is not in the public settings. */
+const CORRECTIONS_SETTING_KEY = "private_corrections";
+const MAX_CORRECTIONS_KEPT = 400;
 const SUBJ_SUBMISSION_HEADERS = [
   "id","username","kind","questionId","questionText","questionMarks",
   "chapterId","solveSec","startedAt","submittedAt",
@@ -151,6 +158,10 @@ const SUBJ_SUBMISSION_HEADERS = [
 ];
 const ADMIN_PERM_HEADERS = ["username","featureKey","enabled","updatedAt","updatedBy"];
 /* v1.32: PDFs the admin uploads for students to study (model answers, notes, past papers). */
+/* v1.32: up to three earlier cloud copies per student, so no save can ever destroy the only good copy. */
+const PROGRESS_HISTORY_HEADERS = ["username","data1","savedAt1","data2","savedAt2","data3","savedAt3"];
+const PROGRESS_HISTORY_MIN_GAP_MS = 30 * 60 * 1000;
+const PROGRESS_GZ_PREFIX = "gz1:";
 const STUDYDOC_HEADERS = [
   "id","title","category","chapterId","description","fileId","fileName",
   "sizeBytes","status","sortOrder","uploadedBy","uploadedAt","updatedAt"
@@ -364,6 +375,8 @@ function doGet(e) {
       case "submitsubjectiveanswer":     result = submitSubjectiveAnswer(e.parameter); break;
       case "getmysubjectivesubmissions": result = getMySubjectiveSubmissions(e.parameter); break;
       case "getmysubmissionpdf":         result = getMySubmissionPdf(e.parameter); break;
+      case "getprogresshistory":         result = getProgressHistory(e.parameter); break;
+      case "getcorrections":             result = getCorrections(e.parameter); break;
       case "liststudydocs":              result = listStudyDocs(e.parameter); break;
       case "getstudydocpdf":             result = getStudyDocPdf(e.parameter); break;
 
@@ -422,6 +435,7 @@ function doGet(e) {
       case "adminreplacesubmissionpdf":        result = adminReplaceSubmissionPdf(e.parameter); break;
       case "admindownloadsubmissionpdf":       result = adminDownloadSubmissionPdf(e.parameter); break;
 
+      case "adminmarkfilecorrected": result = adminMarkFileCorrected(e.parameter); break;
       case "adminliststudydocs":     result = adminListStudyDocs(e.parameter); break;
       case "adminaddstudydoc":       result = adminAddStudyDoc(e.parameter); break;
       case "adminupdatestudydoc":    result = adminUpdateStudyDoc(e.parameter); break;
@@ -744,7 +758,11 @@ function getProgressSheet_()   { return _getOrCreateSheet_(PROGRESS_SHEET, PROGR
 function getPushTokensSheet_() { return _getOrCreateSheet_(PUSHTOKENS_SHEET, PUSHTOKENS_HEADERS, [1], "#e67c00", SpreadsheetApp.BandingTheme.ORANGE, 300); }
 function getWeeklySetsSheet_() { return _getOrCreateSheet_(WEEKLYSETS_SHEET, WEEKLYSET_HEADERS, [1,3], "#00acc1", SpreadsheetApp.BandingTheme.CYAN, 320); }
 function getWeeklyAttemptsSheet_()  { return _getOrCreateSheet_(WEEKLYATTEMPTS_SHEET, WEEKLYATTEMPT_HEADERS, [1,2], "#00897b", SpreadsheetApp.BandingTheme.TEAL, 300); }
-function getQReportsSheet_()        { return _getOrCreateSheet_(QREPORTS_SHEET, QREPORT_HEADERS, [1,2,3], "#d81b60", SpreadsheetApp.BandingTheme.PINK, 340); }
+function getQReportsSheet_() {
+  const sheet = _getOrCreateSheet_(QREPORTS_SHEET, QREPORT_HEADERS, [1,2,3], "#d81b60", SpreadsheetApp.BandingTheme.PINK, 340);
+  _topUpHeaders_(sheet, QREPORT_HEADERS, "#d81b60");
+  return sheet;
+}
 function getAdminPermsSheet_()      { return _getOrCreateSheet_(ADMIN_PERMS_SHEET, ADMIN_PERM_HEADERS, [1,2], "#7c3aed", SpreadsheetApp.BandingTheme.PURPLE, 320); }
 function getProgressImportsSheet_() { return _getOrCreateSheet_(PROGRESS_IMPORTS_SHEET, PROGRESS_IMPORT_HEADERS, [], "#5e35b1", SpreadsheetApp.BandingTheme.PURPLE, 320); }
 function getProgressBackupsSheet_() { return _getOrCreateSheet_(PROGRESS_BACKUPS_SHEET, PROGRESS_BACKUP_HEADERS, [], "#455a64", SpreadsheetApp.BandingTheme.GREY, 320); }
@@ -755,6 +773,10 @@ function getSubjSubmissionsSheet_() {
   const sheet = _getOrCreateSheet_(SUBJ_SUBMISSIONS_SHEET, SUBJ_SUBMISSION_HEADERS, [1,2,4,11], "#0891b2", SpreadsheetApp.BandingTheme.CYAN, 400);
   _topUpHeaders_(sheet, SUBJ_SUBMISSION_HEADERS, "#0891b2");
   return sheet;
+}
+
+function getProgressHistorySheet_() {
+  return _getOrCreateSheet_(PROGRESS_HISTORY_SHEET, PROGRESS_HISTORY_HEADERS, [1], "#455a64", SpreadsheetApp.BandingTheme.LIGHT_GREY, 300);
 }
 
 function getStudyDocsSheet_() {
@@ -974,11 +996,20 @@ function rowToWeeklySet_(row) {
   };
 }
 function rowToQReport_(row) {
+  const uid = String(row[1] || "");
+  const m = uid.match(/^(.+)_(\d+)$/);
+  let options = [];
+  try { const o = JSON.parse(row[9] || "[]"); if (Array.isArray(o)) options = o; } catch (e) {}
+  const num = v => (v === "" || v === null || v === undefined) ? null : Number(v);
   return {
-    id: row[0] || "", uid: row[1] || "", fileId: row[2] || "",
+    id: row[0] || "", uid, fileId: row[2] || "",
+    questionNumber: m ? Number(m[2]) + 1 : null,         /* position in the question file, counting from 1 */
     questionSnapshot: row[3] || "", reason: row[4] || "",
     note: row[5] || "", reportedBy: row[6] || "",
-    reportedAt: row[7] || "", status: row[8] || "open"
+    reportedAt: row[7] || "", status: row[8] || "open",
+    options, correctIndex: num(row[10]), chosenIndex: num(row[11]),
+    section: row[12] || "", appVersion: row[13] || "",
+    resolvedAt: row[14] || "", resolvedBy: row[15] || "", corrected: String(row[16]).toLowerCase() === "true"
   };
 }
 function rowToWeeklyAttempt_(row) {
@@ -2154,10 +2185,47 @@ function purgeAdminPermissions_(username) {
    PROGRESS SYNC
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Pure: is this string a copy the server may store? Plain JSON, or a gzip+base64 copy marked "gz1:". */
+function isAcceptableProgressData_(dataStr) {
+  const d = String(dataStr || "");
+  if (!d) return false;
+  if (d.indexOf(PROGRESS_GZ_PREFIX) === 0) return d.length > 24 && /^gz1:[A-Za-z0-9+\/]+={0,2}$/.test(d);
+  try { JSON.parse(d); return true; } catch (e) { return false; }
+}
+
+/* Pure: should the copy about to be replaced be kept in history? Yes when no history exists yet, when the
+   newest history entry is at least 30 minutes older than it, or when the new copy is much smaller (a shrink is
+   exactly when the old copy is worth keeping). */
+function shouldArchiveProgress_(prevData, prevAtMs, newData, newestHistoryData, newestHistoryAtMs) {
+  const prev = String(prevData || "");
+  if (prev.length < 50) return false;
+  if (newestHistoryData && String(newestHistoryData) === prev) return false;
+  if (!newestHistoryData) return true;
+  if ((prevAtMs - (newestHistoryAtMs || 0)) >= PROGRESS_HISTORY_MIN_GAP_MS) return true;
+  const sameKind = (prev.indexOf(PROGRESS_GZ_PREFIX) === 0) === (String(newData).indexOf(PROGRESS_GZ_PREFIX) === 0);
+  return sameKind && String(newData).length < prev.length * 0.7;
+}
+
+function _archivePreviousProgress_(username, prevData, prevAt, newData) {
+  try {
+    const prevMs = new Date(_isoOf_(prevAt)).getTime() || Date.now();
+    const sheet = getProgressHistorySheet_();
+    const f = _findRowFast_(sheet, 1, username);
+    const slots = f ? [[f.row[1], f.row[2]], [f.row[3], f.row[4]], [f.row[5], f.row[6]]] : [["", ""], ["", ""], ["", ""]];
+    const newestMs = slots[0][1] ? (new Date(_isoOf_(slots[0][1])).getTime() || 0) : 0;
+    if (!shouldArchiveProgress_(prevData, prevMs, newData, slots[0][0], newestMs)) return;
+    const next = [[String(prevData), new Date(prevMs).toISOString()], slots[0], slots[1]];
+    const rowVals = [username, next[0][0], next[0][1], next[1][0], next[1][1], next[2][0], next[2][1]];
+    if (f) sheet.getRange(f.rowIndex, 1, 1, 7).setValues([rowVals]); else sheet.appendRow(rowVals);
+    _invalidateSheet_(PROGRESS_HISTORY_SHEET);
+  } catch (e) { /* history is a safety net: it must never stop a save */ }
+}
+
 /* v1.32: two devices saving progress used to overwrite each other (last write
    wins). A client that sends baseUpdatedAt (the revision it last saw) is now
    told about a conflict, receives the newer copy, merges, and saves again.
-   Clients that do not send baseUpdatedAt keep the old behaviour. */
+   Clients that do not send baseUpdatedAt keep the old behaviour. The copy being
+   replaced is first kept in ProgressHistory (see above). */
 function _isoOf_(v) {
   if (v instanceof Date) return v.toISOString();
   return String(v === null || v === undefined ? "" : v);
@@ -2174,7 +2242,7 @@ function saveProgress(p) {
   const dataStr = String(p.data || "");
   if (!dataStr) return { success: false, error: "No data provided." };
   if (dataStr.length > 45000) return { success: false, error: "Progress data too large to sync." };
-  try { JSON.parse(dataStr); } catch (e) { return { success: false, error: "Malformed progress data." }; }
+  if (!isAcceptableProgressData_(dataStr)) return { success: false, error: "Malformed progress data." };
   const checkRevision = Object.prototype.hasOwnProperty.call(p, "baseUpdatedAt");
 
   return withLock_(() => {
@@ -2184,11 +2252,33 @@ function saveProgress(p) {
       return { success: false, conflict: true, data: found.row[1], updatedAt: _isoOf_(found.row[2]) };
     }
     const now = new Date().toISOString();
-    if (found) sheet.getRange(found.rowIndex, 2, 1, 2).setValues([[dataStr, now]]);
-    else sheet.appendRow([username, dataStr, now]);
+    if (found) {
+      _archivePreviousProgress_(username, found.row[1], found.row[2], dataStr);
+      sheet.getRange(found.rowIndex, 2, 1, 2).setValues([[dataStr, now]]);
+    } else sheet.appendRow([username, dataStr, now]);
     _invalidateSheet_(PROGRESS_SHEET);
     return { success: true, updatedAt: now };
   });
+}
+
+/* Earlier cloud copies. No slot: the list. With slot (1-3): that copy, to be ADDED to the device by the client. */
+function getProgressHistory(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const f = _findRowFast_(getProgressHistorySheet_(), 1, auth.username);
+  if (!f) return { success: true, entries: [] };
+  const slot = Number(p.slot);
+  if (slot >= 1 && slot <= 3) {
+    const data = String(f.row[1 + (slot - 1) * 2] || "");
+    if (!data) return { success: false, error: "That copy is not available." };
+    return { success: true, data, savedAt: _isoOf_(f.row[2 + (slot - 1) * 2]) };
+  }
+  const entries = [];
+  for (let i = 0; i < 3; i++) {
+    const d = String(f.row[1 + i * 2] || "");
+    if (d) entries.push({ slot: i + 1, savedAt: _isoOf_(f.row[2 + i * 2]), chars: d.length });
+  }
+  return { success: true, entries };
 }
 
 function getProgress(p) {
@@ -3344,12 +3434,13 @@ function adminDownloadSubmissionPdf(p) {
 /* Pure: validate and clean the text fields of an upload or edit. Returns
    { error } or { value: { title, category, chapterId, description, sortOrder } }. */
 function normalizeStudyDocMeta_(p, requireTitle) {
-  const title = String(p.title == null ? "" : p.title).replace(/\s+/g, " ").trim().slice(0, 120);
+  /* sanitizeSheetField_ stops a title like =HYPERLINK(...) from running as a formula when the sheet is opened. */
+  const title = sanitizeSheetField_(String(p.title == null ? "" : p.title).replace(/\s+/g, " ").trim().slice(0, 120));
   if (requireTitle && !title) return { error: "Give the PDF a title." };
   const category = String(p.category == null ? "model-answer" : p.category).trim().toLowerCase();
   if (STUDYDOC_CATEGORIES.indexOf(category) === -1) return { error: "Unknown category." };
   const chapterId = String(p.chapterId == null ? "" : p.chapterId).trim().replace(/[^a-zA-Z0-9_.-]/g, "").slice(0, 80);
-  const description = String(p.description == null ? "" : p.description).replace(/[\r\n]+/g, " ").trim().slice(0, 400);
+  const description = sanitizeSheetField_(String(p.description == null ? "" : p.description).replace(/[\r\n]+/g, " ").trim().slice(0, 400));
   const rawSort = (p.sortOrder === undefined || p.sortOrder === null || String(p.sortOrder).trim() === "") ? NaN : Number(p.sortOrder);
   let sortOrder = isFinite(rawSort) ? rawSort : 100;
   sortOrder = Math.max(0, Math.min(9999, Math.round(sortOrder)));
@@ -3835,35 +3926,96 @@ function overwriteDriveFileBinary_(fileId, blob) {
    QUESTION REPORTS
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* Pure: validate and clean a student's report. Returns { error } or { value }. */
+function normalizeReportPayload_(p) {
+  const uid = String(p.uid || "").trim().slice(0, 200);
+  if (!uid) return { error: "Missing question reference." };
+  if (!/^[A-Za-z0-9_.:-]+$/.test(uid)) return { error: "Invalid question reference." };
+  const reason = String(p.reason || "").trim();
+  if (["wrong_answer", "unclear", "typo", "other"].indexOf(reason) === -1) return { error: "Invalid report reason." };
+  const m = uid.match(/^(.+)_(\d+)$/);
+  const idx = v => { const n = Number(v); return (v !== "" && v !== null && v !== undefined && isFinite(n) && n >= 0 && n < 10 && Math.floor(n) === n) ? n : ""; };
+  let opts = p.optionsSnapshot;
+  if (typeof opts === "string") { try { opts = JSON.parse(opts); } catch (e) { opts = null; } }
+  const optionsSnapshot = Array.isArray(opts)
+    ? JSON.stringify(opts.slice(0, 6).map(o => String(o == null ? "" : o).replace(/[\r\n]+/g, " ").slice(0, 200))).slice(0, 1200)
+    : "";
+  const section = QREPORT_SECTIONS.indexOf(String(p.section || "")) !== -1 ? String(p.section) : "other";
+  return { value: {
+    uid, fileId: m ? m[1] : uid, reason,
+    note: sanitizeSheetField_(String(p.note || "").trim().slice(0, 500)),
+    snapshot: sanitizeSheetField_(String(p.questionSnapshot || "").trim().slice(0, 1000)),
+    optionsSnapshot, correctIndex: idx(p.correctIndex), chosenIndex: idx(p.chosenIndex), section,
+    appVersion: String(p.appVersion || "").replace(/[^0-9A-Za-z._-]/g, "").slice(0, 12)
+  } };
+}
+
+/* Pure: record that a file was corrected; keeps only the newest `max` files. */
+function updateCorrectionsMap_(map, fileId, nowMs, max) {
+  const out = {};
+  Object.keys(map || {}).forEach(k => { if (isFinite(Number(map[k]))) out[k] = Number(map[k]); });
+  out[fileId] = nowMs;
+  const keys = Object.keys(out);
+  if (keys.length > max) keys.sort((a, b) => out[a] - out[b]).slice(0, keys.length - max).forEach(k => delete out[k]);
+  return out;
+}
+/* Pure: only the files corrected after `since`. */
+function correctionsSince_(map, since) {
+  const out = {}, s = Number(since) || 0;
+  Object.keys(map || {}).forEach(k => { const t = Number(map[k]); if (isFinite(t) && t > s) out[k] = t; });
+  return out;
+}
+function readCorrectionsMap_() {
+  try { const o = JSON.parse(String(getSettingValue_(CORRECTIONS_SETTING_KEY, "{}"))); return (o && typeof o === "object" && !Array.isArray(o)) ? o : {}; }
+  catch (e) { return {}; }
+}
+function markFileCorrected_(fileId) {
+  if (!fileId) return;
+  setSettingValue_(CORRECTIONS_SETTING_KEY, JSON.stringify(updateCorrectionsMap_(readCorrectionsMap_(), fileId, Date.now(), MAX_CORRECTIONS_KEPT)));
+}
+
+/* Students ask "which question files were corrected since I last looked?" so a corrected question
+   replaces the old copy saved on their device straight away, instead of after the 24-hour refresh. */
+function getCorrections(p) {
+  const auth = authUser_(p);
+  if (!auth.ok) return auth.error;
+  const since = Number(p.since) || 0;
+  /* reports this student sent that the admin has since resolved, so the app can say "thanks, it was fixed" once */
+  const mine = [];
+  try {
+    const data = _cachedSheetData_(QREPORTS_SHEET, getQReportsSheet_).data;
+    const me = auth.username.toLowerCase();
+    for (let i = data.length - 1; i >= 1 && mine.length < 10; i--) {
+      if (String(data[i][6]).toLowerCase() !== me || String(data[i][8]) !== "resolved") continue;
+      const at = new Date(_isoOf_(data[i][14])).getTime();
+      if (isFinite(at) && at > since) mine.push({ uid: String(data[i][1]), at });
+    }
+  } catch (e) {}
+  return { success: true, now: Date.now(), files: correctionsSince_(readCorrectionsMap_(), since), resolvedMine: mine };
+}
+
 function reportQuestion(p) {
   const auth = authUser_(p);
   if (!auth.ok) return auth.error;
   const username = auth.username;
-
-  const uid = String(p.uid || "").trim().slice(0, 200);
-  const reason = String(p.reason || "").trim();
-  const note = sanitizeSheetField_(String(p.note || "").trim().slice(0, 500));
-  const snapshot = sanitizeSheetField_(String(p.questionSnapshot || "").trim().slice(0, 1000));
-  if (!uid) return { success: false, error: "Missing question reference." };
-  if (!["wrong_answer", "unclear", "typo", "other"].includes(reason)) return { success: false, error: "Invalid report reason." };
+  const norm = normalizeReportPayload_(p);
+  if (norm.error) return { success: false, error: norm.error };
+  const r = norm.value;
   if (!checkRateLimit_("qreport_" + username.toLowerCase(), 30, 60 * 60 * 1000)) {
-    return { success: false, error: "Too many reports — please try again later." };
+    return { success: false, error: "Too many reports \u2014 please try again later." };
   }
-
-  const m = uid.match(/^(.+)_(\d+)$/);
-  const fileId = m ? m[1] : uid;
-
   return withLock_(() => {
     const sheet = getQReportsSheet_();
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1]) === uid && String(data[i][6]) === username && String(data[i][8]) === "open") {
-        return { success: true, message: "You've already reported this question — it's in the queue." };
+      if (String(data[i][1]) === r.uid && String(data[i][6]) === username && String(data[i][8]) === "open") {
+        return { success: true, message: "You've already reported this question \u2014 it's in the queue." };
       }
     }
-    sheet.appendRow([Utilities.getUuid(), uid, fileId, snapshot, reason, note, username, new Date().toISOString(), "open"]);
+    sheet.appendRow([Utilities.getUuid(), r.uid, r.fileId, r.snapshot, r.reason, r.note, username, new Date().toISOString(), "open",
+      r.optionsSnapshot, r.correctIndex, r.chosenIndex, r.section, r.appVersion, "", "", ""]);
     _invalidateSheet_(QREPORTS_SHEET);
-    return { success: true, message: "Thanks — this has been sent for review." };
+    return { success: true, message: "Thanks \u2014 this has been sent for review." };
   });
 }
 
@@ -3876,9 +4028,14 @@ function adminListQuestionReports(p) {
   const reports = [];
   /* v1.26: newest-first */
   for (let i = data.length - 1; i >= data.length - limit; i--) reports.push(rowToQReport_(data[i]));
+  /* how many different students have an OPEN report on the same question: the best sign it really is wrong */
+  const openBy = {};
+  reports.forEach(r => { if (r.status === "open") (openBy[r.uid] = openBy[r.uid] || {})[r.reportedBy] = true; });
+  reports.forEach(r => { r.openReporters = r.status === "open" ? Object.keys(openBy[r.uid] || {}).length : 0; });
   reports.sort((a, b) => {
     if (a.status === "open" && b.status !== "open") return -1;
     if (a.status !== "open" && b.status === "open") return 1;
+    if (a.status === "open" && b.status === "open" && b.openReporters !== a.openReporters) return b.openReporters - a.openReporters;
     return new Date(b.reportedAt) - new Date(a.reportedAt);
   });
   return { success: true, reports, totalCount, truncated: totalCount > MAX_LIST_QREPORTS };
@@ -3893,15 +4050,49 @@ function adminUpdateQuestionReportStatus(p) {
   const status = String(p.status || "").trim();
   if (!id) return { success: false, error: "id required." };
   if (!["open", "resolved", "dismissed"].includes(status)) return { success: false, error: "Status must be open, resolved, or dismissed." };
+  /* "Fixed" means the question file was corrected, so every student's app is told to replace that file
+     (pass corrected:false to resolve without a change, e.g. the question was already right). */
+  const signal = status === "resolved" && String(p.corrected) !== "false";
 
   return withLock_(() => {
     const sheet = getQReportsSheet_();
     const found = findQReportRow_(sheet, id);
     if (!found) return { success: false, error: "Report not found." };
+    const stamp = status === "open" ? ["", "", ""] : [new Date().toISOString(), actor, signal ? "TRUE" : ""];
     sheet.getRange(found.rowIndex, 9).setValue(status);
+    sheet.getRange(found.rowIndex, 15, 1, 3).setValues([stamp]);
+    /* Fixing a question fixes it for everyone who reported it: close the other open reports on the same question too. */
+    let alsoClosed = 0;
+    if (status === "resolved") {
+      const data = sheet.getDataRange().getValues();
+      const uid = String(found.row[1] || "");
+      for (let i = 1; i < data.length; i++) {
+        if (i + 1 === found.rowIndex) continue;
+        if (String(data[i][1]) === uid && String(data[i][8]) === "open") {
+          sheet.getRange(i + 1, 9).setValue("resolved");
+          sheet.getRange(i + 1, 15, 1, 3).setValues([stamp]);
+          alsoClosed++;
+        }
+      }
+    }
     _invalidateSheet_(QREPORTS_SHEET);
-    logAction_(actor, "Update Question Report", id, "Status: " + status);
-    return { success: true, id, status };
+    if (signal) markFileCorrected_(String(found.row[2] || ""));
+    logAction_(actor, "Update Question Report", id, "Status: " + status + (signal ? " (students told to refresh the file)" : "") + (alsoClosed ? "; also closed " + alsoClosed + " other report(s) on this question" : ""));
+    return { success: true, id, status, alsoClosed, refreshed: signal };
+  });
+}
+
+/* For a question file that was edited directly in Drive: tell every student's app to replace its copy now. */
+function adminMarkFileCorrected(p) {
+  const chk = checkAdminCan_(p, "qreports_manage");
+  if (!chk.ok) return { success: false, error: chk.error };
+  const fileId = String(p.fileId || "").trim();
+  if (!/^[A-Za-z0-9_-]{10,200}$/.test(fileId)) return { success: false, error: "That does not look like a Drive file id." };
+  return withLock_(() => {
+    markFileCorrected_(fileId);
+    setSettingValue_("contentVersion", String(Date.now()));
+    logAction_(chk.actor, "Refresh Question File", fileId, "Students' apps will replace their copy");
+    return { success: true };
   });
 }
 
@@ -4330,8 +4521,9 @@ function resetMyProgress(p) {
     const target = String(username).toLowerCase().trim();
     const progress = deleteRowsForUser_(PROGRESS_SHEET, getProgressSheet_, 0, target);
     const backups = deleteRowsForUser_(PROGRESS_BACKUPS_SHEET, getProgressBackupsSheet_, 2, target);
-    logAction_("system", "Self-Reset Progress", username, "Cleared cloud progress rows: " + progress + ", snapshots: " + backups);
-    return { success: true, cleared: { progress, snapshots: backups } };
+    const history = deleteRowsForUser_(PROGRESS_HISTORY_SHEET, getProgressHistorySheet_, 0, target);   /* a reset must not leave an earlier copy that could be recovered */
+    logAction_("system", "Self-Reset Progress", username, "Cleared cloud progress rows: " + progress + ", snapshots: " + backups + ", history: " + history);
+    return { success: true, cleared: { progress, snapshots: backups, history } };
   });
 }
 
@@ -4344,6 +4536,7 @@ function purgeUserSheetRows_(username) {
     [PUSHTOKENS_SHEET, getPushTokensSheet_, 0],
     [PAYMENTS_SHEET, getPaymentsSheet_, 0],
     [PROGRESS_BACKUPS_SHEET, getProgressBackupsSheet_, 2],
+    [PROGRESS_HISTORY_SHEET, getProgressHistorySheet_, 0],
     [WEEKLYATTEMPTS_SHEET, getWeeklyAttemptsSheet_, 0],
     [WEEKLYSTARTS_SHEET, getWeeklyStartsSheet_, 0],
     [SUBJ_SUBMISSIONS_SHEET, getSubjSubmissionsSheet_, 1]
@@ -4679,6 +4872,27 @@ function adminListLogs(p) {
   return { success: true, logs, totalCount: totalDataRows, truncated: totalDataRows > LOGS_MAX_ROWS_READ };
 }
 
+/* Pure: is this a usable Loksewa mark scheme? Returns "" when fine, otherwise what is wrong. An empty value clears it. */
+function loksewaSchemeProblem_(value) {
+  const v = String(value == null ? "" : value).trim();
+  if (!v) return "";
+  if (v.length > 4000) return "The mark scheme is too long.";
+  let o; try { o = JSON.parse(v); } catch (e) { return "The mark scheme is not valid."; }
+  if (!o || !Array.isArray(o.groups) || !o.groups.length) return "Add at least one group.";
+  if (o.groups.length > 20) return "At most 20 groups.";
+  let total = 0;
+  for (let i = 0; i < o.groups.length; i++) {
+    const g = o.groups[i] || {};
+    const marks = Number(g.marks);
+    if (!String(g.name || "").trim()) return "Every group needs a name.";
+    if (!isFinite(marks) || marks < 1 || marks > 100 || Math.floor(marks) !== marks) return "Marks must be whole numbers from 1 to 100 (" + String(g.name || "group") + ").";
+    if (!/^[A-Za-z0-9_.-]{1,40}$/.test(String(g.level || ""))) return "Choose a level for " + String(g.name) + ".";
+    total += marks;
+  }
+  if (total > 200) return "The groups add up to more than 200 marks.";
+  return "";
+}
+
 function adminUpdateSettings(p) {
   const chk = checkAdminCan_(p, "settings_manage");
   if (!chk.ok) return { success: false, error: chk.error };
@@ -4687,6 +4901,7 @@ function adminUpdateSettings(p) {
   const value = (p.value !== undefined) ? p.value : "";
   if (!key) return { success: false, error: "Setting key required." };
   if (key.length > 100) return { success: false, error: "Setting key is too long." };
+  if (key === "loksewaScheme") { const bad = loksewaSchemeProblem_(value); if (bad) return { success: false, error: bad }; }
 
   return withLock_(() => {
     const sheet = getSettingsSheet_();
@@ -4727,6 +4942,7 @@ function adminUpdateSettingsBatch(p) {
       const key = String((s && s.key) || "").trim();
       if (!key || key.length > 100) return;
       const value = (s.value !== undefined) ? s.value : "";
+      if (key === "loksewaScheme" && loksewaSchemeProblem_(value)) return;      /* a bad scheme is skipped, never stored */
       if (rowByKey[key]) sheet.getRange(rowByKey[key], 2).setValue(value);
       else appendRows.push([key, value]);
       applied.push(key);
@@ -5310,7 +5526,7 @@ function backupSpreadsheet() {
 function getPublicInfo() {
   const s = getSettings();
   const all = (s && s.settings) || {};
-  return { success: true, announcement: String(all.announcement || ""), contentVersion: String(all.contentVersion || "") };
+  return { success: true, announcement: String(all.announcement || ""), contentVersion: String(all.contentVersion || ""), loksewaScheme: String(all.loksewaScheme || "") };
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -5508,6 +5724,7 @@ function adminUpdateQuestion(p) {
     catch (e) { return { success: false, error: "Could not write the file: " + (e.message || e) }; }
 
     setSettingValue_("contentVersion", String(Date.now()));
+    markFileCorrected_(fileId);     /* v1.32: tells each student's app exactly which file to replace and which saved copies to update */
     logAction_(actor, "Edit Question", fileId + "#" + index, "Question text, options, answer or explanation changed (backup kept)");
     return { success: true };
   });

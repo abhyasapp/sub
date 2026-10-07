@@ -321,9 +321,17 @@ function mergeSyncData(local, remote) {
   const uidOf = x => (x && x.uid !== undefined) ? 'u:' + x.uid : 'j:' + JSON.stringify(x);
 
   const lp = isObj(L.prog) ? L.prog : {}, rp = isObj(R.prog) ? R.prog : {};
-  const sessions = unionBy(lp.sessions, rp.sessions, s => (s && s.at) ? 'a:' + s.at + ':' + (s.fid || s.chapter || '') : 'j:' + JSON.stringify(s))
+  const sessKey = s => (s && s.at) ? 'a:' + s.at + ':' + (s.fid || s.chapter || '') : 'j:' + JSON.stringify(s);
+  const sessions = unionBy(lp.sessions, rp.sessions, sessKey)
     .sort((a, b) => (Number(b && b.at) || 0) - (Number(a && a.at) || 0)).slice(0, 50);
-  const prog = Object.assign({}, rp, lp, { sessions });
+  /* Running totals must never go down. Each side's counter already includes its own sessions, so it is
+     topped up with the sessions only the OTHER side has; the larger result wins. */
+  const sum = (list, f) => list.reduce((n, x) => n + (Number(x && x[f]) || 0), 0);
+  const onlyIn = (a, b) => { const k = new Set(arr(b).map(sessKey)); return arr(a).filter(x => !k.has(sessKey(x))); };
+  const total = Math.max((Number(lp.total) || 0) + sum(onlyIn(rp.sessions, lp.sessions), 'total'), (Number(rp.total) || 0) + sum(onlyIn(lp.sessions, rp.sessions), 'total'));
+  const correct = Math.max((Number(lp.correct) || 0) + sum(onlyIn(rp.sessions, lp.sessions), 'correct'), (Number(rp.correct) || 0) + sum(onlyIn(lp.sessions, rp.sessions), 'correct'));
+  const badges = Object.assign({}, isObj(rp.badges) ? rp.badges : {}, isObj(lp.badges) ? lp.badges : {});
+  const prog = Object.assign({}, rp, lp, { sessions, total, correct, badges });
 
   const chapStats = Object.assign({}, isObj(R.chapStats) ? R.chapStats : {});
   Object.keys(isObj(L.chapStats) ? L.chapStats : {}).forEach(k => {
@@ -518,4 +526,298 @@ function subjChapterName(chapterId) {
     const c = (window.SUBJECTIVE_CHAPTERS || []).find(x => x.id === chapterId);
     return c ? c.name : '';
   } catch (e) { return ''; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   CLOUD COPY ENCODING (v1.32)
+   The server keeps one cell of at most ~45,000 characters per student. A large
+   missed-question bank does not fit as plain JSON, and the old code solved that by
+   CUTTING the lists down (a bank of 250 became 20) and, in the merge path, writing
+   that cut-down copy back over the student's real data on the device.
+
+   Now the full copy is compressed (gzip, then base64, prefixed "gz1:") so it fits.
+   Plain JSON is still sent when it is small enough, so older app versions can read it.
+   Nothing is ever trimmed any more: if even the compressed copy is too large the
+   cloud save is skipped and the device keeps everything.
+   ═══════════════════════════════════════════════════════════════════════ */
+const SYNC_GZ_PREFIX = 'gz1:';
+
+async function _bytesToB64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+function _b64ToBytes(b64) {
+  const bin = atob(b64), out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+async function _pipe(bytes, stream) {
+  const res = new Response(new Blob([bytes]).stream().pipeThrough(stream));
+  return new Uint8Array(await res.arrayBuffer());
+}
+
+/* json -> string to store. Returns null when compression is unavailable and the plain copy is too big. */
+async function syncEncode(json, ceiling) {
+  if (json.length <= ceiling) return json;
+  if (typeof CompressionStream === 'undefined') return null;
+  try {
+    const gz = await _pipe(new TextEncoder().encode(json), new CompressionStream('gzip'));
+    const out = SYNC_GZ_PREFIX + await _bytesToB64(gz);
+    return out.length <= ceiling ? out : null;
+  } catch (e) { return null; }
+}
+
+/* stored string -> object. Accepts plain JSON and "gz1:" copies. Throws on anything else. */
+async function syncDecode(text) {
+  const s = String(text == null ? '' : text);
+  if (s.indexOf(SYNC_GZ_PREFIX) !== 0) return JSON.parse(s);
+  if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot read the compressed cloud copy. Update the browser.');
+  const bytes = await _pipe(_b64ToBytes(s.slice(SYNC_GZ_PREFIX.length)), new DecompressionStream('gzip'));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   QUESTION CORRECTIONS (pure helpers, unit-tested)
+
+   When the admin corrects a question file, a student's app must (1) replace its downloaded copy of
+   the file and (2) update the copies it saved for review (Missed, Saved, Flagged, weekly papers),
+   which would otherwise keep showing the old, wrong version forever.
+
+   A saved copy is matched to the corrected file by its position (uid = fileId_index), and checked
+   against the question text, so a question that merely moved is still found and a different
+   question is never overwritten.
+   ═══════════════════════════════════════════════════════════════════════ */
+function qTokens(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').split(' ').filter(Boolean);
+}
+/* 0..1: share of distinct words the two texts have in common. */
+function qSimilarity(a, b) {
+  const A = new Set(qTokens(a)), B = new Set(qTokens(b));
+  if (!A.size || !B.size) return 0;
+  let inter = 0; A.forEach(t => { if (B.has(t)) inter++; });
+  return inter / (A.size + B.size - inter);
+}
+function qUidParts(uid) {
+  const m = String(uid || '').match(/^(.*)_(\d+)$/);
+  return m ? { fid: m[1], index: Number(m[2]) } : null;
+}
+
+/* How alike are the answer options of two questions? 1 when both have none (nothing to compare). */
+function qOptionsSimilarity(a, b) {
+  const oa = (a && a.options) || [], ob = (b && b.options) || [];
+  if (!oa.length && !ob.length) return 1;
+  return qSimilarity(oa.join(' '), ob.join(' '));
+}
+
+/* Is `fresh` the corrected version of `old`? A corrected answer key leaves the wording alone, a typo fix changes a word,
+   and a different question shares neither the wording nor the options. */
+function sameQuestionAfterCorrection(old, fresh, minStem) {
+  const stem = qSimilarity(old && old.q, fresh && fresh.q);
+  if (stem < minStem) return false;
+  return stem >= 0.9 || qOptionsSimilarity(old, fresh) >= 0.5;
+}
+
+/* Where is `old` in the corrected file? { index, kind: 'same' | 'moved' | 'none' }
+   At its own position a close match is enough (0.6); anywhere else it must be near-identical (0.9), so a question that
+   was removed is never mistaken for a similar-looking neighbour. */
+function matchCorrectedQuestion(old, fresh) {
+  const parts = qUidParts(old && old.uid);
+  const list = Array.isArray(fresh) ? fresh : [];
+  if (parts) {
+    const here = list.find(q => q && q.uid === old.uid);
+    if (here && sameQuestionAfterCorrection(old, here, 0.6)) return { index: parts.index, question: here, kind: 'same' };
+  }
+  let best = null, bestSim = 0;
+  list.forEach(q => { const sm = qSimilarity(old && old.q, q && q.q); if (sm > bestSim) { bestSim = sm; best = q; } });
+  if (best && sameQuestionAfterCorrection(old, best, 0.9)) return { index: (qUidParts(best.uid) || {}).index, question: best, kind: best.uid === (old && old.uid) ? 'same' : 'moved' };
+  return { index: -1, question: null, kind: 'none' };
+}
+
+function questionContentChanged(a, b) {
+  const pick = q => JSON.stringify([q && q.q, q && q.options, String(q && q.correct), (q && q.explanation) || '', (q && q.img) || '', (q && q.imgCaption) || '']);
+  return pick(a) !== pick(b);
+}
+
+/* Update a saved copy from the corrected question. Review settings (streak, next due, tag, note, reason) are kept. */
+function applyQuestionCorrection(item, q, nowMs) {
+  const changed = questionContentChanged(item, q);
+  const out = Object.assign({}, item, { q: q.q, options: q.options, correct: q.correct, explanation: q.explanation, img: q.img, imgCaption: q.imgCaption, uid: q.uid, fileId: q.fileId });
+  delete out._withdrawn;
+  if (changed) out._corrected = nowMs;
+  return out;
+}
+
+/* Bring one saved list up to date with the corrected file `fid`.
+   opts.keepAll: never drop or merge items (a weekly paper must keep its length so answers still line up).
+   Returns { list, updated, moved, merged, withdrawn }. Nothing is ever deleted here: a question that is no longer in
+   the file is marked _withdrawn so the app can show it as withdrawn and leave it out of practice. */
+function applyCorrectionsToList(list, fid, fresh, nowMs, opts) {
+  const o = opts || {};
+  const items = Array.isArray(list) ? list : [];
+  const mine = it => it && it.fileId === fid || (it && String(it.uid || '').indexOf(fid + '_') === 0);
+  const res = { list: items, updated: 0, moved: 0, merged: 0, withdrawn: 0 };
+  if (!Array.isArray(fresh) || !fresh.length) return res;            /* a failed or empty download changes nothing */
+  const planned = items.map(it => mine(it) ? { it, m: matchCorrectedQuestion(it, fresh) } : { it, m: null });
+  const lost = planned.filter(p => p.m && p.m.kind === 'none').length;
+  const total = planned.filter(p => p.m).length;
+  const suspicious = lost > 0 && lost >= Math.max(3, 0.8 * total);     /* most of the file "vanished": bad download, not a real correction */
+  const seen = new Set();
+  const out = [];
+  planned.forEach(p => {
+    if (!p.m) { out.push(p.it); seen.add(p.it && p.it.uid); return; }
+    if (p.m.kind === 'none') {
+      if (suspicious) { out.push(p.it); return; }
+      if (!p.it._withdrawn) res.withdrawn++;
+      out.push(Object.assign({}, p.it, { _withdrawn: true })); return;
+    }
+    const upd = applyQuestionCorrection(p.it, p.m.question, nowMs);
+    if (upd.uid !== p.it.uid) res.moved++;
+    if (!o.keepAll && seen.has(upd.uid)) { res.merged++; return; }       /* two saved copies now point at one question */
+    if (questionContentChanged(p.it, p.m.question)) res.updated++;
+    seen.add(upd.uid); out.push(upd);
+  });
+  res.list = out;
+  return res;
+}
+
+/* Which section a reported question came from. `where` is 'results' or 'review-missed' / 'review-saved' / 'review-flagged'. */
+function reportSection(scope, mode, where) {
+  if (where) return where;
+  const sc = scope || {};
+  if (sc.weeklyId) return 'weekly';
+  if (sc.loksewaMock) return 'daily-paper';
+  if (sc.hourlySprint) return 'hourly';
+  return mode === 'exam' ? 'exam' : 'practice';
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LOKSEWA MARK SCHEME (pure, unit-tested)
+
+   Loksewa-style marking (+1 right, -0.2 wrong, 0 skipped) and the group / chapter
+   breakdown belong to exactly three places: the weekly test, the daily 75-mark paper
+   and the hourly 50-question sprint. Everything else (chapter practice, mixed, review)
+   shows a plain percentage.
+
+   The daily paper is built from a SCHEME the admin sets from the PSC syllabus: groups, the
+   marks each group carries, and which chapters feed it. The app never invents weights.
+   Until an admin sets one, the paper is 25 General Knowledge + 50 Level 7 Civil Engineering,
+   drawn evenly across chapters.
+   ═══════════════════════════════════════════════════════════════════════ */
+const LOKSEWA_NEGATIVE = 0.2;
+
+function isLoksewaFormat(scope) {
+  return !!(scope && (scope.weeklyId || scope.loksewaMock || scope.hourlySprint));
+}
+
+function defaultLoksewaScheme() {
+  return { version: 1, isDefault: true, total: 75, groups: [
+    { key: 'g0', name: 'General Knowledge', marks: 25, level: 'gk', chapters: [] },
+    { key: 'g1', name: 'Level 7 Civil Engineering', marks: 50, level: 'level7', chapters: [] }
+  ] };
+}
+
+/* Anything stored or typed -> a valid scheme, or the default. Never throws. */
+function normalizeLoksewaScheme(raw) {
+  try {
+    const o = (typeof raw === 'string') ? JSON.parse(raw || 'null') : raw;
+    if (!o || !Array.isArray(o.groups)) return defaultLoksewaScheme();
+    const ident = v => /^[A-Za-z0-9_.-]{1,40}$/.test(String(v));
+    const groups = [];
+    o.groups.slice(0, 20).forEach(g => {
+      if (!g) return;
+      const name = String(g.name == null ? '' : g.name).replace(/\s+/g, ' ').trim().slice(0, 60);
+      const marks = Math.round(Number(g.marks));
+      const level = String(g.level == null ? '' : g.level).trim();
+      if (!name || !isFinite(marks) || marks < 1 || marks > 100 || !ident(level)) return;
+      const chapters = (Array.isArray(g.chapters) ? g.chapters : []).map(String).filter(ident).slice(0, 60);
+      groups.push({ key: 'g' + groups.length, name, marks, level, chapters });
+    });
+    const total = groups.reduce((n, g) => n + g.marks, 0);
+    if (!groups.length || total < 1 || total > 200) return defaultLoksewaScheme();
+    return { version: 1, isDefault: false, total, groups };
+  } catch (e) { return defaultLoksewaScheme(); }
+}
+
+/* Which group does a chapter belong to? A group that names the chapter wins over a catch-all group for the level. */
+function loksewaGroupFor(scheme, lv, ch) {
+  const gs = (scheme && scheme.groups) || [];
+  return gs.find(g => g.level === lv && g.chapters.length && g.chapters.indexOf(ch) !== -1)
+      || gs.find(g => g.level === lv && !g.chapters.length) || null;
+}
+
+function _shuffled(arr, rng) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; }
+  return a;
+}
+
+/* pool: [{ q, lv, ch }]. Draws each group's marks from its own chapters, taking turns between chapters so no
+   chapter dominates or goes missing. Returns { questions, perGroup, shortfalls, total }. */
+function composeLoksewaPaper(scheme, pool, rng) {
+  const sch = scheme || defaultLoksewaScheme();
+  const byGroup = {}; sch.groups.forEach(g => { byGroup[g.key] = {}; });
+  (pool || []).forEach(p => {
+    const g = loksewaGroupFor(sch, p.lv, p.ch);
+    if (!g) return;
+    (byGroup[g.key][p.ch] = byGroup[g.key][p.ch] || []).push(p.q);
+  });
+  const questions = [], perGroup = {}, shortfalls = [];
+  sch.groups.forEach(g => {
+    const buckets = _shuffled(Object.keys(byGroup[g.key]), rng).map(ch => _shuffled(byGroup[g.key][ch], rng));
+    const picked = [];
+    for (let round = 0; picked.length < g.marks; round++) {
+      let any = false;
+      for (const b of buckets) { if (picked.length >= g.marks) break; if (round < b.length) { picked.push(b[round]); any = true; } }
+      if (!any) break;
+    }
+    perGroup[g.key] = picked.length;
+    if (picked.length < g.marks) shortfalls.push({ key: g.key, name: g.name, wanted: g.marks, got: picked.length });
+    picked.forEach(q => questions.push(q));
+  });
+  return { questions, perGroup, shortfalls, total: sch.total };
+}
+
+/* Result-page rows: one per group of the scheme (target = its marks), plus "Other" for questions outside it. */
+function loksewaGroupRows(scheme, items, useSchemeMarks) {
+  const sch = scheme || defaultLoksewaScheme();
+  const rows = {}; sch.groups.forEach(g => { rows[g.key] = { key: g.key, name: g.name, target: g.marks, total: 0, correct: 0, wrong: 0, skipped: 0 }; });
+  items.forEach(it => {
+    const g = (it.lv != null) ? loksewaGroupFor(sch, it.lv, it.ch) : null;
+    const k = g ? g.key : 'other';
+    const r = rows[k] || (rows[k] = { key: 'other', name: 'Other', target: 0, total: 0, correct: 0, wrong: 0, skipped: 0 });
+    r.total++;
+    if (it.state === 'skipped') r.skipped++; else if (it.state === 'correct') r.correct++; else r.wrong++;
+  });
+  return Object.keys(rows).map(k => rows[k]).filter(r => r.total > 0).map(r => {
+    const score = Math.round((r.correct - r.wrong * LOKSEWA_NEGATIVE) * 10) / 10;
+    const out = useSchemeMarks && r.target ? r.target : r.total;
+    return Object.assign({}, r, { score, outOf: out, pct: out ? Math.round((score / out) * 100) : 0 });
+  });
+}
+
+/* Rows typed into the admin editor -> '' when fine, else what to fix. A group with no chapters ticked takes every chapter
+   of its level that no other group names, so one catch-all per level is fine; the same chapter in two groups is not. */
+function loksewaSchemeConflict(rows) {
+  if (!Array.isArray(rows) || !rows.length) return 'Add at least one group.';
+  const named = {}, catchAll = {};
+  for (const r of rows) {
+    const name = String(r && r.name || '').trim(), m = Number(r && r.marks);
+    if (!name) return 'Every group needs a name.';
+    if (!isFinite(m) || m < 1 || m > 100 || Math.floor(m) !== m) return 'Marks must be whole numbers from 1 to 100 (' + name + ').';
+    const chs = Array.isArray(r.chapters) ? r.chapters : [];
+    if (!chs.length) {
+      if (catchAll[r.level]) return 'Two groups use every chapter of the same level ("' + catchAll[r.level] + '" and "' + name + '"). Tick chapters for one of them.';
+      catchAll[r.level] = name;
+    }
+    for (const c of chs) {
+      const k = r.level + '|' + c;
+      if (named[k]) return 'A chapter can only belong to one group ("' + named[k] + '" and "' + name + '" both have it).';
+      named[k] = name;
+    }
+  }
+  return '';
 }

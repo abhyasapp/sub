@@ -74,7 +74,7 @@
   --warning:#8F5407; --warning-soft:#FAEEDF; --warning-line:rgba(143,84,7,.24);
   --danger:#B23029;  --danger-soft:#FBE7E5;  --danger-line:rgba(178,48,41,.24);
   --info:#215C99;    --info-soft:#E6EFF9;    --info-line:rgba(33,92,153,.24);
-  --violet:#5A4A8A;  --violet-soft:#EDE9F7;  --violet-line:rgba(90,74,138,.24);
+  --violet:#5A4A8A;  --violet-ink:#5A4A8A;  --violet-soft:#EDE9F7;  --violet-line:rgba(90,74,138,.24);
   --focus:#1E7A4C;
   --selection:rgba(30,122,76,.18);
   --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
@@ -151,7 +151,7 @@
   --warning:#E0A048; --warning-soft:rgba(224,160,72,.14); --warning-line:rgba(224,160,72,.32);
   --danger:#F4606D;  --danger-soft:rgba(244,96,109,.14);  --danger-line:rgba(244,96,109,.32);
   --info:#54B9F0;    --info-soft:rgba(84,185,240,.13);    --info-line:rgba(84,185,240,.30);
-  --violet:#9B7DF0;  --violet-soft:rgba(155,125,240,.14); --violet-line:rgba(155,125,240,.32);
+  --violet:#9B7DF0; --violet-ink:#B5A0F6;  --violet-soft:rgba(155,125,240,.14); --violet-line:rgba(155,125,240,.32);
   --focus:#46C46E;
   --selection:rgba(70,196,110,.24);
   --sh-1:0 1px 2px rgba(0,0,0,.45);
@@ -256,7 +256,7 @@ button,a,label,summary,.eo,input[type=checkbox],input[type=radio]{touch-action:m
 .btn-solid,.btn-primary{background:var(--accent);color:var(--on-accent);border-color:transparent}
 .btn-solid:hover:not(:disabled),.btn-primary:hover:not(:disabled){background:var(--accent-hover)}
 .btn-solid:active:not(:disabled){background:var(--accent-pressed)}
-.btn-a{background:var(--accent-soft);color:var(--accent);border-color:var(--accent-line)}
+.btn-a{background:var(--accent-soft);color:var(--accent-ink,var(--accent));border-color:var(--accent-line)}
 .btn-a:hover:not(:disabled){background:var(--accent);color:var(--on-accent);border-color:transparent}
 .btn-g{background:var(--success-soft);color:var(--success);border-color:var(--success-line)}
 .btn-g:hover:not(:disabled){background:var(--success);color:var(--on-accent);border-color:transparent}
@@ -264,7 +264,7 @@ button,a,label,summary,.eo,input[type=checkbox],input[type=radio]{touch-action:m
 .btn-r:hover:not(:disabled){background:var(--danger);color:#fff;border-color:transparent}
 .btn-c{background:var(--info-soft);color:var(--info);border-color:var(--info-line)}
 .btn-c:hover:not(:disabled){background:var(--info);color:#fff;border-color:transparent}
-.btn-p{background:var(--violet-soft);color:var(--violet);border-color:var(--violet-line)}
+.btn-p{background:var(--violet-soft);color:var(--violet-ink);border-color:var(--violet-line)}
 .btn-p:hover:not(:disabled){background:var(--violet);color:#fff;border-color:transparent}
 .btn-quiet{background:var(--bg-sunken);color:var(--ink-2);border-color:transparent}
 .btn-quiet:hover:not(:disabled){background:var(--sep);color:var(--ink)}
@@ -351,7 +351,7 @@ button,a,label,summary,.eo,input[type=checkbox],input[type=radio]{touch-action:m
 .tg{background:var(--success-soft);color:var(--success)}
 .tr{background:var(--danger-soft);color:var(--danger)}
 .tc{background:var(--info-soft);color:var(--info)}
-.tp{background:var(--violet-soft);color:var(--violet)}
+.tp{background:var(--violet-soft);color:var(--violet-ink)}
 .tw{background:var(--warning-soft);color:var(--warning)}
 
 .sf{margin-bottom:var(--sp-3)}
@@ -777,7 +777,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .bn-sheet-arrow{color:var(--ink-4);font-size:.9rem;flex-shrink:0}
 .bn-sheet-item.admin{background:var(--violet-soft);border-color:var(--violet-line)}
 .bn-sheet-item.admin .bn-sheet-ic{background:var(--violet);color:#fff}
-.bn-sheet-item.admin .bn-sheet-name{color:var(--violet)}
+.bn-sheet-item.admin .bn-sheet-name{color:var(--violet-ink)}
 
 .due-strip{display:flex;flex-direction:column;gap:var(--sp-2);margin-bottom:var(--sp-3)}
 .due-item{
@@ -864,6 +864,11 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 .home-date{text-align:center;font-size:var(--fs-foot);color:var(--ink-3);margin-bottom:var(--sp-3)}
 
 /* v1.32 study PDFs */
+.rec-row{display:flex;align-items:center;gap:var(--sp-3);padding:var(--sp-2) 0;border-top:1px solid var(--sep)}
+.rec-row:first-child{border-top:0}
+.rec-main{flex:1;min-width:0}
+.rec-t{font-weight:650;font-size:var(--fs-callout)}
+.rec-s{font-size:var(--fs-cap);color:var(--ink-3);margin-top:1px}
 .sd-bar{display:flex;flex-direction:column;gap:var(--sp-2)}
 .sd-chips{display:flex;flex-wrap:wrap;gap:6px}
 .sd-chip{border:1px solid var(--sep);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:5px 12px;font:inherit;font-size:var(--fs-cap);font-weight:600;cursor:pointer}
@@ -1260,7 +1265,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   font-size:var(--fs-cap);font-weight:700
 }
 .subj-q-row .qm.m5{background:var(--accent-soft);color:var(--accent)}
-.subj-q-row .qm.m10{background:var(--violet-soft);color:var(--violet)}
+.subj-q-row .qm.m10{background:var(--violet-soft);color:var(--violet-ink)}
 
 .psy-hero{
   display:flex;align-items:center;gap:var(--sp-3);
@@ -1496,7 +1501,7 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
 </style>
 <style id="patch-114">
 /* v1.14: contrast, readable captions, visible menu button, trial pill */
-:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+:root:not(.dark){--ink-3:#5E6963;--ink-4:#7A857F;--accent-ink:#176B42}
 :root{--fs-cap:.75rem}
 .qt-lbl{font-size:.625rem}
 .tb-menu{display:none}
@@ -2277,11 +2282,11 @@ html.focus-mode .marquee-bar{display:none!important}
 
         <div class="card">
           <div class="card-hd"><h3>Backup to your account</h3><span class="ctag tg">Automatic</span></div>
-          <p class="t-callout mb3">Your progress saves to your Abhyas account whenever you're online. Restoring pulls that copy back onto this device.</p>
+          <p class="t-callout mb3">Your progress saves to your Abhyas account whenever you're online. Syncing only ever <b>adds</b> to your data: when two devices differ, they are combined, and nothing is removed.</p>
           <div id="psync-status" class="t-foot mb3">Not backed up yet this session.</div>
           <div class="bg">
             <button class="btn btn-a" onclick="DATA.syncNow()"><i class="ph ph-cloud-arrow-up"></i> Back up now</button>
-            <button class="btn btn-quiet" onclick="DATA.restoreCloud()"><i class="ph ph-cloud-arrow-down"></i> Restore</button>
+            <button class="btn btn-quiet" onclick="DATA.restoreCloud()"><i class="ph ph-cloud-arrow-down"></i> Add missing from cloud</button>
           </div>
         </div>
 
@@ -2361,6 +2366,15 @@ html.focus-mode .marquee-bar{display:none!important}
       <!-- ─────────────── BACKUP ─────────────── -->
       <div class="view" id="view-data">
         <div class="pg-head" data-head="data"></div>
+        <div class="card" id="recover-card">
+          <div class="card-hd"><h3><i class="ph ph-lifebuoy"></i> Recover data</h3><span class="ctag tg">Safe</span></div>
+          <p class="t-callout mb3">Syncing only ever adds to your data. If something looks missing, add back an earlier copy here. Adding a copy never deletes what you have now.</p>
+          <div class="t-foot mb2"><b>Saved on this device</b> before a sync changed anything</div>
+          <div id="recover-local" class="mb3"></div>
+          <div class="t-foot mb2"><b>Earlier cloud copies</b></div>
+          <div id="recover-cloud"><button class="btn btn-quiet btn-sm" onclick="RECOVER.loadCloud()"><i class="ph ph-cloud-arrow-down"></i> Check earlier cloud copies</button></div>
+          <div id="recover-msg" class="t-foot" style="margin-top:var(--sp-2)" aria-live="polite"></div>
+        </div>
         <div class="card">
           <div class="card-hd"><h3>Backup file</h3></div>
           <p class="t-callout mb4">Progress, saved questions, flags, your miss list and your study plan all live on this device. Export keeps a copy you control.</p>

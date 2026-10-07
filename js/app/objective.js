@@ -625,7 +625,7 @@ const REV = {
       REV.addWrong(question);
     }
   },
-  dueWrong(){ return S.wr.filter(x => (x._nextDue==null) || x._nextDue <= Date.now()); },
+  dueWrong(){ return S.wr.filter(x => !x._withdrawn && ((x._nextDue==null) || x._nextDue <= Date.now())); },
   dueCount(){ return REV.dueWrong().length; },
 
   renderList(kind){
@@ -701,6 +701,9 @@ const REV = {
           ${q.tag ? `<span class="ctag ta" style="margin-left:.3rem"><i class="ph ph-tag"></i> ${esc(q.tag)}</span>` : ''}
           ${srBadge}
           ${missBadge}
+          ${q._withdrawn ? `<span class="ctag tr" style="margin-left:.3rem" title="This question was removed from the question bank"><i class="ph ph-prohibit"></i> Withdrawn</span>` : ''}
+          ${(q._corrected && Date.now() - q._corrected < 14*24*60*60*1000) ? `<span class="ctag tg" style="margin-left:.3rem" title="Your teacher corrected this question"><i class="ph ph-check-circle"></i> Corrected</span>` : ''}
+          ${qReportHtml(q, `REV._report(${kindJson},${uidJson})`)}
           ${qSearchHtml(q)}
           <button class="ib" onclick='REV._removeOne(${kindJson},${uidJson})' title="Remove from review" aria-label="Remove from review"><i class="ph ph-trash"></i></button>
         </div>
@@ -714,6 +717,10 @@ const REV = {
       </div>`;
     }).join('');
     renderMath(el);
+  },
+  _report(kind, uid){
+    const q = REV._store(kind).find(x => x.uid === uid);
+    QUIZ._openReport(q, { section: kind === 'bk' ? 'review-saved' : kind === 'fl' ? 'review-flagged' : 'review-missed', chosen: null });
   },
   _removeOne(kind, uid){
     const arr=REV._store(kind);
@@ -735,7 +742,7 @@ const REV = {
     });
   },
   start(kind, mode, dueOnly){
-    let arr = [...REV._store(kind)];
+    let arr = [...REV._store(kind)].filter(x => !x._withdrawn);     /* a withdrawn question stays listed but is never practised */
     if(kind==='wr' && dueOnly) arr = REV.dueWrong();
     if(!arr.length){toast(dueOnly?'Nothing due for review right now 🎉':'Nothing to study here yet');return}
     QUIZ.startWith(shuf(arr), mode, kind==='bk'?'⭐ Bookmarks':kind==='fl'?'🚩 Flagged':(dueOnly?'🔁 Wrong Bank (Due Today)':'❌ Wrong Bank'));
@@ -1481,10 +1488,29 @@ const QUIZ = {
       toastUndo('🚩 Flagged', function(){ REV.toggle('fl', q); QUIZ._renderFlashcard(); });
     }
   },
+  /* ── Reporting a question. One reporter serves every section; each entry point only says which
+     question, which section, and what the student had picked. ── */
   _reportCurrent(){
     const q = S.quiz.qs?.[S.quiz.idx];
+    const pick = S.quiz.ans?.[S.quiz.idx];
+    QUIZ._openReport(q, { section: reportSection(S.quiz.scope, S.quiz.mode), chosen: (typeof pick === 'number') ? pick : null });
+  },
+  _reportExam(qi){
+    const q = S.quiz.qs?.[qi];
+    const pick = S.quiz.ans?.[qi];
+    QUIZ._openReport(q, { section: reportSection(S.quiz.scope, S.quiz.mode), chosen: (typeof pick === 'number') ? pick : null });
+  },
+  _reportResult(i){
+    const q = S.quiz.qs?.[i];
+    const pick = S.quiz.ans?.[i];
+    QUIZ._openReport(q, { section: reportSection(S.quiz.scope, S.quiz.mode, 'results'), chosen: (typeof pick === 'number') ? pick : null });
+  },
+  _openReport(q, ctx){
     if(!q){ toast('No question to report.'); return; }
+    if(!q.uid || q.fileId === 'local' || String(q.uid).indexOf('local_') === 0){ toast('Questions from your own question bank cannot be reported.'); return; }
+    QUIZ._rep = { q, section: (ctx && ctx.section) || 'other', chosen: (ctx && ctx.chosen != null) ? ctx.chosen : null };
     openMod('Report an issue', `
+      <div class="t-foot mb2" style="max-height:4.5em;overflow:hidden">${esc(String(q.q || '').slice(0, 160))}</div>
       <div class="sf"><label for="qr-reason">What's wrong?</label>
         <select id="qr-reason">
           <option value="wrong_answer">The marked answer looks wrong</option>
@@ -1493,32 +1519,38 @@ const QUIZ = {
           <option value="other">Something else</option>
         </select>
       </div>
-      <div class="sf"><label for="qr-note">Details (optional)</label><textarea id="qr-note" rows="3" placeholder="Anything that would help — e.g. which option you think is actually correct"></textarea></div>
+      <div class="sf"><label for="qr-note">Details (optional)</label><textarea id="qr-note" rows="3" maxlength="500" placeholder="Anything that would help, e.g. which option you think is correct"></textarea></div>
       <button class="btn" id="qr-send-btn">Send Report</button>
     `);
     const sendBtn = document.getElementById('qr-send-btn');
-    if(sendBtn) sendBtn.onclick = ()=> QUIZ._submitReport(q.uid);
+    if(sendBtn) sendBtn.onclick = ()=> QUIZ._submitReport();
   },
-  async _submitReport(uid){
-    const q = (S.quiz.qs||[]).find(x=>x.uid===uid) || S.quiz.qs?.[S.quiz.idx];
+  async _submitReport(){
+    const rep = QUIZ._rep;
+    const q = rep && rep.q;
+    if(!q){ closeMod(); return; }
     const reason = document.getElementById('qr-reason')?.value || 'other';
     const note = (document.getElementById('qr-note')?.value || '').trim();
-    if(!S.user?.username || !S.user?.token){ toast('❌ Please log in again to report a question.'); return; }
+    if(!S.user?.username || !S.user?.token){ toast('Please sign in again to report a question.'); return; }
+    if(!S.online || S.forcedOffline){ toast('You are offline. Connect to the internet to send a report.', 5000); return; }
     closeMod();
-    toast('Sending report…');
+    toast('Sending report\u2026');
     try{
       const r = await netFetch(APPS, {
         method:'POST', headers:{'Content-Type':'text/plain'},
         body: JSON.stringify({
           action:'reportQuestion', username:S.user.username, token:S.user.token,
-          uid, reason, note, questionSnapshot: (q?.q||'').slice(0,1000)
+          uid: q.uid, reason, note, questionSnapshot: (q.q||'').slice(0,1000),
+          optionsSnapshot: (q.options || []).slice(0, 6), correctIndex: isNaN(Number(q.correct)) ? '' : Number(q.correct),
+          chosenIndex: rep.chosen == null ? '' : rep.chosen, section: rep.section,
+          appVersion: (typeof APP_VERSION !== 'undefined') ? APP_VERSION : ''
         })
       }, 15000);
       const res = await r.json();
-      if(res.success) toast('✅ ' + (res.message || 'Thanks — report sent.'));
-      else toast('❌ ' + (res.error || 'Could not send report.'));
+      if(res.success) toast('\u2705 ' + (res.message || 'Thanks, report sent.'));
+      else toast('\u274c ' + (res.error || 'Could not send report.'));
     }catch(e){
-      toast('⚠️ Could not send report — check your connection and try again.');
+      toast('\u26a0\ufe0f Could not send report. Check your connection and try again.');
     }
   },
   _tagCurrent(tag){
@@ -1548,7 +1580,7 @@ const QUIZ = {
       const savedAns = S.quiz.ans[qi];
       return `
       <div class="eqc${savedAns!==null?' answered':''}" id="eqc-${qi}">
-        <div class="qm"><span class="qn mono">Q${qi+1}</span><span style="display:inline-flex;gap:.3rem;align-items:center"><button type="button" class="ib mark-btn${S.quiz.marked && S.quiz.marked.has(qi) ? ' fl-on' : ''}" onclick="QUIZ.toggleMark(${qi})" title="Mark for review" aria-label="Mark question ${qi+1} for review"><i class="ph ph-flag"></i></button>${qSearchHtml(q)}</span></div>
+        <div class="qm"><span class="qn mono">Q${qi+1}</span><span style="display:inline-flex;gap:.3rem;align-items:center"><button type="button" class="ib mark-btn${S.quiz.marked && S.quiz.marked.has(qi) ? ' fl-on' : ''}" onclick="QUIZ.toggleMark(${qi})" title="Mark for review" aria-label="Mark question ${qi+1} for review"><i class="ph ph-flag"></i></button>${qReportHtml(q, `QUIZ._reportExam(${qi})`, `Report an issue with question ${qi+1}`)}${qSearchHtml(q)}</span></div>
         <div class="qt" style="font-size:.85rem">${esc(q.q)}</div>
         ${qImgHtml(q)}
         ${q.options.map((opt,oi)=>{
@@ -1675,16 +1707,16 @@ const QUIZ = {
     const wrong = S.quiz.ans.filter((a,i)=> a!==null && !isOk(a,S.quiz.qs[i].correct)).length;
     const skipped = S.quiz.ans.filter(a=>a===null).length;
 
-    /* Weekly tests and the daily Loksewa paper are marked the Loksewa way (+1 right,
+    /* Weekly tests, the daily Loksewa paper and the hourly 50 are marked the Loksewa way (+1 right,
        -0.2 wrong, 0 skipped), and that is the number the headline shows, so it matches
        the score line below it and what the server ranks. Every other quiz type
-       (chapter practice, mixed, review) keeps the plain percentage. `isWeekly` is
+       (chapter practice, mixed, review) keeps the plain percentage and shows no Loksewa wording. `isWeekly` is
        reused further down when recording the attempt (declaring it twice with
        `const` is a syntax error that stops this whole file from loading). */
     const rawPct = total ? Math.round((correct/total)*100) : 0;
     const isWeekly = !!(S.quiz.scope && S.quiz.scope.weeklyId);
-    const isLoksewaPaper = !!(S.quiz.scope && S.quiz.scope.loksewaMock);
-    const marked = ((isWeekly || isLoksewaPaper) && total)
+    const isLoksewa = isLoksewaFormat(S.quiz.scope);     /* weekly test, daily 75-mark paper, hourly 50: nothing else */
+    const marked = (isLoksewa && total)
       ? Math.round(((correct - wrong * 0.2) / total) * 1000) / 10
       : null;
     const pct = (marked !== null) ? Math.max(0, marked) : rawPct;   /* 0 floor keeps the ring sane; the score line shows the exact marks */
@@ -1702,8 +1734,8 @@ const QUIZ = {
       negEl.style.marginTop = '.3rem';
       document.getElementById('res-grade').after(negEl);
     }
-    if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock){
-      const score = correct - wrong * 0.2;
+    if (isLoksewa){
+      const score = correct - wrong * LOKSEWA_NEGATIVE;
       const pctLok = total ? Math.round((score / total) * 1000) / 10 : 0;
       const verdict = score >= total * 0.4
         ? '<span style="color:var(--success);font-weight:700">above the usual 40% cut-off</span>'
@@ -1715,9 +1747,7 @@ const QUIZ = {
       negEl.style.lineHeight = '1.55';
       negEl.style.textAlign = 'center';
     } else {
-      negEl.textContent = total
-        ? `Loksewa-style score: ${Math.max(0, correct - wrong * 0.2).toFixed(1)} / ${total} (each wrong answer costs 0.2)`
-        : '';
+      negEl.textContent = '';          /* chapter practice, mixed and review show the plain percentage only */
     }
 
     document.getElementById('res-stats').innerHTML = `
@@ -1728,7 +1758,9 @@ const QUIZ = {
     `;
 
     try {
-      if (S.quiz && S.quiz.scope && S.quiz.scope.loksewaMock) {
+      const oldBlock = document.querySelector('#view-results .chapter-breakdown, .chapter-breakdown');
+      if (oldBlock) oldBlock.remove();      /* never leave the previous paper's tables behind */
+      if (isLoksewa) {
         const groups = {};
         (S.quiz.qs || []).forEach((q, i) => {
           let label = 'Other';
@@ -1771,54 +1803,40 @@ const QUIZ = {
 
         const weak = rows.filter(r => r.pct < 40 && r.total >= 2);
 
-        const groupMap = (window.WEEKLY && window.WEEKLY.LOKSEWA_GROUPS) || {};
-        const byGroup = {};
-        (S.quiz.qs || []).forEach((q, i) => {
-          let key = 'Other';
+        /* Groups come from the scheme the admin set (see shared.js). The daily paper is scored out of each group's
+           marks; weekly and hourly sets are not built from the scheme, so they are scored out of their own questions. */
+        const scheme = (window.LKS && LKS.scheme()) || defaultLoksewaScheme();
+        const items = (S.quiz.qs || []).map((q, i) => {
+          let lv = null, ch = null;
           try {
-            if (typeof fidFromUid === 'function' && typeof ChapterData !== 'undefined'){
-              const fid = fidFromUid(String(q.uid || ''));
-              const ref = ChapterData.allFileRefs().find(r => r.fid === fid);
-              if (ref){
-                for (const k of Object.keys(groupMap)){
-                  if ((groupMap[k].chapters || []).indexOf(ref.ch) !== -1){ key = k; break; }
-                }
-              }
-            }
+            const fid = (typeof fidFromUid === 'function') ? fidFromUid(String(q.uid || '')) : '';
+            const ref = ChapterData.allFileRefs().find(r => r.fid === fid);
+            if (ref) { lv = ref.lv; ch = ref.ch; }
           } catch(e){}
-          const g = byGroup[key] || (byGroup[key] = { key, correct: 0, wrong: 0, skipped: 0, total: 0 });
           const a = S.quiz.ans[i];
-          g.total++;
-          if (a === null || a === undefined) g.skipped++;
-          else if (isOk(a, q.correct)) g.correct++;
-          else g.wrong++;
+          return { lv, ch, state: (a === null || a === undefined) ? 'skipped' : (isOk(a, q.correct) ? 'correct' : 'wrong') };
         });
-        const groupRows = Object.keys(byGroup).sort().map(k => {
-          const g = byGroup[k];
-          const score = g.correct - g.wrong * 0.2;
-          const target = (groupMap[k] && groupMap[k].marks) || g.total;
-          const pct = target ? Math.round((score / target) * 100) : 0;
-          const cls = pct >= 60 ? 'color:var(--success)'
-                    : pct >= 40 ? 'color:var(--accent)'
-                    : 'color:var(--danger)';
-          const label = (groupMap[k] && groupMap[k].name) ? groupMap[k].name : ('Group ' + k);
+        const gRows = loksewaGroupRows(scheme, items, !!(S.quiz.scope && S.quiz.scope.loksewaMock));
+        const showGroups = gRows.some(r => r.key !== 'other');       /* a table with only "Other" says nothing */
+        const groupRows = gRows.map(g => {
+          const cls = g.pct >= 60 ? 'color:var(--success)' : g.pct >= 40 ? 'color:var(--accent)' : 'color:var(--danger)';
           return '<tr>' +
-            '<td>' + esc(label) + '</td>' +
+            '<td>' + esc(g.name) + '</td>' +
             '<td class="num" style="text-align:center">' + g.total + '</td>' +
             '<td class="num" style="text-align:center;color:var(--success)">' + g.correct + '</td>' +
             '<td class="num" style="text-align:center;color:var(--danger)">' + g.wrong + '</td>' +
             '<td class="num" style="text-align:center">' + g.skipped + '</td>' +
             '<td class="num" style="text-align:right;font-weight:700;' + cls + '">' +
-              score.toFixed(1) + ' <span class="t-cap">/ ' + target + '</span>' +
+              g.score.toFixed(1) + ' <span class="t-cap">/ ' + g.outOf + '</span>' +
             '</td>' +
           '</tr>';
         }).join('');
 
         const block = document.createElement('div');
         block.className = 'chapter-breakdown';
-        block.innerHTML =
+        block.innerHTML = (!showGroups ? '' :
           '<h3 class="t-t3" style="margin:var(--sp-4) 0 var(--sp-2)">' +
-            '<i class="ph ph-medal"></i> Marks by group (Loksewa format)' +
+            '<i class="ph ph-medal"></i> Marks by group' +
           '</h3>' +
           '<div class="table-wrap" style="margin-bottom:var(--sp-3)">' +
             '<table>' +
@@ -1832,7 +1850,7 @@ const QUIZ = {
               '</tr></thead>' +
               '<tbody>' + groupRows + '</tbody>' +
             '</table>' +
-          '</div>' +
+          '</div>') +
           '<h3 class="t-t3" style="margin:var(--sp-4) 0 var(--sp-2)">' +
             '<i class="ph ph-chart-bar"></i> Marks by chapter' +
           '</h3>' +
@@ -1897,7 +1915,7 @@ const QUIZ = {
       const a = S.quiz.ans[i];
       const correctPick = isOk(a,q.correct);
       return `<div class="qcard" style="border-left-color:${correctPick?'var(--ok)':'var(--bad)'}">
-        <div class="qm"><span class="qn mono">Q${i+1}</span><span class="ctag ${correctPick?'tg':'tr'}">${correctPick?'Correct':a===null?'Skipped':'Wrong'}</span>${qSearchHtml(q)}</div>
+        <div class="qm"><span class="qn mono">Q${i+1}</span><span class="ctag ${correctPick?'tg':'tr'}">${correctPick?'Correct':a===null?'Skipped':'Wrong'}</span>${qReportHtml(q, `QUIZ._reportResult(${i})`, `Report an issue with question ${i+1}`)}${qSearchHtml(q)}</div>
         <div class="qt" style="font-size:.82rem">${esc(q.q)}</div>
         ${qImgHtml(q)}
         ${q.options.map((opt,oi)=>{

@@ -82,6 +82,89 @@
 - Tests: permissions are now cross-checked (every permission the backend checks exists and can be granted, except the
   deliberately owner-only `admins_manage`, which the test confirms is role-enforced), plus 36 tests for the study-PDF rules.
 
+## Review of the remaining files (seventh pass)
+- **Offline bug fixed:** `sw.js` never precached `js/app/user-page.js`, the biggest student script (Home sprint card, insights,
+  study PDFs, sidebar search, achievements). After a first visit, going offline left those features missing. Proven with a real
+  browser: server stopped, page reloaded, the script was not loaded before the fix and is now. A new test fails if any script,
+  stylesheet or image the public pages load is missing from the offline list.
+- **Accessibility (axe-core, WCAG 2.1 AA, real Chromium, 15 screens in light and dark): 0 violations.** Fixed: the admin side rail
+  buttons had no accessible name (icons only); muted text colours were below 4.5:1 in several places (light `--ink-3`, the login
+  footer, the admin dark theme, tinted buttons, the admin dark error banner); links inside sentences relied on colour alone; the
+  achievements strip was not keyboard-reachable and its locked items were nearly invisible. A test now reads the CSS colour tokens
+  of all three pages in both themes and fails below 4.5:1.
+- **Security audit made permanent:** all 91 backend actions were checked. Only the 9 intended public ones (login, sign-up, password
+  reset, public info/settings, client error log, admin login) lack an authentication check, and a test now fails if a new endpoint
+  is added without one. Self-service admin actions (change own password, list admins) are confirmed to act on the caller's own
+  account only. No duplicate names exist across the five Apps Script files (they share one global scope).
+- **Formula injection:** study-PDF titles and notes that start with = + - @ are now neutralised before they reach the sheet.
+- Lint (eslint:recommended with cross-file globals) is clean on every script. Toasts use `textContent`, so error messages cannot
+  inject HTML.
+- `tests/browser/` added: `a11y.js` and `offline.js` for repeatable real-browser checks.
+
+## Data-loss fix: sync only ever adds (eighth pass)
+**What went wrong.** A student's large missed-question bank was cut down after "Combined progress from your other device".
+Two things combined. (1) The cloud copy has always been limited to about 45,000 characters, and to fit it the app cut the lists
+down (a bank of 250 became about 20) before uploading. (2) The two-device merge added earlier in v1.32 started from that
+cut-down copy instead of the full data on the device, and then wrote the result back over the device. Reproduced: 250 missed and
+60 saved questions became 21 and 20.
+
+**What changed.**
+- Every merge starts from the complete data on the device, and a result smaller than what the device already had is refused.
+- The cloud copy is the complete state, compressed (`gz1:`) when large; a 2,000-question bank fits. Small copies stay plain JSON.
+  If a copy cannot fit even compressed, nothing is cut and nothing is uploaded; the device keeps everything.
+- The page-closing upload never sends a cut-down copy.
+- "Restore", "Load a backup file", first sign-in on a new device and every save conflict now ADD to the device. Nothing replaces
+  anything. (Before, Restore and file import replaced the lists wholesale.)
+- Safety copies: before any of those changes, the device keeps the last 3 copies of its own data (Data > Recover data > Add back).
+  The server also keeps up to 3 earlier cloud copies per student (sheet `ProgressHistory`, taken at least 30 minutes apart, and
+  always when a save would make the copy much smaller). Adding a copy back only adds.
+- Running totals (questions answered, correct) and earned badges are merged, not overwritten by one device's numbers.
+- Signing in with the same account in different capitals no longer counts as a different account (a different account still
+  starts clean, after keeping a copy for the first one).
+- Tests: the real sync code is loaded and run against the failing case, and a real-browser test (`tests/browser/sync-merge.js`)
+  covers conflict, restore, import, recovery after loss, and account switching. With trimming put back, 8 of these fail.
+
+**Deploy order matters.** Paste the new `gas/code.gs` and create a new deployment BEFORE publishing the new site files.
+A new app talking to the old backend cannot upload compressed copies; it keeps all data on the device and retries.
+
+**Limits.** Adding means deleted items can come back from another device (a bookmark removed on one device can reappear after a
+sync). Data already lost cannot be re-created by this update; it can come back only from a device that still holds it, a backup file,
+or the optional Google Drive backup.
+
+## Question corrections and the Loksewa mark scheme (ninth pass)
+**Why Loksewa marks appeared everywhere.** The result page printed "Loksewa-style score ... each wrong answer costs 0.2" for every
+quiz, including chapter practice. Loksewa marking, the score line and the group / chapter tables now appear only on the weekly test,
+the daily 75-mark paper and the hourly 50. Every other result shows the plain percentage and no Loksewa wording.
+
+**Why the daily 75 did not follow a mark scheme.** There was none. The paper was 25 General Knowledge + 50 Level 7 questions picked at
+random from the whole pool, so one big chapter could dominate and others be missing, and the "Marks by group" table read a group map
+(`WEEKLY.LOKSEWA_GROUPS`) that was never defined, so every question landed in "Other". Now:
+- Admin > Settings > **Loksewa mark scheme**: groups, the marks each carries, the level and the chapters that feed it. Enter it from the PSC
+  syllabus (the app does not guess official weights). Until one is saved the paper is 25 + 50, drawn evenly across chapters.
+- The daily paper takes exactly each group's marks, chapters take turns inside a group, and a group that has too few questions is
+  reported honestly instead of being padded from another group. Time is 0.8 minute per mark (75 marks = 60 minutes).
+- The result page shows marks by group out of each group's marks (daily paper) or out of the set's own questions (weekly, hourly).
+- Students receive the scheme with the public info they already fetch; the server refuses a malformed scheme.
+
+**Reported-question corrections, in every section.**
+- A report button now appears in chapter practice, timed exams, the daily paper, weekly tests, the hourly 50, the results review and the
+  full Missed, Saved and Flagged lists (it was in chapter practice only). A report carries the options, the answer the app marks correct,
+  what the student picked, the section and the app version. Questions from a student's own bank have no button.
+- Admin > Reports shows all of that, plus how many different students reported the same question (the best sign it is wrong), the
+  position in the file and a link to the file. **Mark fixed** closes every open report on that question and tells all phones to refresh
+  that file. **No change needed** closes without telling phones. **Refresh a file** is for files edited directly in Drive.
+- Phones ask every few minutes which files were corrected. For each: drop the downloaded copy (it used to linger up to 24 hours), download
+  the corrected file, and update the questions saved for review and weekly papers. Streaks, due dates, tags and notes are kept. A saved
+  question that is no longer in the file is marked **Withdrawn**, kept, and never practised. A failed download changes nothing and is retried.
+- A saved question is matched to the corrected file by position AND by wording and options, so a deleted question is never overwritten by a
+  look-alike neighbour. The Missed practice screen also no longer swaps a saved question for a different one at the same position.
+- The student who reported a question is thanked when it is fixed.
+- Editing a question in the admin editor now does the same refresh.
+- Correct questions in place: do not delete or reorder questions in a file, because progress is tied to each question's position.
+
+**Deploy:** paste the new `gas/code.gs` and create a new deployment first (new report columns are added automatically), then publish the
+site. Then open Admin > Settings and enter the mark scheme.
+
 ## Learning
 - New 60-day sprint card (shared.js sprintPlan + SPRINT in user-page.js): daily topic, question and time targets,
   pace indicator, and a one-tap start (mock paper in the last 8 days).

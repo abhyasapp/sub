@@ -511,7 +511,7 @@ details.faq p{
 
 .foot{
   margin-top:var(--sp-12);padding-top:var(--sp-5);border-top:1px solid var(--sep);
-  text-align:center;font-size:var(--fs-cap);color:var(--ink-4)
+  text-align:center;font-size:var(--fs-cap);color:var(--ink-3)
 }
 
 /* ── Toasts ───────────────────────────────────────────────────────── */
@@ -544,7 +544,9 @@ details.faq p{
 </style>
 <style id="patch-114">
 /* v1.14: small text now meets 4.5:1 contrast on the light theme */
-:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+:root:not(.dark){--ink-3:#5E6963;--ink-4:#7A857F;--accent-ink:#176B42}
+/* links inside sentences are underlined so they do not rely on colour alone */
+#cookie-banner a,.field-hint a,.foot a{text-decoration:underline;text-underline-offset:2px}
 </style>
 </head>
 <body>

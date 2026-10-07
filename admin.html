@@ -81,11 +81,11 @@
   color-scheme:dark;
   --bg:#0F1213;--bg-grouped:#171A1C;--surface:#1A1E20;--surface-2:#22272A;--scrim:rgba(0,0,0,.58);
   --sep:rgba(255,255,255,.08);--sep-strong:rgba(255,255,255,.15);
-  --ink:#EFF2F1;--ink-2:#9BA1A3;--ink-3:#71777A;--ink-4:#4D5254;--on-accent:#05120C;
+  --ink:#EFF2F1;--ink-2:#9BA1A3;--ink-3:#8E9498;--ink-4:#4D5254;--on-accent:#05120C;
   --accent:#41C98A;--accent-hover:#5BD49C;--accent-pressed:#31AA73;--accent-soft:rgba(65,201,138,.15);--accent-rgb:65,201,138;
   --success:#41C98A;--success-soft:rgba(65,201,138,.15);
   --warning:#E3A751;--warning-soft:rgba(227,167,81,.15);
-  --danger:#F0685F;--danger-soft:rgba(240,104,95,.15);
+  --danger:#F4837B;--danger-soft:rgba(240,104,95,.15);
   --info:#5FAEE8;--info-soft:rgba(95,174,232,.15);
   --focus:#41C98A;--selection:rgba(65,201,138,.25);
   --sh-1:0 1px 2px rgba(0,0,0,.4);--sh-2:0 6px 20px rgba(0,0,0,.45);--sh-modal:0 28px 72px rgba(0,0,0,.62);
@@ -532,6 +532,13 @@ td .empty{padding:var(--sp-10) var(--sp-4)}
 .banner i{flex-shrink:0;margin-top:1px;font-size:1rem}
 .banner-warning{background:var(--warning-soft);color:var(--warning)}
 .banner-danger{background:var(--danger-soft);color:var(--danger)}
+.qr-opts{margin-top:var(--sp-2);display:grid;gap:4px}
+.qr-opt{padding:6px 10px;border:1px solid var(--sep);border-radius:var(--r-control);font-size:var(--fs-callout);color:var(--ink)}
+.qr-opt.is-correct{border-color:var(--success);background:var(--success-soft)}
+.qr-opt.is-picked{border-color:var(--warning)}
+.qr-tag{margin-left:6px;font-size:var(--fs-cap);font-weight:700;color:var(--ink)}
+/* links inside a sentence are underlined so they do not rely on colour alone */
+.t-cap a,.t-foot a{text-decoration:underline;text-underline-offset:2px}
 .banner-info{background:var(--info-soft);color:var(--info)}
 .banner-accent{background:var(--accent-soft);color:var(--accent)}
 #busy{position:fixed;top:0;left:0;right:0;height:2px;z-index:var(--z-toast);
@@ -699,7 +706,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
 #ov-confirm,#ov-pwd,#ov-review,#ov-user,#ov-sheet{ z-index:10020; }
 </style>
 <style id="patch-114">
-:root:not(.dark){--ink-3:#66716B;--ink-4:#7A857F}
+:root:not(.dark){--ink-3:#5E6963;--ink-4:#7A857F;--accent-ink:#176B42}
 </style>
 </head>
 <body>
@@ -770,7 +777,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
     <div id="rail-nav"></div>
 
     <div class="rail-foot">
-      <button class="rail-item" id="rail-switch" onclick="ADMIN._leaveAdminMode()"><i class="ph ph-arrow-square-out"></i><span id="rail-switch-label">Student app</span></button>
+      <button class="rail-item" id="rail-switch" aria-labelledby="rail-switch-label" onclick="ADMIN._leaveAdminMode()"><i class="ph ph-arrow-square-out"></i><span id="rail-switch-label">Student app</span></button>
       <div class="rail-version" id="rail-version">Abhyas V1</div>
     </div>
   </nav>
@@ -1014,7 +1021,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
       <section class="view" id="view-qreports" aria-label="Question reports">
         <div class="page-head">
           <div><h1>Reports</h1><p>Questions students have flagged as wrong, unclear or broken.</p></div>
-          <div class="acts"><button class="btn btn-secondary btn-sm" data-perm="exports" onclick="QREPORTS.exportCSV()"><i class="ph ph-download-simple"></i> Export CSV</button></div>
+          <div class="acts"><button class="btn btn-secondary btn-sm" data-perm="qreports_manage" onclick="QREPORTS.refreshFile()"><i class="ph ph-arrows-clockwise"></i> Refresh a file</button><button class="btn btn-secondary btn-sm" data-perm="exports" onclick="QREPORTS.exportCSV()"><i class="ph ph-download-simple"></i> Export CSV</button></div>
         </div>
         <div class="toolbar">
           <input class="input search" type="search" id="qreports-search" placeholder="Search question, reporter or note" oninput="QREPORTS.debouncedFilter()" aria-label="Search reports">
@@ -1278,7 +1285,21 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
           <div class="panel-hd"><div><h3>Your account</h3><div class="sub" id="settings-account-line">—</div></div></div>
           <button class="btn btn-secondary" onclick="ADMIN.changePassword()"><i class="ph ph-key"></i> Change password</button>
         </div>
-      </section>
+      
+        <div class="panel" id="lks-panel">
+          <div class="panel-hd"><div><h3>Loksewa mark scheme</h3></div></div>
+          <p class="t-foot mb3">How the <b>daily paper</b> is built and how <b>marks by group</b> are shown on the results of the weekly test, the daily paper and the hourly 50. Enter the groups and their marks from the PSC syllabus. Each group draws its questions from the chapters you tick, taking turns between chapters. If nothing is saved, the daily paper is 25 General Knowledge + 50 Level 7 Civil Engineering.</p>
+          <div id="lks-rows"></div>
+          <div class="flex between center wrap g2 mt2">
+            <button class="btn btn-quiet btn-sm" onclick="LKS_ADMIN.addRow()"><i class="ph ph-plus"></i> Add a group</button>
+            <span class="t-callout" id="lks-total" aria-live="polite"></span>
+          </div>
+          <div class="flex g2 mt4 wrap">
+            <button class="btn btn-primary" id="lks-save" data-perm="settings_manage" onclick="LKS_ADMIN.save()"><i class="ph ph-check"></i> Save mark scheme</button>
+            <button class="btn btn-quiet" data-perm="settings_manage" onclick="LKS_ADMIN.useDefault()">Go back to the default (25 + 50)</button>
+          </div>
+        </div>
+</section>
 
     </div>
     </main>
@@ -2924,6 +2945,17 @@ const WEEKLYSETS = {
 const QREPORTS = {
   all: [], filter: 'open', chapterFilter: 'all', reasonFilter: 'all', searchTerm: '', _t: null,
   REASON: { wrong_answer:'Wrong answer', unclear:'Unclear wording', typo:'Typo or formatting', other:'Other' },
+  SECTION: { practice:'Chapter practice', exam:'Timed exam', 'daily-paper':'Daily 75-mark paper', weekly:'Weekly test', hourly:'Hourly 50', results:'Results review',
+             'review-missed':'Missed list', 'review-saved':'Saved list', 'review-flagged':'Flagged list', other:'Other' },
+  /* The options as the student saw them, with the answer the app marks correct and the one the student picked. */
+  _optionsHtml(r){
+    if (!r.options || !r.options.length) return '';
+    return '<div class="qr-opts">' + r.options.map((o, i) => {
+      const isC = r.correctIndex === i, isP = r.chosenIndex === i;
+      return '<div class="qr-opt' + (isC ? ' is-correct' : '') + (isP && !isC ? ' is-picked' : '') + '"><b>' + 'ABCDEF'.charAt(i) + '.</b> ' + esc(o) +
+        (isC ? ' <span class="qr-tag">\u2713 marked correct</span>' : '') + (isP ? ' <span class="qr-tag">\u2190 student chose</span>' : '') + '</div>';
+    }).join('') + '</div>';
+  },
 
   setFilter(v){ this.filter = v; ADMIN.state.qrPage = 1; this.render(this.all); },
   setChapterFilter(v){ this.chapterFilter = v; ADMIN.state.qrPage = 1; this.render(this.all); },
@@ -3002,11 +3034,20 @@ const QREPORTS = {
           '</div>' +
           '<div class="t-cap">' + esc(r.reportedBy) + ' · ' + relTime(r.reportedAt) + '</div>' +
         '</div>' +
+        (r.openReporters > 1 ? '<div class="banner banner-warning mt3"><i class="ph ph-users-three"></i><span><b>' + r.openReporters + ' students</b> have reported this question. It is very likely wrong.</span></div>' : '') +
         '<div class="t-callout mt3" style="color:var(--ink);line-height:1.6">' + esc(r.questionSnapshot || 'The question text was not captured.') + '</div>' +
+        this._optionsHtml(r) +
+        '<div class="t-cap mt2">' +
+          esc(this.SECTION[r.section] || 'Section not recorded') +
+          (r.questionNumber ? ' \u00b7 question ' + r.questionNumber + ' in its file' : '') +
+          (r.fileId && r.fileId !== 'local' ? ' \u00b7 <a href="https://drive.google.com/file/d/' + encodeURIComponent(r.fileId) + '/view" target="_blank" rel="noopener">open the file in Drive</a>' : '') +
+          (r.status !== 'open' && r.resolvedBy ? ' \u00b7 closed by ' + esc(r.resolvedBy) + (r.corrected ? ' (students\' apps told to refresh)' : '') : '') +
+        '</div>' +
         (r.note ? '<div class="sub-feedback">' + esc(r.note) + '</div>' : '') +
         (canManage ? '<div class="sub-acts">' +
           '<button class="btn btn-secondary btn-sm" onclick="QREPORTS.editQ(\'' + escAttrJs(r.id) + '\')"><i class="ph ph-pencil-simple"></i> Fix the question</button>' +
-          (r.status !== 'resolved' ? '<button class="btn btn-primary btn-sm" onclick="QREPORTS.setStatus(\'' + escAttrJs(r.id) + '\',\'resolved\')">Mark fixed</button>' : '') +
+          (r.status !== 'resolved' ? '<button class="btn btn-primary btn-sm" title="You corrected the question file. Every student\'s app replaces its copy." onclick="QREPORTS.setStatus(\'' + escAttrJs(r.id) + '\',\'resolved\')">Mark fixed</button>' +
+            '<button class="btn btn-secondary btn-sm" title="The question was already right. Nothing changes for students." onclick="QREPORTS.setStatus(\'' + escAttrJs(r.id) + '\',\'resolved\',false)">No change needed</button>' : '') +
           (r.status !== 'dismissed' ? '<button class="btn btn-secondary btn-sm" onclick="QREPORTS.setStatus(\'' + escAttrJs(r.id) + '\',\'dismissed\')">Dismiss</button>' : '') +
           (r.status !== 'open' ? '<button class="btn btn-quiet btn-sm" onclick="QREPORTS.setStatus(\'' + escAttrJs(r.id) + '\',\'open\')">Reopen</button>' : '') +
           '<button class="icon-btn sm danger" style="margin-left:auto" onclick="QREPORTS.del(\'' + escAttrJs(r.id) + '\')" aria-label="Delete report"><i class="ph ph-trash"></i></button>' +
@@ -3032,7 +3073,7 @@ const QREPORTS = {
       const letters = 'ABCDEF';
       const opts = q.options || [];
       $('bd-sheet').innerHTML =
-        '<p class="t-foot mb3">A copy of the file is saved before your change. Students get the fix the next time they open the app online.</p>' +
+        '<p class="t-foot mb3">A copy of the file is saved before your change. Students\' apps replace their copy within minutes of opening online, and update the questions they saved for review. Correct questions in place: do not delete or reorder questions in the file, because students\' progress is tied to each question\'s position.</p>' +
         (r.note ? '<div class="banner banner-info"><i class="ph ph-chat-text"></i><span>Student note: ' + esc(r.note) + '</span></div>' : '') +
         '<div class="field"><label for="eq-q">Question</label><textarea class="textarea" id="eq-q" style="min-height:96px">' + esc(q.q) + '</textarea></div>' +
         opts.map((o, i) => '<div class="field"><label for="eq-o' + i + '">Option ' + letters[i] + '</label><input class="input" type="text" id="eq-o' + i + '" value="' + esc(o) + '"></div>').join('') +
@@ -3077,22 +3118,44 @@ const QREPORTS = {
     const rows = this._visibleRows();
     if (!rows.length) return TOAST.show('Nothing to export', 'warning');
     ADMIN.downloadCSV(ADMIN.toCSV(
-      ['ID','Status','Reason','Chapter','Question','Note','Reported by','Reported at'],
-      rows.map(r => [r.id, r.status, this.REASON[r.reason] || r.reason, this.chapterFor(r.fileId), r.questionSnapshot || '', r.note || '', r.reportedBy, r.reportedAt])
+      ['ID','Status','Reason','Chapter','Section','Question no.','Question','Marked correct','Student chose','Students reporting','Note','Reported by','Reported at','Closed by'],
+      rows.map(r => [r.id, r.status, this.REASON[r.reason] || r.reason, this.chapterFor(r.fileId), this.SECTION[r.section] || '', r.questionNumber || '', r.questionSnapshot || '',
+        r.correctIndex == null ? '' : 'ABCDEF'.charAt(r.correctIndex), r.chosenIndex == null ? '' : 'ABCDEF'.charAt(r.chosenIndex), r.openReporters || '', r.note || '', r.reportedBy, r.reportedAt, r.resolvedBy || ''])
     ), 'question_reports.csv');
   },
-  async setStatus(id, status){
+  async setStatus(id, status, corrected){
     const item = this.all.find(r => r.id === id);
     const prev = item?.status;
     if (item) { item.status = status; this.render(this.all); }
     try {
-      const res = await ADMIN.post('adminUpdateQuestionReportStatus', { id, status });
+      const body = { id, status };
+      if (corrected === false) body.corrected = false;
+      const res = await ADMIN.post('adminUpdateQuestionReportStatus', body);
       if (!res.success) throw new Error(res.error || 'Update failed.');
-      TOAST.show('Report marked ' + statusLabel(status).toLowerCase(), 'success', 2200);
+      TOAST.show('Report marked ' + statusLabel(status).toLowerCase() + (res.alsoClosed ? ' (' + res.alsoClosed + ' more report' + (res.alsoClosed === 1 ? '' : 's') + ' on this question closed too)' : ''), 'success', 3200);
+      if (res.alsoClosed) this.load();
     } catch(e){
       if (item) { item.status = prev; this.render(this.all); }
       TOAST.show(e.message, 'error');
     }
+  },
+  /* A question file was edited directly in Drive: tell every student's app to replace its copy now. */
+  refreshFile(){
+    MODAL.sheet('Refresh a question file',
+      '<p class="t-foot mb3">Edited a question file directly in Drive? Paste its file id here and every student\'s app replaces its copy, and updates the questions it saved for review, within minutes. (Fixing a question from a report does this for you.)</p>' +
+      '<div class="field"><label for="rf-id">File id</label><input class="input" type="text" id="rf-id" placeholder="the long code in the file\'s Drive link" autocomplete="off"></div>' +
+      '<div class="flex g2 mt4"><button class="btn btn-quiet" style="flex:1" onclick="MODAL.close(\'sheet\')">Cancel</button>' +
+      '<button class="btn btn-primary" style="flex:2" id="rf-go" onclick="QREPORTS.doRefreshFile()">Refresh on students\' phones</button></div>');
+  },
+  async doRefreshFile(){
+    const id = ($('rf-id').value || '').trim();
+    if (!/^[A-Za-z0-9_-]{10,200}$/.test(id)) { $('rf-id').classList.add('invalid'); return TOAST.show('That does not look like a Drive file id', 'warning'); }
+    const btn = $('rf-go'); btn.disabled = true;
+    try {
+      const res = await ADMIN.post('adminMarkFileCorrected', { fileId: id });
+      if (!res.success) throw new Error(res.error || 'Could not refresh.');
+      MODAL.close('sheet'); TOAST.show('Done. Students\' apps will replace that file.', 'success', 4000);
+    } catch(e){ btn.disabled = false; TOAST.show(e.message, 'error'); }
   },
   async del(id){
     const ok = await CONFIRM.ask({ title:'Delete report', body:'Delete this report permanently?', confirmText:'Delete', tone:'danger' });
@@ -4102,6 +4165,106 @@ const IMPORT = {
   }
 };
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LKS_ADMIN — the Loksewa mark scheme editor (Settings). Saved as the public setting `loksewaScheme`.
+   Students' apps pick it up with the public info they already fetch. Rules are shared with the app
+   (normalizeLoksewaScheme in shared.js) and checked again on the server.
+   ═══════════════════════════════════════════════════════════════════════ */
+const LKS_ADMIN = {
+  rows: [],
+
+  /* levels and the chapters in each, from the chapter list the console already loads */
+  _catalog(){
+    const levels = new Map();
+    try {
+      ChapterData.allFileRefs().forEach(r => {
+        if (!levels.has(r.lv)) levels.set(r.lv, { id: r.lv, label: ChapterData.levelLabel(r.lv), chapters: new Map() });
+        const L = levels.get(r.lv);
+        if (!L.chapters.has(r.ch)) L.chapters.set(r.ch, ChapterData.chapterName(r.lv, r.ch) || r.ch);
+      });
+    } catch(e){}
+    return levels;
+  },
+
+  load(stored){
+    const sch = normalizeLoksewaScheme(stored || '');
+    this.rows = sch.groups.map(g => ({ name: g.name, marks: g.marks, level: g.level, chapters: g.chapters.slice() }));
+    this.render();
+  },
+
+  _sync(){        /* read the form back into this.rows */
+    document.querySelectorAll('#lks-rows .lks-row').forEach((el, i) => {
+      const r = this.rows[i]; if (!r) return;
+      r.name = el.querySelector('.lks-name').value;
+      r.marks = el.querySelector('.lks-marks').value;
+      r.level = el.querySelector('.lks-level').value;
+      r.chapters = [...el.querySelectorAll('.lks-ch:checked')].map(c => c.value);
+    });
+  },
+
+  render(){
+    const box = $('lks-rows'); if (!box) return;
+    const cat = this._catalog();
+    const levelOpts = sel => [...cat.values()].map(L => '<option value="' + esc(L.id) + '"' + (sel === L.id ? ' selected' : '') + '>' + esc(L.label) + '</option>').join('') +
+      (cat.has(sel) || !sel ? '' : '<option value="' + esc(sel) + '" selected>' + esc(sel) + ' (not in the chapter list)</option>');
+    box.innerHTML = this.rows.map((r, i) => {
+      const L = cat.get(r.level);
+      const chapters = L ? [...L.chapters.entries()] : [];
+      return '<div class="lks-row" style="border:1px solid var(--sep);border-radius:var(--r-card);padding:var(--sp-3);margin-bottom:var(--sp-2)">' +
+        '<div class="field-row">' +
+          '<div class="field"><label for="lks-n' + i + '">Group name</label><input class="input lks-name" id="lks-n' + i + '" type="text" maxlength="60" value="' + esc(r.name) + '" placeholder="Structural Engineering" oninput="LKS_ADMIN._changed()"></div>' +
+          '<div class="field"><label for="lks-m' + i + '">Marks</label><input class="input lks-marks" id="lks-m' + i + '" type="number" min="1" max="100" inputmode="numeric" value="' + esc(r.marks) + '" oninput="LKS_ADMIN._changed()"></div>' +
+        '</div>' +
+        '<div class="field"><label for="lks-l' + i + '">Level</label><select class="select lks-level" id="lks-l' + i + '" onchange="LKS_ADMIN._levelChanged(' + i + ')">' + levelOpts(r.level) + '</select></div>' +
+        '<details' + (r.chapters.length ? ' open' : '') + '><summary class="t-callout" style="cursor:pointer">' +
+          (r.chapters.length ? r.chapters.length + ' chapter' + (r.chapters.length === 1 ? '' : 's') + ' selected' : 'All chapters of this level') + '</summary>' +
+          '<div class="t-foot mt2 mb2">Tick chapters to limit this group to them. Leave all unticked to use every chapter of the level.</div>' +
+          '<div style="display:grid;gap:6px">' + (chapters.length ? chapters.map(([id, name]) =>
+            '<label class="perm-row"><input type="checkbox" class="lks-ch" value="' + esc(id) + '"' + (r.chapters.indexOf(id) !== -1 ? ' checked' : '') + ' onchange="LKS_ADMIN._changed()"><span>' + esc(name) + '</span></label>').join('')
+            : '<span class="t-foot">No chapters are loaded for this level.</span>') + '</div>' +
+        '</details>' +
+        (this.rows.length > 1 ? '<div class="mt2"><button class="btn btn-quiet btn-sm" onclick="LKS_ADMIN.removeRow(' + i + ')"><i class="ph ph-trash"></i> Remove this group</button></div>' : '') +
+      '</div>';
+    }).join('');
+    this._changed();
+  },
+
+  _changed(){
+    this._sync();
+    const total = this.rows.reduce((n, r) => n + (Math.round(Number(r.marks)) || 0), 0);
+    const t = $('lks-total'); if (t) t.textContent = 'Total: ' + total + ' marks';
+  },
+  _levelChanged(i){ this._sync(); this.rows[i].chapters = []; this.render(); },
+  addRow(){ this._sync(); const cat = this._catalog(); this.rows.push({ name: '', marks: 10, level: (cat.keys().next().value) || 'level7', chapters: [] }); this.render(); },
+  removeRow(i){ this._sync(); this.rows.splice(i, 1); this.render(); },
+
+  /* what is wrong with the form, or '' (rules are in shared.js, and unit-tested) */
+  problem(){ this._sync(); return loksewaSchemeConflict(this.rows); },
+
+  async save(){
+    const bad = this.problem();
+    if (bad) return TOAST.show(bad, 'warning', 5000);
+    const scheme = { version: 1, groups: this.rows.map(r => ({ name: String(r.name).trim(), marks: Math.round(Number(r.marks)), level: r.level, chapters: r.chapters })) };
+    await this._store(JSON.stringify(scheme), 'Mark scheme saved. Students get it the next time they open the app online.');
+  },
+  async useDefault(){
+    const ok = await CONFIRM.ask({ title: 'Go back to the default?', body: 'The daily paper returns to 25 General Knowledge + 50 Level 7 Civil Engineering.', confirmText: 'Use the default' });
+    if (!ok) return;
+    await this._store('', 'Back to the default scheme.');
+    this.load('');
+  },
+  async _store(value, message){
+    const btn = $('lks-save'); if (btn) btn.classList.add('loading');
+    try {
+      const res = await ADMIN.post('adminUpdateSettings', { key: 'loksewaScheme', value });
+      if (!res.success) throw new Error(res.error || 'Could not save.');
+      ADMIN.data.settings = Object.assign({}, ADMIN.data.settings || {}, { loksewaScheme: value });
+      TOAST.show(message, 'success', 4500);
+    } catch(e){ TOAST.show(e.message, 'error', 6000); }
+    if (btn) btn.classList.remove('loading');
+  }
+};
+
 const SETTINGS = {
   load(){
     const s = ADMIN.data.settings || {};
@@ -4113,6 +4276,7 @@ const SETTINGS = {
     $('set-announce').value = s.announcement || '';
     $('set-eta').value = s.paymentEta || '';
     $('set-trial').value = s.trialHours || '';
+    try { LKS_ADMIN.load(s.loksewaScheme); } catch(e){}
     const preview = $('set-qr-preview'), status = $('set-qr-status');
     if (s.qrCodeUrl) {
       preview.src = s.qrCodeUrl; preview.hidden = false;

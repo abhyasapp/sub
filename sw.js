@@ -76,6 +76,7 @@ const SHELL = [
   './js/app/cloud-sync.js',
 
   './js/app/app.js',
+  './js/app/user-page.js',
   './js/app/objective.js',
   './js/app/subjective.js',
   './js/data/subjective_chapters.js',
