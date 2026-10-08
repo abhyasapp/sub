@@ -247,6 +247,7 @@ function sprintDayNumber(startISO, now) {
 }
 
 function sprintPlan(o) {
+  if ((o.totalQ | 0) > 0) return sprintPlanQ(o);     /* v1.33: size-based plan when the question counts are known */
   const day = sprintDayNumber(o.startISO, o.now || new Date());
   if (!day || day < 1) return { state: 'notstarted' };
   if (day > SPRINT_DAYS) return { state: 'finished', day };
@@ -285,6 +286,166 @@ function sprintPlan(o) {
   };
 }
 
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SIZE-BASED SPRINT PLAN (v1.33, pure, unit-tested)
+
+   The fixed 40 / 80 / 100 targets ignored how much content there is. This plan is built from the real numbers:
+
+     totalQ      questions in Level 7 + GK            attemptedQ  questions answered at least once
+     wrongQ      attempted, latest answer wrong       dueReview   wrong-bank reviews due today
+     offDays     dates the student took off           examISO     exam date (shortens the plan, never lengthens it)
+     secPerQ     average seconds per question         paperSize   questions in one mock paper
+
+   Learn  : remaining new questions / remaining working days, plus reviews.
+   Catch-up: every 7th learn day has no new quota. It pays back any backlog, or is a light review and weak-spot day.
+   Drill  : (remaining new + wrong) / days left, between 40 and 150, plus reviews.
+   Mock   : one full paper a day.
+   Pace is judged in QUESTIONS attempted, not chapters touched.
+   Reviews are capped (30, or 15 when behind) so they cannot crowd out new work.
+   ═══════════════════════════════════════════════════════════════════════ */
+const SPRINT_CATCHUP_EVERY = 7, SPRINT_REVIEW_CAP = 30, SPRINT_REVIEW_CAP_BEHIND = 15;
+const SPRINT_FEAS_OK = 120, SPRINT_FEAS_TIGHT = 200, SPRINT_MIN_DAYS = 14;
+
+function sprintIsoAdd(iso, n) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
+  if (!m) return '';
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3] + n)).toISOString().slice(0, 10);
+}
+
+/* 60 days, or fewer when the exam is sooner. Day 1 is the start date; the last plan day is the day before the exam. */
+function sprintTotalDays(startISO, examISO) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(startISO || ''));
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(examISO || ''));
+  if (!a || !b) return SPRINT_DAYS;
+  const gap = Math.round((Date.UTC(+b[1], +b[2] - 1, +b[3]) - Date.UTC(+a[1], +a[2] - 1, +a[3])) / 86400000);
+  return Math.max(SPRINT_MIN_DAYS, Math.min(SPRINT_DAYS, gap));
+}
+
+function sprintPlanQ(o) {
+  const clamp = (lo, hi, v) => Math.max(lo, Math.min(hi, v));
+  const D = sprintTotalDays(o.startISO, o.examISO);
+  const day = sprintDayNumber(o.startISO, o.now || new Date());
+  if (!day || day < 1) return { state: 'notstarted' };
+  if (day > D) return { state: 'finished', day, totalDays: D };
+
+  const learnEnd = Math.round(D * 35 / 60), drillEnd = Math.round(D * 52 / 60);
+  const off = new Set(Array.isArray(o.offDays) ? o.offDays : []);
+  const isOff = d => off.has(sprintIsoAdd(o.startISO, d - 1));
+  const isCatch = d => d <= learnEnd && d % SPRINT_CATCHUP_EVERY === 0;
+  const working = (a, b, skipCatch) => { let n = 0; for (let d = a; d <= b; d++) if (!isOff(d) && !(skipCatch && isCatch(d))) n++; return n; };
+
+  const totalQ = Math.max(1, o.totalQ | 0);
+  const attempted = clamp(0, totalQ, o.attemptedQ | 0);
+  const wrongQ = clamp(0, attempted, o.wrongQ | 0);
+  const due = Math.max(0, o.dueReview | 0), doneQ = Math.max(0, o.questionsToday | 0);
+  const remainingNew = totalQ - attempted;
+  const secPerQ = clamp(20, 180, Number(o.secPerQ) || 60);
+  const paper = (o.paperSize | 0) > 0 ? (o.paperSize | 0) : 100;
+
+  const learnWork = Math.max(1, working(1, learnEnd, true));
+  const expectedPct = day <= learnEnd ? Math.min(1, working(1, Math.min(day, learnEnd), true) / learnWork) : 1;
+  const actualPct = attempted / totalQ, gap = actualPct - expectedPct;
+  const pace = gap >= 0.05 ? 'ahead' : gap <= -0.1 ? 'behind' : 'on-track';
+  const reviewQ = Math.min(due, pace === 'behind' ? SPRINT_REVIEW_CAP_BEHIND : SPRINT_REVIEW_CAP);
+
+  const learnDaysLeft = day <= learnEnd ? working(day, learnEnd, true) : 0;
+  const drillDaysLeft = day <= drillEnd ? Math.max(1, working(Math.max(day, learnEnd + 1), drillEnd, false)) : 0;
+  let phase = day <= learnEnd ? 'learn' : day <= drillEnd ? 'drill' : 'mock';
+  let label = phase === 'learn' ? 'Learn' : phase === 'drill' ? 'Drill' : 'Mock';
+  let newQ = 0, qTarget = 0, mock = false, catchup = false, rest = false, backlogQ = 0;
+
+  if (isOff(day)) {
+    rest = true; label = 'Rest day';
+  } else if (phase === 'learn') {
+    if (isCatch(day)) {
+      catchup = true; label = 'Catch-up';
+      backlogQ = Math.max(0, Math.round(totalQ * expectedPct) - attempted);
+      newQ = Math.min(backlogQ, remainingNew, 150);
+      qTarget = newQ > 0 ? newQ + reviewQ : reviewQ + 20;
+    } else {
+      newQ = (learnDaysLeft > 0 && remainingNew > 0) ? Math.ceil(remainingNew / learnDaysLeft) : 0;
+      qTarget = newQ + reviewQ;
+      if (!qTarget) qTarget = 20;
+    }
+  } else if (phase === 'drill') {
+    const need = remainingNew + wrongQ;
+    newQ = Math.min(remainingNew, Math.ceil(remainingNew / drillDaysLeft));
+    qTarget = clamp(40, 150, Math.ceil(need / drillDaysLeft) + reviewQ);
+  } else {
+    mock = true; qTarget = paper;
+  }
+
+  const raw = rest ? 0 : mock ? qTarget * secPerQ / 60 + 30 : Math.max(15, qTarget * secPerQ / 60);
+  const mins = rest ? 0 : Math.ceil(raw / 5) * 5;
+
+  /* Can it be finished? Needed new questions per working day to cover everything by the end of Learn
+     (or of Drill once Learn is over). */
+  const needDays = phase === 'learn' ? learnDaysLeft : drillDaysLeft;
+  const neededPerDay = remainingNew > 0 && needDays > 0 ? Math.ceil(remainingNew / needDays) : (remainingNew > 0 ? remainingNew : 0);
+  const feasibility = remainingNew === 0 ? 'done' : neededPerDay <= SPRINT_FEAS_OK ? 'ok' : neededPerDay <= SPRINT_FEAS_TIGHT ? 'tight' : 'unrealistic';
+
+  return {
+    state: 'active', sized: true, day, totalDays: D, daysLeft: D - day, learnEnd, drillEnd,
+    phase, label, qTarget, mins, newQ, reviewQ, backlogQ, catchup, rest, mock, due, doneQ,
+    qRemaining: Math.max(0, qTarget - doneQ), newTopics: 0,
+    covered: attempted, total: totalQ, pace, coveragePct: Math.round(actualPct * 100),
+    goalMet: rest ? true : doneQ >= qTarget,
+    neededPerDay, feasibility, learnDaysLeft
+  };
+}
+
+/* What to do today, as a list.
+   chapters: [{ lv, ch, label, total, attempted, wrong, accuracy (0..1|null), state }]  (Level 7 + GK, in course order)
+   -> [{ kind:'review'|'new'|'weak'|'mock'|'rest', lv, ch, label, questions }]
+   New work is split between Level 7 and GK in proportion to what is left in each (GK always gets a share while any
+   remains), chapters already started come first. Weak work goes to the lowest-accuracy chapters first. */
+function sprintToday(plan, chapters) {
+  if (!plan || plan.state !== 'active') return [];
+  if (plan.rest) return [{ kind: 'rest', label: 'Rest day. Nothing planned.', questions: 0 }];
+  const items = [];
+  if (plan.mock) {
+    items.push({ kind: 'mock', label: 'Full mock paper', questions: plan.qTarget });
+    if (plan.reviewQ > 0) items.push({ kind: 'review', label: 'Review missed questions', questions: plan.reviewQ });
+    return items;
+  }
+  if (plan.reviewQ > 0) items.push({ kind: 'review', label: 'Review missed questions', questions: plan.reviewQ });
+  const list = (Array.isArray(chapters) ? chapters : []).filter(c => c && c.total > 0);
+
+  const fill = (cands, budget, kind, need) => {
+    for (const c of cands) {
+      if (budget <= 0) break;
+      const take = Math.min(need(c), budget);
+      if (take > 0) { items.push({ kind, lv: c.lv, ch: c.ch, label: c.label, questions: take }); budget -= take; }
+    }
+    return budget;
+  };
+  const newNeed = c => Math.max(0, c.total - c.attempted);
+
+  const newPick = budget => {
+    const pool = list.filter(c => newNeed(c) > 0);
+    pool.sort((a, b) => (b.attempted > 0) - (a.attempted > 0));          // stable: started chapters first
+    const gk = pool.filter(c => c.lv === 'gk'), l7 = pool.filter(c => c.lv !== 'gk');
+    const gkRem = gk.reduce((n, c) => n + newNeed(c), 0), l7Rem = l7.reduce((n, c) => n + newNeed(c), 0);
+    let gkBudget = gkRem > 0 ? Math.min(gkRem, Math.max(Math.min(10, budget), Math.round(budget * gkRem / (gkRem + l7Rem)))) : 0;
+    let l7Budget = budget - gkBudget;
+    l7Budget = fill(l7, l7Budget, 'new', newNeed);
+    gkBudget = fill(gk, gkBudget + l7Budget, 'new', newNeed);
+    if (gkBudget > 0) fill(l7.filter(c => !items.some(i => i.lv === c.lv && i.ch === c.ch && i.kind === 'new')), gkBudget, 'new', newNeed);
+  };
+  const weakPick = budget => {
+    const need = c => newNeed(c) + Math.max(0, c.wrong || 0);
+    const pool = list.filter(c => c.state !== 'complete' && need(c) > 0);
+    pool.sort((a, b) => (a.attempted ? (a.accuracy == null ? 0.5 : a.accuracy) : 0.6) - (b.attempted ? (b.accuracy == null ? 0.5 : b.accuracy) : 0.6));
+    fill(pool, budget, 'weak', need);
+  };
+
+  const budget = Math.max(0, plan.qTarget - plan.reviewQ);
+  if (plan.phase === 'learn' && !plan.catchup) newPick(plan.newQ);
+  else if (plan.catchup && plan.newQ > 0) newPick(plan.newQ);
+  else weakPick(budget);
+  return items;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    EXAM TIMER WARNINGS (v1.33, pure, unit-tested)

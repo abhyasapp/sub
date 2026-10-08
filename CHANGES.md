@@ -25,6 +25,19 @@
 - Six categories (adds "incomplete question" and "image or table problem"). Reports written offline are queued (max 20)
   and sent when the device is back online. gas/code.gs must be redeployed.
 
+## 60-day plan (Level 7 + GK)
+- Targets are sized to the real question counts instead of a fixed 40 / 80 / 100: remaining new questions divided by remaining
+  working days, plus reviews (capped at 30, or 15 when behind). Drill is sized from what is still unattempted or wrong
+  (40 to 150 a day). Mock days are one paper plus time to review it.
+- Pace is judged in questions attempted, not chapters touched.
+- The card says when the pace needed is tight (over 120 new questions a day) or very hard (over 200).
+- Every 7th learn day is a catch-up day: it pays back any backlog, or is a light review of weak spots.
+- Today's list names the chapters, how many questions from each and about how long, with a Start button per line. Level 7 and
+  GK are interleaved (GK always gets a share while any is left); drill goes to the weakest chapters first.
+- "Take today off" (the other days carry a little more) and an exam date (the plan shortens to finish the day before it).
+- Time estimates use your own speed from your last 20 sessions.
+- Rest days and the exam date are stored on this device and are not synced between devices.
+
 ## Display
 - Text size (small / medium / large), high contrast, AMOLED black.
 

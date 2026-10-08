@@ -446,6 +446,132 @@ group('Multi-device merge');
   eq('garbage input does not throw', ctx.merge('x', 5).prog.sessions.length, 0);
 })();
 
+group('Size-based 60-day plan');
+(function sizedPlanTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} } };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.plan=sprintPlan;this.today=sprintToday;this.days=sprintTotalDays;this.add=sprintIsoAdd;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const P = (day, o) => ctx.plan(Object.assign({ startISO: '2026-10-01', now: new Date(ctx.add('2026-10-01', day - 1) + 'T12:00:00'), totalQ: 3000, attemptedQ: 0, wrongQ: 0, dueReview: 0, questionsToday: 0 }, o || {}));
+
+  eq('the target is sized to the content: 3000 questions over 30 working learn days is 100 a day', [P(1).newQ, P(1).qTarget, P(1).sized], [100, 100, true]);
+  eq('it says so when the pace needed is realistic, tight or not realistic', [P(1).feasibility, P(1, { totalQ: 6000 }).feasibility, P(1, { totalQ: 7000 }).feasibility], ['ok', 'tight', 'unrealistic']);
+  eq('it reports the pace needed per day', P(1, { totalQ: 7000 }).neededPerDay, 234);
+  eq('everything attempted: feasibility is done', P(10, { attemptedQ: 3000 }).feasibility, 'done');
+  eq('no question counts: the old fixed plan is used', ctx.plan({ startISO: '2026-10-01', now: new Date('2026-10-01T12:00:00'), totalTopics: 70, coveredTopics: 0, dueReview: 0, questionsToday: 0 }).qTarget, 40);
+
+  eq('every 7th learn day is a catch-up day', [7, 14, 21, 28, 35].map(d => P(d, { attemptedQ: 3000 * d / 35 }).catchup), [true, true, true, true, true]);
+  eq('a normal day is not a catch-up day', P(6).catchup, false);
+  const c = P(14);   // nothing attempted by day 14
+  eq('catch-up day pays back the backlog, capped at 150 new questions', [c.catchup, c.backlogQ, c.newQ], [true, 1200, 150]);
+  eq('catch-up day with no backlog is a light review day', (r => [r.catchup, r.newQ, r.qTarget])(P(7, { attemptedQ: 900 })), [true, 0, 20]);
+  eq('the new quota is spread over the remaining WORKING days (catch-up days excluded)', P(8, { attemptedQ: 700 }).newQ, Math.ceil(2300 / 24));
+
+  const off = P(5, { offDays: ['2026-10-05'] });
+  eq('a rest day has no target and counts as met', [off.rest, off.qTarget, off.mins, off.goalMet], [true, 0, 0, true]);
+  eq('taking a day off raises the other days a little (fewer working days left)', P(4, { offDays: ['2026-10-05'] }).newQ > P(4).newQ, true);
+
+  eq('reviews are capped at 30', P(2, { dueReview: 100, attemptedQ: 90 }).reviewQ, 30);
+  eq('reviews are capped at 15 when behind', P(20, { dueReview: 100, attemptedQ: 100 }).reviewQ, 15);
+  eq('the daily target includes the reviews', P(2, { dueReview: 10, attemptedQ: 90 }).qTarget, P(2, { attemptedQ: 90 }).qTarget + 10);
+
+  eq('pace is judged in questions: 100 of 3000 on day 20 is behind', P(20, { attemptedQ: 100 }).pace, 'behind');
+  eq('pace: 3000 attempted on day 10 is ahead', P(10, { attemptedQ: 3000 }).pace, 'ahead');
+
+  const dr = P(40, { attemptedQ: 3000, wrongQ: 300 });
+  eq('drill phase starts after learn and is at least 40 questions', [dr.phase, dr.qTarget], ['drill', 40]);
+  eq('drill target grows with the work still to do', P(40, { attemptedQ: 1000, wrongQ: 600 }).qTarget > 40, true);
+  eq('drill target never exceeds 150', P(40, { attemptedQ: 0, wrongQ: 0, totalQ: 9000 }).qTarget, 150);
+  eq('mock phase: one paper', (r => [r.phase, r.mock, r.qTarget])(P(55, { attemptedQ: 3000 })), ['mock', true, 100]);
+  eq('time estimate follows the student\'s own speed', [P(1, { secPerQ: 30 }).mins, P(1, { secPerQ: 90 }).mins], [50, 150]);
+  eq('a mock day budgets time to review the paper', P(55, { attemptedQ: 3000, secPerQ: 60 }).mins, 130);
+
+  eq('an exam in 31 days shortens the plan to 31 days', [ctx.days('2026-10-01', '2026-11-01'), P(1, { examISO: '2026-11-01' }).totalDays], [31, 31]);
+  eq('the plan is never shorter than 14 days or longer than 60', [ctx.days('2026-10-01', '2026-10-05'), ctx.days('2026-10-01', '2027-06-01'), ctx.days('2026-10-01', '')], [14, 60, 60]);
+  eq('past the shortened plan it is finished', P(32, { examISO: '2026-11-01' }).state, 'finished');
+  eq('a shorter plan needs a faster pace', P(1, { examISO: '2026-11-01' }).newQ > P(1).newQ, true);
+  eq('garbage input does not throw and is never negative', (() => { const r = P(3, { attemptedQ: 99999, wrongQ: -5, dueReview: -3, secPerQ: 'x', offDays: 'no' }); return [r.qTarget >= 0, r.newQ >= 0, r.coveragePct]; })(), [true, true, 100]);
+
+  /* the daily list */
+  const ch = [
+    { lv: 'level7', ch: 'a', label: 'A', total: 100, attempted: 0, wrong: 0, accuracy: null, state: 'not-started' },
+    { lv: 'level7', ch: 'b', label: 'B', total: 50, attempted: 20, wrong: 3, accuracy: 0.85, state: 'in-progress' },
+    { lv: 'gk', ch: 'g', label: 'G', total: 100, attempted: 0, wrong: 0, accuracy: null, state: 'not-started' }
+  ];
+  const plan60 = { state: 'active', phase: 'learn', catchup: false, rest: false, mock: false, reviewQ: 0, newQ: 60, qTarget: 60 };
+  const t = ctx.today(plan60, ch);
+  eq('today\'s list adds up to the day\'s new quota', t.reduce((n, i) => n + i.questions, 0), 60);
+  eq('a chapter already started comes first', t[0].label, 'B');
+  eq('GK always gets a share while any is left', t.some(i => i.lv === 'gk' && i.questions > 0), true);
+  eq('a list never offers more than a chapter has left', t.every(i => i.questions <= ch.find(c => c.label === i.label).total - ch.find(c => c.label === i.label).attempted), true);
+  eq('reviews come first in the list', ctx.today(Object.assign({}, plan60, { reviewQ: 12, qTarget: 72 }), ch)[0], { kind: 'review', label: 'Review missed questions', questions: 12 });
+  const weak = ctx.today({ state: 'active', phase: 'drill', catchup: false, rest: false, mock: false, reviewQ: 0, newQ: 0, qTarget: 40 }, [
+    { lv: 'level7', ch: 'x', label: 'X', total: 10, attempted: 10, wrong: 4, accuracy: 0.6, state: 'in-progress' },
+    { lv: 'level7', ch: 'y', label: 'Y', total: 10, attempted: 10, wrong: 2, accuracy: 0.8, state: 'in-progress' },
+    { lv: 'gk', ch: 'z', label: 'Z', total: 10, attempted: 10, wrong: 0, accuracy: 1, state: 'complete' }]);
+  eq('drill list goes to the weakest chapters first and skips completed ones', weak.map(i => [i.label, i.kind, i.questions]), [['X', 'weak', 4], ['Y', 'weak', 2]]);
+  eq('mock day lists the paper', ctx.today({ state: 'active', mock: true, qTarget: 100, reviewQ: 0 }, ch).map(i => i.kind), ['mock']);
+  eq('rest day lists nothing to do', ctx.today({ state: 'active', rest: true }, ch).map(i => i.kind), ['rest']);
+  eq('no plan, no list', [ctx.today(null, ch), ctx.today({ state: 'notstarted' }, ch)], [[], []]);
+})();
+
+group('Sprint screen wiring');
+(function sprintUiTests(){
+  const eq = (n, ok, why) => ok ? pass(n) : fail(n + (why ? ': ' + why : ''));
+  const ujs = readFile('user-page.js') || '', uh = readFile('user.html') || '', app = readFile('app.js') || '';
+  eq('the plan is built from real question counts (Level 7 + GK)', /totalQ,\s*attemptedQ,\s*wrongQ/.test(ujs) && /sprintRefs\(ChapterData\.allFileRefs\(\)\)/.test(ujs));
+  eq('the card shows today\'s chapter list with a Start button for each line', /sprintToday\(plan, this\._chapters\(\)\)/.test(ujs) && /SPRINT\.startItem\(/.test(ujs));
+  eq('a warning shows when the pace needed is tight or unrealistic', /plan\.feasibility === 'tight'/.test(ujs) && /plan\.feasibility === 'unrealistic'/.test(ujs));
+  eq('a rest day can be taken and cancelled', /restDay\(\)/.test(ujs) && /abhyas_sprint_off/.test(ujs));
+  eq('an exam date can be set, validated and removed', /examDialog\(\)/.test(ujs) && /saveExam\(\)/.test(ujs) && /clearExam\(\)/.test(ujs) && /v <= this\._iso\(new Date\(\)\)/.test(ujs));
+  eq('speed is measured from the student\'s own sessions', /_secPerQ\(\)/.test(ujs) && /durationSec/.test(ujs));
+  eq('start of a list line opens the chapter or the review', /CH_GRID\.startChapter\(it\.lv, it\.ch/.test(ujs) && /REV\.start\('wr'/.test(ujs));
+  eq('the Start button on the card begins the first real task of the day', /items\.findIndex\(it => it\.kind !== 'rest'\)/.test(ujs));
+  eq('the list has styles', /\.sprint-row\{/.test(uh) && /\.sprint-list\{/.test(uh));
+  eq('restarting or resetting the sprint also clears rest days', /_saveOff\(\[\]\)/.test(ujs) && /removeItem\('abhyas_sprint_off'\)/.test(app));
+  eq('the 24-hour undo brings rest days back too', /sprintOff/.test(app));
+})();
+
+group('Sprint card (runs against a fake device)');
+(function sprintCardRuntime(){
+  const ujs = readFile('user-page.js') || '', sh = readFile('shared.js') || '';
+  const grab = marker => { const st = ujs.indexOf(marker); let d = 0, en = -1; for (let i = ujs.indexOf('{', st); i < ujs.length; i++) { if (ujs[i] === '{') d++; else if (ujs[i] === '}' && --d === 0) { en = i + 1; break; } } return ujs.slice(st, en); };
+  const eq = (n, ok, why) => ok ? pass(n) : fail(n + (why ? ': ' + why : ''));
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  const store = { abhyas_sprint_start: iso(new Date()) };
+  const refs = []; ['level7', 'gk'].forEach(lv => [1, 2, 3].forEach(c => refs.push({ fid: lv + c, key: 'k', lv, ch: 'c' + c, book: 'B' })));
+  const S = { fcount: {}, cov: {}, wr: [], prog: { sessions: [] } }; refs.forEach(r => { S.fcount[r.fid] = 100; });
+  S.cov.level71 = { p: '1'.repeat(40) + '2'.repeat(5), a: 45, c: 40 };
+  const box = { style: {}, innerHTML: '' }, out = {};
+  const env = { window: { addEventListener(){}, removeEventListener(){} }, navigator: {}, S,
+    ChapterData: { allFileRefs: () => refs, chapters: () => ({ c1: 1, c2: 1, c3: 1 }), chapterFileRefs: (lv, ch) => refs.filter(r => r.lv === lv && r.ch === ch), chapterName: (lv, ch) => ch.toUpperCase() },
+    $: id => id === 'sprint-card' ? box : null, esc: x => String(x).replace(/</g, '&lt;'), toast(){}, openMod(){}, closeMod(){}, confirm: () => true,
+    REV: { dueWrong: () => [1, 2, 3], start(){ out.rev = 1; } }, CH_GRID: { startChapter(...a){ out.started = a; } }, SYLLABUS_MOCK: { start(){} }, TODAY_PLAN: { start(){} },
+    localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+    document: { getElementById: () => null, addEventListener(){} }, Date, JSON, Math, Array, Number, String, Object, Set, console };
+  let m;
+  try {
+    const code = sh + '\n' + grab('window.MASTERY = {').replace('window.MASTERY = ', 'const MASTERY = ') + ';\n' + grab('window.SPRINT = {').replace('window.SPRINT = ', 'const SPRINT = ') + ';\nreturn {SPRINT};';
+    m = new Function(...Object.keys(env), code)(...Object.values(env));
+    m.SPRINT.render();
+  } catch (e) { fail('the sprint card threw: ' + e.message); return; }
+  eq('day 1 renders with its phase and a size-based target', /Day 1 of 60/.test(box.innerHTML) && /Learn/.test(box.innerHTML) && /\/\d+ questions/.test(box.innerHTML));
+  eq('the list has a review line and chapter lines with Start buttons', /Review missed questions/.test(box.innerHTML) && (box.innerHTML.match(/SPRINT\.startItem\(/g) || []).length >= 2);
+  eq('a chapter that is already started is offered first', /C1<span/.test(box.innerHTML));
+  eq('Level 7 and GK both appear in today\'s list', /\(GK\)/.test(box.innerHTML) && /C1<span/.test(box.innerHTML));
+  m.SPRINT.startItem(1);
+  eq('Start opens that chapter', Array.isArray(out.started) && out.started[0] === 'level7');
+  m.SPRINT.startItem(0);
+  eq('Start on the review line opens the review', out.rev === 1);
+  m.SPRINT.restDay();
+  eq('taking today off is saved and shows a rest day', store.abhyas_sprint_off === JSON.stringify([iso(new Date())]) && (m.SPRINT.render(), /Rest day/.test(box.innerHTML)));
+  m.SPRINT.restDay();
+  eq('cancelling the rest day removes it', store.abhyas_sprint_off === '[]');
+  const ex = new Date(); ex.setDate(ex.getDate() + 30);
+  store.abhyas_exam_date = iso(ex); m.SPRINT.render();
+  eq('an exam in 30 days shortens the plan and shows the countdown', /Day 1 of 30/.test(box.innerHTML) && /to exam/.test(box.innerHTML));
+})();
+
 group('Exam timer warnings, shortcuts and display preferences');
 (function examUxTests(){
   const vm = require('vm');

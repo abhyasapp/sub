@@ -2014,6 +2014,7 @@ window.SPRINT = {
 
   reset(){
     if (!confirm('Restart your 60-day sprint from today?')) return;
+    this._saveOff([]);
     this.begin();
   },
 
@@ -2033,6 +2034,37 @@ window.SPRINT = {
     return Math.round(secs / 60);
   },
 
+  OFF_KEY: 'abhyas_sprint_off',
+  EXAM_KEY: 'abhyas_exam_date',
+  _ISO: /^\d{4}-\d{2}-\d{2}$/,
+
+  _offDays(){ try { const v = JSON.parse(localStorage.getItem(this.OFF_KEY) || '[]'); return Array.isArray(v) ? v.filter(x => this._ISO.test(x)) : []; } catch(e){ return []; } },
+  _saveOff(list){ try { localStorage.setItem(this.OFF_KEY, JSON.stringify(list.slice(-80))); } catch(e){} },
+  _exam(){ try { const v = localStorage.getItem(this.EXAM_KEY) || ''; return this._ISO.test(v) ? v : ''; } catch(e){ return ''; } },
+
+  /* the student's own speed: seconds per question over the last 20 sessions (60 until there is enough data) */
+  _secPerQ(){
+    const ss = ((S.prog && S.prog.sessions) || []).filter(x => x && Number(x.durationSec) > 0 && Number(x.total) > 0).slice(0, 20);
+    const secs = ss.reduce((n, x) => n + Number(x.durationSec), 0), q = ss.reduce((n, x) => n + Number(x.total), 0);
+    return q >= 20 ? Math.round(secs / q) : 60;
+  },
+
+  /* Level 7 + GK chapters with their real numbers (from the mastery rules) */
+  _chapters(){
+    const t = Date.now();
+    if (this._chC && t - this._chC.t < 300) return this._chC.v;     /* one render asks several times */
+    const out = [];
+    try {
+      MASTERY.filteredChapters().forEach(c => {
+        const m = MASTERY.chapter(c.lv, c.ch);
+        out.push({ lv: c.lv, ch: c.ch, label: ChapterData.chapterName(c.lv, c.ch) + (c.lv === 'gk' ? ' (GK)' : ''),
+                   total: m.total, attempted: m.attempted, wrong: m.wrong, accuracy: m.accuracy, state: m.state });
+      });
+    } catch(e){}
+    this._chC = { t, v: out };
+    return out;
+  },
+
   _inputs(){
     let total = 0, covered = 0;
     try {
@@ -2043,10 +2075,17 @@ window.SPRINT = {
     } catch(e){}
     let due = 0;
     try { due = REV.dueWrong().length; } catch(e){}
+    /* real question counts: only chapters whose size is known count, so the plan never guesses */
+    const known = this._chapters().filter(c => c.total > 0);
+    const totalQ = known.reduce((n, c) => n + c.total, 0);
+    const attemptedQ = Math.min(totalQ, known.reduce((n, c) => n + c.attempted, 0));
+    const wrongQ = known.reduce((n, c) => n + (c.wrong || 0), 0);
     return {
       startISO: this._start(), now: new Date(),
       totalTopics: total, coveredTopics: covered,
-      dueReview: due, questionsToday: this._questionsToday()
+      dueReview: due, questionsToday: this._questionsToday(),
+      totalQ, attemptedQ, wrongQ, offDays: this._offDays(), examISO: this._exam(),
+      secPerQ: this._secPerQ(), paperSize: 100
     };
   },
 
@@ -2071,6 +2110,7 @@ window.SPRINT = {
       return;
     }
 
+    if (plan.sized) { this._renderSized(box, plan); return; }
     const paceTxt = plan.pace === 'ahead' ? 'Ahead' : plan.pace === 'behind' ? 'Behind' : 'On track';
     const paceCls = plan.pace === 'behind' ? 'low' : plan.pace === 'ahead' ? 'ok' : 'mid';
     const dayPct = Math.round(plan.day / SPRINT_DAYS * 100);
@@ -2090,8 +2130,102 @@ window.SPRINT = {
       ' <button class="linkish" type="button" onclick="SPRINT.reset()" title="Restart the 60 days from today">restart</button></div>';
   },
 
+  _renderSized(box, plan){
+    const items = sprintToday(plan, this._chapters());
+    this._items = items;
+    const spq = this._secPerQ();
+    const paceTxt = plan.pace === 'ahead' ? 'Ahead' : plan.pace === 'behind' ? 'Behind' : 'On track';
+    const paceCls = plan.pace === 'behind' ? 'low' : plan.pace === 'ahead' ? 'ok' : 'mid';
+    const dayPct = Math.round(plan.day / plan.totalDays * 100);
+    const left = plan.total - plan.covered;
+
+    let feas = '';
+    if (plan.feasibility === 'tight') {
+      feas = 'Tight: covering the ' + left + ' questions you have not tried yet needs about ' + plan.neededPerDay + ' new questions a day. Keep every day, and avoid rest days if you can.';
+    } else if (plan.feasibility === 'unrealistic') {
+      feas = 'This pace is very hard: covering the ' + left + ' remaining questions needs about ' + plan.neededPerDay + ' new questions a day. Add study time, or decide which chapters to leave for revision rather than first learning.';
+    }
+
+    const bits = [];
+    bits.push(plan.doneQ + '/' + plan.qTarget + (plan.mock ? ' paper' : ' questions'));
+    if (plan.mins) bits.push('about ' + plan.mins + ' min');
+    bits.push(plan.coveragePct + '% of questions tried');
+    try { const m = MASTERY.summary(); if (m.total) bits.push(m.done + '/' + m.total + ' chapters mastered'); } catch(e){}
+    const exam = this._exam();
+    if (exam) {
+      const dl = Math.round((Date.UTC(+exam.slice(0,4), +exam.slice(5,7) - 1, +exam.slice(8,10)) - Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())) / 86400000);
+      if (dl >= 0) bits.push(dl + ' day' + (dl === 1 ? '' : 's') + ' to exam');
+    }
+
+    const icon = { review: 'ph-arrows-clockwise', new: 'ph-book-open', weak: 'ph-target', mock: 'ph-exam', rest: 'ph-moon' };
+    const rows = items.map((it, i) => {
+      const mins = it.questions ? Math.max(1, Math.round(it.questions * spq / 60)) : 0;
+      const act = it.kind === 'rest' ? '' : '<button class="btn btn-sm btn-quiet" type="button" onclick="SPRINT.startItem(' + i + ')">Start</button>';
+      return '<div class="sprint-row"><i class="ph ' + (icon[it.kind] || 'ph-circle') + '" aria-hidden="true"></i>' +
+        '<span class="grow">' + esc(it.label) + (it.questions ? '<span class="t-cap" style="display:block">' + it.questions + ' questions \u00b7 about ' + mins + ' min</span>' : '') + '</span>' + act + '</div>';
+    }).join('');
+
+    const todayISO = this._iso(new Date()), isOffToday = this._offDays().indexOf(todayISO) !== -1;
+    box.innerHTML =
+      '<div class="sprint-head"><span><i class="ph ph-rocket-launch"></i>Day ' + plan.day + ' of ' + plan.totalDays + ' \u00b7 ' + esc(plan.label) + '</span>' +
+      '<span class="pct ' + paceCls + '">' + paceTxt + '</span></div>' +
+      (plan.goalMet && !plan.rest ? '<div class="sprint-done" role="status"><i class="ph ph-check-circle"></i> Daily target met</div>' : '') +
+      (feas ? '<div class="banner banner-warning" role="status" style="margin:var(--sp-2) 0">' + esc(feas) + '</div>' : '') +
+      '<div class="sprint-bar"><div style="width:' + dayPct + '%"></div></div>' +
+      '<div class="sprint-meta">' + bits.map(esc).join(' \u00b7 ') + '</div>' +
+      (plan.catchup ? '<div class="t-foot" style="margin:var(--sp-1) 0">Catch-up day: ' + (plan.backlogQ > 0 ? 'you are about ' + plan.backlogQ + ' questions behind, so today pays some of that back.' : 'you are on track, so today is a light review of weak spots.') + '</div>' : '') +
+      '<div class="sprint-list">' + rows + '</div>' +
+      '<div class="sprint-meta" style="margin-top:var(--sp-2)">' +
+      '<button class="linkish" type="button" onclick="SPRINT.restDay()">' + (isOffToday ? 'Cancel rest day' : 'Take today off') + '</button> \u00b7 ' +
+      '<button class="linkish" type="button" onclick="SPRINT.examDialog()">' + (exam ? 'Change exam date' : 'Set exam date') + '</button> \u00b7 ' +
+      '<button class="linkish" type="button" onclick="SPRINT.reset()" title="Restart the plan from today">restart</button></div>';
+  },
+
+  /* start one line of today's list */
+  startItem(i){
+    const it = (this._items || [])[i];
+    if (!it) return;
+    if (it.kind === 'review') { try { if (REV.start) { REV.start('wr', 'flashcard', true); return; } } catch(e){} toast('Nothing to review right now.'); return; }
+    if (it.kind === 'mock') { try { if (SYLLABUS_MOCK && SYLLABUS_MOCK.start) { SYLLABUS_MOCK.start(); return; } } catch(e){} toast('Mock papers are not available yet.'); return; }
+    if (it.lv && it.ch) CH_GRID.startChapter(it.lv, it.ch, 'flashcard');
+  },
+
+  restDay(){
+    const t = this._iso(new Date()), list = this._offDays(), at = list.indexOf(t);
+    if (at === -1) { list.push(t); toast('Rest day set. The other days will carry a little more.'); }
+    else { list.splice(at, 1); toast('Rest day cancelled.'); }
+    this._saveOff(list);
+    this.render();
+  },
+
+  examDialog(){
+    const min = this._iso(new Date(Date.now() + 86400000));
+    openMod('Exam date',
+      '<p class="t-callout mb3">If your exam is sooner than 60 days away, the plan is shortened to finish the day before it. It never gets longer than 60 days.</p>' +
+      '<label class="t-foot" for="sp-exam">Exam date</label>' +
+      '<input class="input" type="date" id="sp-exam" min="' + min + '" value="' + esc(this._exam()) + '" style="margin:var(--sp-1) 0 var(--sp-3)">' +
+      '<div class="bg"><button class="btn btn-a" type="button" onclick="SPRINT.saveExam()">Save</button>' +
+      '<button class="btn btn-quiet" type="button" onclick="SPRINT.clearExam()">Remove date</button></div>');
+  },
+  saveExam(){
+    const v = (document.getElementById('sp-exam') || {}).value || '';
+    if (!this._ISO.test(v) || v <= this._iso(new Date())) { toast('Pick a date after today.'); return; }
+    try { localStorage.setItem(this.EXAM_KEY, v); } catch(e){}
+    closeMod(); toast('Exam date saved.'); this.render();
+  },
+  clearExam(){
+    try { localStorage.removeItem(this.EXAM_KEY); } catch(e){}
+    closeMod(); this.render();
+  },
+
   go(){
     const plan = sprintPlan(this._inputs());
+    if (plan.state === 'active' && plan.sized) {
+      const items = sprintToday(plan, this._chapters());
+      this._items = items;
+      const first = items.findIndex(it => it.kind !== 'rest');
+      if (first !== -1) { this.startItem(first); return; }
+    }
     if (plan.state === 'active' && plan.mock) {
       try { if (typeof SYLLABUS_MOCK !== 'undefined' && SYLLABUS_MOCK.start) { SYLLABUS_MOCK.start(); return; } } catch(e){}
     }
