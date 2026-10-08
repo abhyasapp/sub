@@ -1035,6 +1035,8 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
             <option value="wrong_answer">Wrong answer</option>
             <option value="unclear">Unclear wording</option>
             <option value="typo">Typo or formatting</option>
+            <option value="incomplete">Incomplete question</option>
+            <option value="image_problem">Image or table problem</option>
             <option value="other">Other</option>
           </select>
           <button class="btn btn-quiet btn-sm spacer" onclick="QREPORTS.load()"><i class="ph ph-arrow-clockwise"></i> Reload</button>
@@ -2944,7 +2946,7 @@ const WEEKLYSETS = {
 
 const QREPORTS = {
   all: [], filter: 'open', chapterFilter: 'all', reasonFilter: 'all', searchTerm: '', _t: null,
-  REASON: { wrong_answer:'Wrong answer', unclear:'Unclear wording', typo:'Typo or formatting', other:'Other' },
+  REASON: { wrong_answer:'Wrong answer', unclear:'Unclear wording', typo:'Typo or formatting', incomplete:'Incomplete question', image_problem:'Image or table problem', other:'Other' },
   SECTION: { practice:'Chapter practice', exam:'Timed exam', 'daily-paper':'Daily 75-mark paper', weekly:'Weekly test', hourly:'Hourly 50', results:'Results review',
              'review-missed':'Missed list', 'review-saved':'Saved list', 'review-flagged':'Flagged list', other:'Other' },
   /* The options as the student saw them, with the answer the app marks correct and the one the student picked. */

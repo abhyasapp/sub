@@ -287,6 +287,95 @@ function sprintPlan(o) {
 
 
 /* ═══════════════════════════════════════════════════════════════════════
+   EXAM TIMER WARNINGS (v1.33, pure, unit-tested)
+   Announce at 10, 5 and 1 minute left. A warning is skipped when the whole exam is not longer than it (a 5-minute
+   quiz has no "10 minutes left"), and one that was already passed when the exam was resumed is not announced late.
+   `warned` is the list of thresholds already handled; the caller keeps the returned list.
+   ═══════════════════════════════════════════════════════════════════════ */
+const EXAM_WARN_AT = [600, 300, 60];
+function examWarning(left, total, warned) {
+  const done = Array.isArray(warned) ? warned.slice() : [];
+  let fire = 0;
+  EXAM_WARN_AT.forEach(t => {
+    if (left <= t && done.indexOf(t) === -1) {
+      done.push(t);
+      if (t < total && left > t - 5) fire = t;
+    }
+  });
+  return { fire, warned: done };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   OFFLINE REPORT QUEUE (v1.33, pure, unit-tested)
+   A report written offline (or one that failed to send) waits here and is sent when the device is back online.
+   Same question + same reason is kept once. The queue is capped so it can never grow without limit.
+   ═══════════════════════════════════════════════════════════════════════ */
+const REPORT_REASONS = ['wrong_answer', 'unclear', 'typo', 'incomplete', 'image_problem', 'other'];
+const REPORT_QUEUE_MAX = 20;
+
+function reportQueueAdd(queue, report, now) {
+  const q = Array.isArray(queue) ? queue.filter(x => x && x.uid) : [];
+  if (!report || !report.uid || REPORT_REASONS.indexOf(report.reason) === -1) return q;
+  const note = String(report.note || '').slice(0, 500);
+  const dup = q.findIndex(x => x.uid === report.uid && x.reason === report.reason);
+  const entry = Object.assign({}, report, { note, queuedAt: Number(now) || Date.now() });
+  if (dup !== -1) q[dup] = entry; else q.push(entry);
+  return q.slice(-REPORT_QUEUE_MAX);
+}
+function reportQueueRemove(queue, report) {
+  return (Array.isArray(queue) ? queue : []).filter(x => !(x && report && x.uid === report.uid && x.reason === report.reason));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MASTERY (v1.33, pure, unit-tested)
+
+   A chapter is COMPLETE only when all three hold:
+     1. every question in it has been attempted at least once
+     2. accuracy on those questions is at least 85%
+     3. nothing from it is left in the wrong bank
+   "Accuracy" uses each question's LATEST result (coverage bits: '1' right, '2' wrong), not lifetime totals, so an
+   old mistake you have since corrected stops counting against you.
+
+   The 60-day sprint is planned over Level 7 and General Knowledge only (Level 5 is a separate paper).
+   ═══════════════════════════════════════════════════════════════════════ */
+const MASTERY_THRESHOLD = 0.85;
+const SPRINT_LEVELS = ['level7', 'gk'];
+
+function sprintRefs(refs) {
+  return (Array.isArray(refs) ? refs : []).filter(r => r && SPRINT_LEVELS.indexOf(r.lv) !== -1);
+}
+
+/* o = { fids:[file ids of the chapter], fcount:{fid: questionCount}, cov:{fid:{p}}, wr:[wrong-bank items], threshold }
+   -> { state, attempted, right, wrong, total, accuracy (0..1 or null), wrongLeft, needs:[...] }
+   state: 'unknown' (sizes not known yet), 'not-started', 'in-progress', 'complete' */
+function chapterMastery(o) {
+  o = o || {};
+  const fids = Array.isArray(o.fids) ? o.fids : [];
+  const fcount = o.fcount || {}, cov = o.cov || {};
+  const need = Number(o.threshold) > 0 ? Number(o.threshold) : MASTERY_THRESHOLD;
+  let total = 0, right = 0, wrong = 0, known = 0;
+  fids.forEach(f => {
+    const n = fcount[f];
+    if (n != null) { total += Number(n) || 0; known++; }
+    const p = (cov[f] && cov[f].p) ? String(cov[f].p) : '';
+    for (let i = 0; i < p.length; i++) { if (p[i] === '1') right++; else if (p[i] === '2') wrong++; }
+  });
+  const attempted = right + wrong;
+  const set = new Set(fids);
+  const wrongLeft = (Array.isArray(o.wr) ? o.wr : []).filter(q => q && set.has(q.fileId) && !q._withdrawn).length;
+  const accuracy = attempted ? right / attempted : null;
+  const out = { attempted, right, wrong, total, accuracy, wrongLeft, needs: [] };
+  if (!fids.length || known < fids.length || total <= 0) { out.state = 'unknown'; return out; }
+  if (!attempted) { out.state = 'not-started'; out.needs.push('Start practising this chapter'); return out; }
+  if (attempted < total) out.needs.push((total - attempted) + ' question' + (total - attempted === 1 ? '' : 's') + ' not attempted yet');
+  if (accuracy < need) out.needs.push('Accuracy ' + Math.round(accuracy * 100) + '% (need ' + Math.round(need * 100) + '%)');
+  if (wrongLeft > 0) out.needs.push(wrongLeft + ' in your wrong bank');
+  out.state = out.needs.length ? 'in-progress' : 'complete';
+  return out;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
    MULTI-DEVICE PROGRESS MERGE (pure function, unit-tested)
 
    When two devices save progress, the server no longer lets the later save
@@ -302,11 +391,133 @@ function sprintPlan(o) {
      qnotes     union; this device wins a conflict
      sprint     this device's start date, else the other's
    ═══════════════════════════════════════════════════════════════════════ */
-function mergeSyncData(local, remote) {
-  const L = (local && typeof local === 'object') ? local : {};
-  const R = (remote && typeof remote === 'object') ? remote : {};
+/* ═══════════════════════════════════════════════════════════════════════
+   RESET MARKERS (v1.33)
+
+   A merge only ever adds, so a reset done on one device would be undone by the next sync. A reset therefore
+   leaves a small marker (a timestamp) that travels with the data. Anything saved BEFORE the marker is ignored
+   by every merge; anything saved after it is kept.
+
+     resets = { all: ms,            reset all progress (sessions, chapter stats, coverage, wrong bank, study days, totals)
+                wr: ms,             reset only the wrong bank
+                exams: ms,          reset only exam history
+                sprint: ms,         the 60-day sprint was restarted (the later start date wins)
+                ch: { key: ms },    one chapter, key = file id or chapter name
+                rm: { uid: ms } }   one question removed from the wrong bank
+
+   Bookmarks, flags, notes, PDFs and reports are never touched by a reset.
+   Wrong-bank items carry `_addedAt`, coverage entries carry `t`; a copy without one counts as older than any marker.
+   ═══════════════════════════════════════════════════════════════════════ */
+function mergeResets(a, b) {
+  const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+  const A = isObj(a) ? a : {}, B = isObj(b) ? b : {};
+  const out = {};
+  ['all', 'wr', 'exams', 'sprint'].forEach(k => {
+    const v = Math.max(Number(A[k]) || 0, Number(B[k]) || 0);
+    if (v > 0) out[k] = v;
+  });
+  ['ch', 'rm'].forEach(k => {
+    const m = {};
+    [A[k], B[k]].forEach(src => {
+      if (!isObj(src)) return;
+      Object.keys(src).forEach(id => { const v = Number(src[id]) || 0; if (v > (m[id] || 0)) m[id] = v; });
+    });
+    let keys = Object.keys(m);
+    if (!keys.length) return;
+    if (keys.length > 400) { keys.sort((x, y) => m[y] - m[x]); keys = keys.slice(0, 400); }
+    const t = {}; keys.forEach(id => { t[id] = m[id]; }); out[k] = t;
+  });
+  /* `un` lists markers that were undone (the 24-hour undo, or "Clear all" undone). A marker whose time is in
+     that list is ignored everywhere, so an undo is not reversed by another device that still carries the marker. */
+  const un = Array.from(new Set((Array.isArray(A.un) ? A.un : []).concat(Array.isArray(B.un) ? B.un : [])
+    .map(Number).filter(v => v > 0))).sort((x, y) => y - x).slice(0, 40);
+  if (un.length) {
+    const lifted = v => un.indexOf(v) !== -1;
+    ['all', 'wr', 'exams', 'sprint'].forEach(k => { if (lifted(out[k])) delete out[k]; });
+    ['ch', 'rm'].forEach(k => {
+      if (!out[k]) return;
+      Object.keys(out[k]).forEach(id => { if (lifted(out[k][id])) delete out[k][id]; });
+      if (!Object.keys(out[k]).length) delete out[k];
+    });
+    out.un = un;
+  }
+  return out;
+}
+
+function applyResets(d, rs) {
   const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
   const arr = v => Array.isArray(v) ? v : [];
+  if (!isObj(d) || !isObj(rs) || !Object.keys(rs).length) return d;
+  const allT = Number(rs.all) || 0, wrT = Number(rs.wr) || 0, exT = Number(rs.exams) || 0;
+  const ch = isObj(rs.ch) ? rs.ch : {}, rm = isObj(rs.rm) ? rs.rm : {};
+  const chT = k => (k ? (Number(ch[k]) || 0) : 0);
+  const out = Object.assign({}, d);
+
+  if (isObj(d.prog)) {
+    const prog = Object.assign({}, d.prog);
+    prog.sessions = arr(d.prog.sessions).filter(s => {
+      if (!s) return false;
+      const at = Number(s.at) || 0;
+      if (allT && at <= allT) return false;
+      if (exT && s.mode === 'exam' && at <= exT) return false;
+      const t = Math.max(chT(s.fid), chT(s.chapter));
+      return !(t && at <= t);
+    });
+    const gen = Number(d.prog.gen) || 0;
+    if (allT && gen < allT) { prog.total = 0; prog.correct = 0; }
+    if (allT) prog.gen = Math.max(gen, allT);
+    out.prog = prog;
+  }
+  if (isObj(d.chapStats)) {
+    const cs = {};
+    Object.keys(d.chapStats).forEach(k => {
+      const rec = d.chapStats[k], at = Number(rec && rec.lastAt) || 0;
+      if (allT && at <= allT) return;
+      const t = chT(k);
+      if (t && at <= t) return;
+      cs[k] = rec;
+    });
+    out.chapStats = cs;
+  }
+  if (isObj(d.cov)) {
+    const cv = {};
+    Object.keys(d.cov).forEach(fid => {
+      const rec = d.cov[fid], at = Number(rec && rec.t) || 0;
+      if (allT && at <= allT) return;
+      const t = chT(fid);
+      if (t && at <= t) return;
+      cv[fid] = rec;
+    });
+    out.cov = cv;
+  }
+  if (Array.isArray(d.wr)) {
+    out.wr = d.wr.filter(x => {
+      if (!x) return false;
+      const at = Number(x._addedAt) || 0;
+      if (allT && at <= allT) return false;
+      if (wrT && at <= wrT) return false;
+      const r = Number(rm[x.uid]) || 0;
+      if (r && at <= r) return false;
+      const t = chT(x.fileId);
+      return !(t && at <= t);
+    });
+  }
+  if (allT && isObj(d.stk)) {
+    const cut = localISODate(new Date(allT));
+    const days = arr(d.stk.days).filter(x => String(x) >= cut);
+    out.stk = Object.assign({}, d.stk, { days, last: days.length ? days[days.length - 1] : '' });
+  }
+  return out;
+}
+
+function mergeSyncData(local, remote) {
+  const isObj = v => v && typeof v === 'object' && !Array.isArray(v);
+  const arr = v => Array.isArray(v) ? v : [];
+  const L0 = isObj(local) ? local : {};
+  const R0 = isObj(remote) ? remote : {};
+  const resets = mergeResets(L0.resets, R0.resets);
+  const L = applyResets(L0, resets);
+  const R = applyResets(R0, resets);
 
   const unionBy = (a, b, keyOf) => {
     const seen = new Set(), out = [];
@@ -332,6 +543,7 @@ function mergeSyncData(local, remote) {
   const correct = Math.max((Number(lp.correct) || 0) + sum(onlyIn(rp.sessions, lp.sessions), 'correct'), (Number(rp.correct) || 0) + sum(onlyIn(lp.sessions, rp.sessions), 'correct'));
   const badges = Object.assign({}, isObj(rp.badges) ? rp.badges : {}, isObj(lp.badges) ? lp.badges : {});
   const prog = Object.assign({}, rp, lp, { sessions, total, correct, badges });
+  const gen = Math.max(Number(lp.gen) || 0, Number(rp.gen) || 0); if (gen) prog.gen = gen;
 
   const chapStats = Object.assign({}, isObj(R.chapStats) ? R.chapStats : {});
   Object.keys(isObj(L.chapStats) ? L.chapStats : {}).forEach(k => {
@@ -343,10 +555,12 @@ function mergeSyncData(local, remote) {
   const lc = isObj(L.cov) ? L.cov : {}, rc = isObj(R.cov) ? R.cov : {};
   new Set(Object.keys(lc).concat(Object.keys(rc))).forEach(fid => {
     const a = isObj(lc[fid]) ? lc[fid] : null, b = isObj(rc[fid]) ? rc[fid] : null;
-    if (!a || !b) { const o = a || b; cov[fid] = { p: String(o.p || ''), a: Number(o.a) || 0, c: Number(o.c) || 0 }; return; }
+    const tt = Math.max(Number(a && a.t) || 0, Number(b && b.t) || 0);
+    if (!a || !b) { const o = a || b; cov[fid] = { p: String(o.p || ''), a: Number(o.a) || 0, c: Number(o.c) || 0 }; if (tt) cov[fid].t = tt; return; }
     const pa = String(a.p || ''), pb = String(b.p || ''); let p = '';
     for (let i = 0, n = Math.max(pa.length, pb.length); i < n; i++) { const x = pa[i] || '0'; p += x !== '0' ? x : (pb[i] || '0'); }
     cov[fid] = { p, a: Math.max(Number(a.a) || 0, Number(b.a) || 0), c: Math.max(Number(a.c) || 0, Number(b.c) || 0) };
+    if (tt) cov[fid].t = tt;
   });
 
   const ls = isObj(L.stk) ? L.stk : {}, rs = isObj(R.stk) ? R.stk : {};
@@ -355,10 +569,12 @@ function mergeSyncData(local, remote) {
 
   const qnotes = Object.assign({}, isObj(R.qnotes) ? R.qnotes : {}, isObj(L.qnotes) ? L.qnotes : {});
   const okDate = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
-  const sprint = okDate(L.sprint) ? L.sprint : (okDate(R.sprint) ? R.sprint : '');
+  let sprint = okDate(L.sprint) ? L.sprint : (okDate(R.sprint) ? R.sprint : '');
+  /* a restarted sprint must win over the old start date still held by another device */
+  if (resets.sprint && okDate(L.sprint) && okDate(R.sprint)) sprint = L.sprint > R.sprint ? L.sprint : R.sprint;
 
   return {
-    prog, chapStats, cov, stk, qnotes, sprint,
+    prog, chapStats, cov, stk, qnotes, sprint, resets,
     bk: unionBy(L.bk, R.bk, uidOf),
     fl: unionBy(L.fl, R.fl, uidOf),
     wr: unionBy(L.wr, R.wr, uidOf)

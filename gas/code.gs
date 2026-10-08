@@ -75,7 +75,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.32";
+const APP_VERSION = "1.33";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -146,6 +146,7 @@ const QREPORT_HEADERS = [
   /* v1.32: what the admin needs to judge a report without opening the file */
   "optionsSnapshot","correctIndex","chosenIndex","section","appVersion","resolvedAt","resolvedBy","corrected"
 ];
+const QREPORT_REASONS = ["wrong_answer","unclear","typo","incomplete","image_problem","other"];
 const QREPORT_SECTIONS = ["practice","exam","daily-paper","weekly","hourly","results","review-missed","review-saved","review-flagged","other"];
 /* fileId -> time (ms) the admin said that file was corrected. Private, so it is not in the public settings. */
 const CORRECTIONS_SETTING_KEY = "private_corrections";
@@ -3932,7 +3933,7 @@ function normalizeReportPayload_(p) {
   if (!uid) return { error: "Missing question reference." };
   if (!/^[A-Za-z0-9_.:-]+$/.test(uid)) return { error: "Invalid question reference." };
   const reason = String(p.reason || "").trim();
-  if (["wrong_answer", "unclear", "typo", "other"].indexOf(reason) === -1) return { error: "Invalid report reason." };
+  if (QREPORT_REASONS.indexOf(reason) === -1) return { error: "Invalid report reason." };
   const m = uid.match(/^(.+)_(\d+)$/);
   const idx = v => { const n = Number(v); return (v !== "" && v !== null && v !== undefined && isFinite(n) && n >= 0 && n < 10 && Math.floor(n) === n) ? n : ""; };
   let opts = p.optionsSnapshot;

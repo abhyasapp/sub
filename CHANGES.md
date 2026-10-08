@@ -1,3 +1,33 @@
+# v1.33 changes
+
+## Exams
+- Tap the selected option again to unselect it; every question has a Clear response button.
+- Warnings at 10, 5 and 1 minute left (toast plus screen-reader announcement); the clock turns red in the last 5 minutes.
+- Keyboard: 1-5 pick, C clear, M mark, N next, P previous.
+
+## Progress and resets
+- Data > Reset progress: all, wrong bank only, sprint only, one chapter, or exam history only. Offers a JSON download and a
+  cloud backup first, needs a typed word (START FRESH for all, RESET otherwise) and keeps a 24-hour undo copy.
+  Bookmarks, flags, notes, PDFs and reports are never removed.
+- Resets and wrong-bank removals leave a timestamp marker that travels with the synced data, so another device cannot bring
+  the old data back (shared.js mergeResets / applyResets). Undo lifts the marker.
+- Fixed: the 24-hour recovery card had no place on the page, so the undo copy was saved but never offered.
+- A chapter is Complete only when every question is attempted, accuracy is at least 85% (latest result per question) and
+  nothing from it is left in the wrong bank. The 60-day sprint covers Level 7 and GK only. Green "Daily target met" badge.
+
+## Backup and storage
+- Google Drive: one file per backup, newest 5 kept, checksum checked on restore, complete payload (no 500-item cut, now
+  includes coverage, notes and sprint). Restore adds to the device and never removes anything.
+- Storage meter with an 80% warning and a per-kind breakdown; "Protect from auto-clean"; backup reminder after 7 days or
+  100 new answers. Nothing is ever deleted automatically.
+
+## Reports
+- Six categories (adds "incomplete question" and "image or table problem"). Reports written offline are queued (max 20)
+  and sent when the device is back online. gas/code.gs must be redeployed.
+
+## Display
+- Text size (small / medium / large), high contrast, AMOLED black.
+
 # v1.32 changes
 
 ## Security

@@ -74,6 +74,8 @@ const SHELL = [
   './js/core/firebase-config.js',
   './js/data/chapters-loader.js',
   './js/app/cloud-sync.js',
+  './js/app/storage-health.js',
+  './js/app/display-prefs.js',
 
   './js/app/app.js',
   './js/app/user-page.js',

@@ -77,6 +77,12 @@
           copy protection, live Loksewa negative-marking score in the
           exam bar, boot error boundary, search inside Saved/Flagged/
           Missed lists, faster progress flush, weekly admin summary. */
+/* 1.33 - exam and study tools. Unselect an answer and Clear response in timed exams; 10/5/1-minute warnings;
+          exam keyboard shortcuts (1-5, C, M, N, P). Scoped "Reset progress" with backup offer, typed confirmation and
+          24-hour undo; resets and wrong-bank removals now survive sync. Storage meter with 80% warning, backup
+          reminder, versioned Google Drive backups with checksum. 85% mastery gate for chapter completion, sprint
+          limited to Level 7 + GK, "Daily target met" badge. Six report categories and an offline report queue.
+          Text size, high contrast and AMOLED black. Needs gas/code.gs v1.33 deployed. */
 /* 1.32 - weekly test hardening. Fixed the entire weekly feature:
             • objective.js — removed a duplicate `const isWeekly`
               declaration in _showResults that was a parse-time syntax
@@ -111,4 +117,4 @@
               Review and Retake always have questions to work with
               even when the chapter pools and the weekly set's Drive
               file are both unreachable. */
-const APP_VERSION = '1.32';
+const APP_VERSION = '1.33';

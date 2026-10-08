@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#F2F4F3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#080B14" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
+<script>(function(){try{var d=JSON.parse(localStorage.getItem('abhyas_display')||'null')||{},e=document.documentElement;e.setAttribute('data-fs',['small','medium','large'].indexOf(d.fs)>-1?d.fs:'medium');if(d.hc===true)e.setAttribute('data-hc','1');if(d.amoled===true)e.setAttribute('data-amoled','1');}catch(x){}})();</script>
 <meta name="apple-mobile-web-app-title" content="Abhyas">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex,nofollow">
@@ -1095,6 +1096,26 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   font-family:var(--mono);font-size:var(--fs-foot);font-weight:700;color:var(--ink-3)
 }
 .eo.sel{background:var(--accent-soft);border-color:var(--accent)}
+.ex-clear{display:inline-flex;align-items:center;gap:.3rem;margin-top:var(--sp-1);padding:.35rem .7rem;min-height:32px;background:transparent;border:1px solid var(--sep-strong);border-radius:8px;color:var(--ink-2);font:inherit;font-size:.78rem;font-weight:600;cursor:pointer}
+.ex-clear[hidden]{display:none}
+/* v1.33 display preferences */
+html[data-fs="small"]{font-size:90%}
+html[data-fs="large"]{font-size:118%}
+.seg{display:inline-flex;border:1px solid var(--sep-strong);border-radius:10px;overflow:hidden}
+.seg-btn{padding:.45rem .9rem;min-height:40px;background:transparent;border:0;border-right:1px solid var(--sep-strong);color:var(--ink-2);font:inherit;font-weight:600;cursor:pointer}
+.seg-btn:last-child{border-right:0}
+.seg-btn.on{background:var(--accent-soft);color:var(--accent)}
+html[data-hc="1"]{--ink:#000;--ink-2:#111;--sep:#444;--sep-strong:#222;--accent-soft:#dbe7ff}
+html[data-hc="1"].dark{--ink:#fff;--ink-2:#f2f2f2;--sep:#bbb;--sep-strong:#ddd;--accent-soft:#1d2b52}
+html[data-hc="1"] :focus-visible{outline:3px solid currentColor;outline-offset:2px}
+html[data-hc="1"] .card,html[data-hc="1"] .eo,html[data-hc="1"] .eqc{border-width:2px}
+html[data-amoled="1"].dark{--bg:#000;--bg-sunken:#000;--surface:#050505;--surface-2:#0b0b0b;--surface-alt:#000}
+.sprint-done{display:inline-flex;align-items:center;gap:.35rem;margin:var(--sp-1) 0;padding:.25rem .65rem;border-radius:99px;background:var(--success-soft,#e6f4ea);color:var(--success,#1e7a3c);font-weight:700;font-size:.8rem}
+.pr-list{display:flex;flex-direction:column;gap:var(--sp-2)}
+.pr-opt{display:flex;gap:var(--sp-2);align-items:flex-start;padding:var(--sp-2);border:1px solid var(--sep-strong);border-radius:10px;cursor:pointer}
+.pr-opt input{margin-top:.2rem}
+.pr-opt:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.ex-clear:hover{background:var(--bg-sunken);color:var(--ink)}
 .eo.sel .ok{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .eo.shc,.eo.ok2{background:var(--success-soft);border-color:var(--success);color:var(--success)}
 .eo.shc .ok,.eo.ok2 .ok{background:var(--success);border-color:var(--success);color:#fff;font-size:0}
@@ -1835,6 +1856,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
       <!-- ─────────────── HOME ─────────────── -->
       <div class="view on" id="view-home">
+        <div id="backup-nudge-slot"></div>
         <div id="home-marquee" class="marquee-bar" style="display:none" role="status" aria-live="polite">
           <i class="ph ph-megaphone-simple marquee-icon" aria-hidden="true"></i>
           <div class="marquee-viewport"><div class="marquee-track" id="marquee-track"></div></div>
@@ -2292,12 +2314,12 @@ html.focus-mode .marquee-bar{display:none!important}
 
         <div class="card">
           <div class="card-hd"><h3>Backup to your own Drive</h3><span class="ctag tp">Optional</span></div>
-          <p class="t-callout mb3">Keep a second copy in your own Google Drive, separate from the Abhyas server.</p>
+          <p class="t-callout mb3">Keep a second copy in your own Google Drive, separate from the Abhyas server. Each backup is saved as its own version and the newest 5 are kept. Restoring <b>adds</b> a copy&rsquo;s data to this device; nothing on this device is removed.</p>
           <div id="cloud-status" class="t-foot mb3">Sign in with Google to turn this on.</div>
           <div class="bg" id="cloud-btn-row">
             <button class="btn btn-p" id="cloud-signin-btn" onclick="CLOUD_UI.signIn()"><i class="ph ph-google-logo"></i> Sign in with Google</button>
             <button class="btn btn-a" id="cloud-backup-btn" style="display:none" onclick="CLOUD_UI.backup()"><i class="ph ph-cloud-arrow-up"></i> Back up to Drive</button>
-            <button class="btn btn-quiet" id="cloud-restore-btn" style="display:none" onclick="CLOUD_UI.restore()"><i class="ph ph-cloud-arrow-down"></i> Restore</button>
+            <button class="btn btn-quiet" id="cloud-restore-btn" style="display:none" onclick="CLOUD_UI.restore()"><i class="ph ph-cloud-arrow-down"></i> Restore a version&hellip;</button>
             <button class="btn btn-r btn-sm" id="cloud-signout-btn" style="display:none" onclick="CLOUD_UI.signOut()">Sign out</button>
           </div>
         </div>
@@ -2366,6 +2388,7 @@ html.focus-mode .marquee-bar{display:none!important}
       <!-- ─────────────── BACKUP ─────────────── -->
       <div class="view" id="view-data">
         <div class="pg-head" data-head="data"></div>
+        <div id="reset-recover-slot"></div>
         <div class="card" id="recover-card">
           <div class="card-hd"><h3><i class="ph ph-lifebuoy"></i> Recover data</h3><span class="ctag tg">Safe</span></div>
           <p class="t-callout mb3">Syncing only ever adds to your data. If something looks missing, add back an earlier copy here. Adding a copy never deletes what you have now.</p>
@@ -2375,6 +2398,15 @@ html.focus-mode .marquee-bar{display:none!important}
           <div id="recover-cloud"><button class="btn btn-quiet btn-sm" onclick="RECOVER.loadCloud()"><i class="ph ph-cloud-arrow-down"></i> Check earlier cloud copies</button></div>
           <div id="recover-msg" class="t-foot" style="margin-top:var(--sp-2)" aria-live="polite"></div>
         </div>
+        <div class="card" id="display-card">
+          <div class="card-hd"><h3>Display and accessibility</h3><span class="ctag tg">This device</span></div>
+          <div id="display-card-body"></div>
+        </div>
+        <div id="backup-nudge-slot-data"></div>
+        <div class="card" id="storage-card">
+          <div class="card-hd"><h3>Storage</h3><span class="ctag tg">This device</span></div>
+          <div id="storage-card-body" aria-live="polite"><p class="t-foot">Checking&hellip;</p></div>
+        </div>
         <div class="card">
           <div class="card-hd"><h3>Backup file</h3></div>
           <p class="t-callout mb4">Progress, saved questions, flags, your miss list and your study plan all live on this device. Export keeps a copy you control.</p>
@@ -2383,6 +2415,11 @@ html.focus-mode .marquee-bar{display:none!important}
             <button class="btn btn-quiet" onclick="DATA.imp()"><i class="ph ph-upload-simple"></i> Load a backup</button>
             <button class="btn btn-quiet" onclick="EXPORTNOTES.run()"><i class="ph ph-note"></i> Export my notes</button>
           </div>
+        </div>
+        <div class="card">
+          <div class="card-hd"><h3>Reset progress</h3><span class="ctag tr">Careful</span></div>
+          <p class="t-callout mb4">Start over completely, or reset just the wrong bank, the 60-day sprint, one chapter or exam history. You can back up first, and a copy is kept on this device for 24 hours so you can undo. Bookmarks, flags, notes, PDFs and reports are never removed.</p>
+          <div class="bg"><button class="btn btn-r" onclick="PROGRESS_RESET.open()"><i class="ph ph-arrow-counter-clockwise"></i> Reset progress&hellip;</button></div>
         </div>
         <div class="card">
           <div class="card-hd"><h3>Clear data</h3><span class="ctag tr">Careful</span></div>
@@ -2655,6 +2692,8 @@ if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
 <script src="js/app/subjective.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="js/app/cloud-sync.js"></script>
+<script src="js/app/storage-health.js"></script>
+<script src="js/app/display-prefs.js"></script>
 <script src="js/app/pdf-viewer.js"></script>
 <script src="js/app/user-page.js"></script></body>
 </html>

@@ -64,7 +64,9 @@ js/
   app/     app.js             Core: state, auth, sync, offline, timetable, home
            objective.js       MCQ engine, chapter picker, mixed practice, review
            subjective.js      Written answers: QOTD, exam, Smart Paste parser
-           cloud-sync.js      Optional backup to the student's own Google Drive
+           cloud-sync.js      Optional backup to the student's own Google Drive (5 versions, checksum, additive restore)
+           storage-health.js  Storage meter and 80% warning, storage breakdown, backup reminder
+           display-prefs.js   Text size, high contrast, AMOLED black
            pdf-viewer.js      Shared PDF reader and ink annotation layer
            user-page.js       Student-page features: sprint card, insights charts, sidebar, tools
   data/    chapters-loader.js     Loads chapters-data.js from Drive

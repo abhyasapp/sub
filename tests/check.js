@@ -23,7 +23,7 @@ function group(msg) { console.log('\n── ' + msg + ' ' + '─'.repeat(Math.ma
    names; this maps each short name to its real location. */
 const MOVED = {
   'config.js': 'js/core/config.js', 'version.js': 'js/core/version.js', 'firebase-config.js': 'js/core/firebase-config.js', 'shared.js': 'js/core/shared.js', 'nav.js': 'js/core/nav.js',
-  'app.js': 'js/app/app.js', 'objective.js': 'js/app/objective.js', 'subjective.js': 'js/app/subjective.js', 'cloud-sync.js': 'js/app/cloud-sync.js',
+  'app.js': 'js/app/app.js', 'objective.js': 'js/app/objective.js', 'subjective.js': 'js/app/subjective.js', 'cloud-sync.js': 'js/app/cloud-sync.js', 'storage-health.js': 'js/app/storage-health.js', 'display-prefs.js': 'js/app/display-prefs.js',
   'pdf-viewer.js': 'js/app/pdf-viewer.js', 'user-page.js': 'js/app/user-page.js',
   'chapters-loader.js': 'js/data/chapters-loader.js', 'subjective_chapters.js': 'js/data/subjective_chapters.js',
   'subjective-data.js': 'js/data/subjective-data.js', 'content-index.js': 'js/data/content-index.js',
@@ -77,7 +77,7 @@ group('Version drift');
 group('Required files');
 [
   'index.html','user.html','admin.html','privacy.html','terms.html',
-  'app.js','objective.js','subjective.js','cloud-sync.js',
+  'app.js','objective.js','subjective.js','cloud-sync.js','storage-health.js','display-prefs.js',
   'shared.js','config.js','version.js','chapters-loader.js',
   'subjective_chapters.js','subjective-data.js',
   'pdf-viewer.js','content-index.js','firebase-config.js',
@@ -92,7 +92,7 @@ group('Required files');
    ═══════════════════════════════════════════════════════════════════════ */
 group('JS syntax');
 const jsFiles = [
-  'app.js','objective.js','subjective.js','cloud-sync.js',
+  'app.js','objective.js','subjective.js','cloud-sync.js','storage-health.js','display-prefs.js',
   'shared.js','config.js','version.js','chapters-loader.js',
   'subjective_chapters.js','subjective-data.js',
   'pdf-viewer.js','content-index.js','firebase-config.js','sw.js'
@@ -446,6 +446,242 @@ group('Multi-device merge');
   eq('garbage input does not throw', ctx.merge('x', 5).prog.sessions.length, 0);
 })();
 
+group('Exam timer warnings, shortcuts and display preferences');
+(function examUxTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; }, documentElement: { setAttribute(){}, removeAttribute(){} } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} } };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.ew=examWarning;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const total = 3600;
+  let w = [], fired = [];
+  for (let left = total; left >= 0; left--) { const r = ctx.ew(left, total, w); w = r.warned; if (r.fire) fired.push([r.fire, left]); }
+  eq('a 60-minute exam warns once each at 10, 5 and 1 minute left', fired, [[600, 600], [300, 300], [60, 60]]);
+  eq('resuming with 4 minutes left does not announce the 10-minute warning late', (() => { const r = ctx.ew(240, 3600, []); return [r.fire, r.warned.sort((a, b) => a - b)]; })(), [0, [300, 600]]);
+  eq('a 5-minute quiz has no "10 minutes left"', (() => { let ww = [], f = []; for (let l = 300; l >= 0; l--) { const r = ctx.ew(l, 300, ww); ww = r.warned; if (r.fire) f.push(r.fire); } return f; })(), [60]);
+  eq('the warning list is not changed in place', (() => { const a = []; ctx.ew(100, 3600, a); return a.length; })(), 0);
+  const obj = readFile('objective.js') || '';
+  /_timerWarn\(S\.quiz\.left\)/.test(obj) ? pass('the exam clock checks for warnings every second') : fail('timer does not call _timerWarn');
+  /examTotal: \(snap/.test(obj) ? pass('a resumed exam keeps its warnings') : fail('resume path has no examTotal');
+  /aria-live/.test(obj) ? pass('warnings are announced to screen readers') : fail('no live region for timer warnings');
+  ['1', 'c', 'm', 'n', 'p'].every(k => new RegExp("k==='" + k + "'|\\['1','2','3','4','5'\\]").test(obj)) ? pass('exam keyboard shortcuts: 1-5 pick, C clear, M mark, N next, P previous') : fail('an exam shortcut is missing');
+  const dp = readFile('display-prefs.js') || '';
+  const win = {};
+  try { vm.runInNewContext(dp, { window: win, document: { addEventListener(){}, getElementById(){ return null; }, documentElement: { setAttribute(){}, removeAttribute(){} } }, localStorage: { getItem(){ return null; }, setItem(){} } }); } catch (e) { fail('display-prefs.js load: ' + e.message); return; }
+  const R = win.DISPLAY_RULES;
+  eq('display preferences: bad or missing data falls back to the defaults', [R.cleanPrefs(null), R.cleanPrefs('x'), R.cleanPrefs({ fs: 'huge', hc: 'yes', amoled: 1 })], [R.DEFAULTS, R.DEFAULTS, R.DEFAULTS]);
+  eq('display preferences: valid choices are kept', R.cleanPrefs({ fs: 'large', hc: true, amoled: true }), { fs: 'large', hc: true, amoled: true });
+  eq('three text sizes', R.SIZES, ['small', 'medium', 'large']);
+  const uh = readFile('user.html') || '';
+  /html\[data-hc="1"\]/.test(uh) && /html\[data-amoled="1"\]\.dark/.test(uh) && /html\[data-fs="large"\]/.test(uh) ? pass('CSS exists for large text, high contrast and AMOLED black') : fail('display CSS missing');
+  /abhyas_display/.test(uh) && /id="display-card-body"/.test(uh) ? pass('the page applies saved display settings before it paints, and has a settings card') : fail('early apply or settings card missing');
+})();
+
+group('Question reports: 6 categories and offline queue');
+(function reportTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} } };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.add=reportQueueAdd;this.rm=reportQueueRemove;this.R=REPORT_REASONS;this.MAX=REPORT_QUEUE_MAX;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  eq('there are six report categories', ctx.R.length, 6);
+  const gs = require('fs').readFileSync(require('path').join(ROOT, 'gas/code.gs'), 'utf8'), obj = readFile('objective.js') || '', adm = require('fs').readFileSync(require('path').join(ROOT, 'admin.html'), 'utf8');
+  const sv = (gs.match(/const QREPORT_REASONS = \[([^\]]*)\]/) || [])[1] || '';
+  eq('server accepts the same six categories as the app', sv.replace(/[" ]/g, '').split(',').sort(), ctx.R.slice().sort());
+  ctx.R.every(r => obj.indexOf('value="' + r + '"') !== -1) ? pass('the report form offers every category') : fail('a category is missing from the report form');
+  ctx.R.every(r => adm.indexOf(r) !== -1) ? pass('the admin screen knows every category') : fail('admin.html is missing a category');
+  let q = ctx.add([], { uid: 'f_1', reason: 'typo', note: 'x' }, 5);
+  eq('a report is queued', [q.length, q[0].queuedAt], [1, 5]);
+  eq('the same question and reason is kept once (newest wins)', ctx.add(q, { uid: 'f_1', reason: 'typo', note: 'newer' }, 9).map(x => x.note), ['newer']);
+  eq('the same question with another reason is a separate report', ctx.add(q, { uid: 'f_1', reason: 'unclear' }, 9).length, 2);
+  eq('an invalid category or empty uid is ignored', [ctx.add(q, { uid: 'f_2', reason: 'rude' }).length, ctx.add(q, { reason: 'typo' }).length], [1, 1]);
+  let big = []; for (let i = 0; i < 30; i++) big = ctx.add(big, { uid: 'u' + i, reason: 'other' }, i);
+  eq('the queue is capped and keeps the newest', [big.length, big[big.length - 1].uid], [ctx.MAX, 'u29']);
+  eq('a sent report is removed from the queue', ctx.rm(q, { uid: 'f_1', reason: 'typo' }).length, 0);
+  eq('note length is limited to 500', ctx.add([], { uid: 'a', reason: 'other', note: 'x'.repeat(900) })[0].note.length, 500);
+  /flushReports/.test(readFile('app.js') || '') ? pass('queued reports are sent when the device comes back online') : fail('the online handler does not flush the report queue');
+})();
+
+group('85% mastery gate and Level 7 + GK sprint');
+(function masteryTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} } };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.cm=chapterMastery;this.sr=sprintRefs;this.TH=MASTERY_THRESHOLD;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const base = { fids: ['a'], fcount: { a: 20 } };
+  const bits = (r, w, u) => '1'.repeat(r) + '2'.repeat(w) + '0'.repeat(u);
+  eq('the pass mark is 85%', ctx.TH, 0.85);
+  eq('all attempted, 17/20 right (85%), nothing in wrong bank: complete', ctx.cm({ ...base, cov: { a: { p: bits(17, 3, 0) } }, wr: [] }).state, 'complete');
+  const low = ctx.cm({ ...base, cov: { a: { p: bits(16, 4, 0) } }, wr: [] });
+  eq('80% is not complete, and the reason is shown', [low.state, low.needs], ['in-progress', ['Accuracy 80% (need 85%)']]);
+  eq('95% accurate but only half attempted: not complete', ctx.cm({ ...base, cov: { a: { p: bits(10, 0, 10) } }, wr: [] }).state, 'in-progress');
+  const w = ctx.cm({ ...base, cov: { a: { p: bits(20, 0, 0) } }, wr: [{ uid: 'a_1', fileId: 'a' }, { uid: 'z_1', fileId: 'other' }] });
+  eq('100% but one question still in the wrong bank: not complete', [w.state, w.wrongLeft], ['in-progress', 1]);
+  eq('nothing attempted yet: not started', ctx.cm({ ...base, cov: {}, wr: [] }).state, 'not-started');
+  eq('unknown size (file not downloaded yet) is never called complete', ctx.cm({ fids: ['a'], fcount: {}, cov: { a: { p: bits(20, 0, 0) } }, wr: [] }).state, 'unknown');
+  eq('an empty chapter is never complete', ctx.cm({ fids: [], fcount: {}, cov: {}, wr: [] }).state, 'unknown');
+  eq('accuracy uses the latest result, so a corrected mistake stops counting', ctx.cm({ fids: ['a'], fcount: { a: 4 }, cov: { a: { p: '1111' } }, wr: [] }).accuracy, 1);
+  eq('two sets in one chapter are judged together', ctx.cm({ fids: ['a', 'b'], fcount: { a: 10, b: 10 }, cov: { a: { p: bits(10, 0, 0) }, b: { p: bits(7, 3, 0) } }, wr: [] }).accuracy, 0.85);
+  const refs = [{ fid: 1, lv: 'level7' }, { fid: 2, lv: 'level5' }, { fid: 3, lv: 'gk' }];
+  eq('the sprint covers Level 7 and GK only', ctx.sr(refs).map(r => r.fid), [1, 3]);
+  eq('sprintRefs tolerates garbage', ctx.sr(null), []);
+  const up = readFile('user.html') || '', ujs = readFile('user-page.js') || '';
+  /sprintRefs\(ChapterData\.allFileRefs\(\)\)/.test(ujs) ? pass('the sprint plan is built from Level 7 + GK files') : fail('SPRINT._inputs does not use sprintRefs');
+  /Daily target met/.test(ujs) && /\.sprint-done/.test(up) ? pass('a green "Daily target met" badge shows when the day\'s goal is done') : fail('daily target badge missing');
+  /MASTERY\.chapter\(this\.lv, ch\)/.test(ujs) ? pass('chapter cards only say Complete when the gate is met') : fail('chapter cards do not use the mastery gate');
+})();
+
+group('Storage warning and backup reminder (rules)');
+(function storageRulesTests(){
+  const vm = require('vm');
+  const win = {};
+  const ctx = { window: win, document: { addEventListener(){}, getElementById(){ return null; } }, localStorage: { getItem(){ return null; }, setItem(){} }, navigator: {}, setTimeout(){}, console };
+  try { vm.runInNewContext(readFile('storage-health.js') || '', ctx); } catch (e) { fail('storage-health.js load: ' + e.message); return; }
+  const R = win.STORAGE_RULES;
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  eq('79% is fine, 80% warns, 95% is full', [R.storageLevel(0.79), R.storageLevel(0.8), R.storageLevel(0.95)], ['ok', 'warn', 'full']);
+  eq('fraction is clamped and a missing limit is zero', [R.storageFraction(50, 100), R.storageFraction(500, 100), R.storageFraction(5, 0), R.storageFraction(-5, 100)], [0.5, 1, 0, 0]);
+  eq('4,000,000 of 5,000,000 characters is exactly the 80% line', R.storageLevel(R.storageFraction(4000000, R.LIMIT_CHARS)), 'warn');
+  eq('keys are grouped for the breakdown', ['abhyas_prog', 'abhyas_wr', 'abhyas_qnotes', 'abhyas_tt', 'abhyas_theme'].map(R.storageGroup), ['progress', 'saved', 'notes', 'plan', 'other']);
+  const D = 24 * 60 * 60 * 1000, now = 100 * D;
+  eq('no record yet: no reminder (a new install is not nagged)', R.backupDue(null, now, 500).due, false);
+  eq('6 days and 99 answers: no reminder', R.backupDue({ at: now - 6 * D, total: 0 }, now, 99).due, false);
+  eq('7 days: reminder, because of the days', (r => [r.due, r.reason])(R.backupDue({ at: now - 7 * D, total: 0 }, now, 5)), [true, 'days']);
+  eq('100 new answers: reminder, because of the answers', (r => [r.due, r.reason, r.answers])(R.backupDue({ at: now - D, total: 40 }, now, 140)), [true, 'answers', 100]);
+  eq('answers are counted since the last backup, never negative', R.backupDue({ at: now, total: 900 }, now, 100).answers, 0);
+  eq('sizes read naturally', [R.fmtBytes(500), R.fmtBytes(2048), R.fmtBytes(3 * 1024 * 1024)], ['500 B', '2.0 KB', '3.0 MB']);
+  const sh = readFile('storage-health.js') || '';
+  /localStorage\.removeItem|\.clear\(\)|QDB\.clear|DATA\.reset/.test(sh) ? fail('storage-health.js deletes data by itself') : pass('the storage module never deletes anything on its own');
+  const uh = readFile('user.html') || '';
+  /id="storage-card-body"/.test(uh) && /id="backup-nudge-slot"/.test(uh) && /id="backup-nudge-slot-data"/.test(uh) ? pass('Data and Home have a place for the storage card and the reminder') : fail('storage/reminder slots missing from user.html');
+  /js\/app\/storage-health\.js/.test(uh) ? pass('user.html loads storage-health.js') : fail('user.html does not load storage-health.js');
+})();
+
+group('Google Drive backup versions');
+(function driveVersionTests(){
+  const vm = require('vm');
+  const win = { addEventListener(){} };
+  const ctx = { window: win, document: { addEventListener(){} }, localStorage: { getItem(){ return null; }, setItem(){} }, navigator: {}, console, setTimeout, fetch: async () => ({}), URLSearchParams, Date, Math, JSON, Object, Array, Number, String, Promise };
+  const src = readFile('cloud-sync.js') || '';
+  try { vm.runInNewContext(src, ctx); } catch (e) { fail('cloud-sync.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const names = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'].map((d, i) => ({ id: 'id' + i, name: 'abhyas-backup-' + d + 'T00-00-00-000Z.json' }));
+  eq('with 7 snapshots the 2 oldest are removed, the newest 5 stay', win._cloudPrune(names, 5), ['id1', 'id0']);
+  eq('5 or fewer snapshots: nothing is removed', win._cloudPrune(names.slice(0, 5), 5), []);
+  eq('the older single-file backup is never pruned', win._cloudPrune([{ id: 'legacy', name: 'abhyas-progress-backup.json' }].concat(names), 5).indexOf('legacy'), -1);
+  eq('files this app did not create are never pruned', win._cloudPrune([{ id: 'x', name: 'notes.txt' }].concat(names), 5).indexOf('x'), -1);
+  const a = { v: 2, ts: 1, prog: { total: 5 }, bk: [{ uid: 'a' }] };
+  const sum = win._cloudChecksum(a);
+  eq('the checksum ignores the time and the sum itself', [win._cloudChecksum(Object.assign({}, a, { ts: 999, sum: 'zzz' })) === sum, sum.length], [true, 8]);
+  eq('any change to the content changes the checksum', win._cloudChecksum(Object.assign({}, a, { bk: [{ uid: 'b' }] })) === sum, false);
+  eq('key order does not matter', win._cloudChecksum({ bk: a.bk, prog: a.prog, v: 2 }) === win._cloudChecksum({ v: 2, prog: a.prog, bk: a.bk }), true);
+  const m = win._cloudMigrate({ v: 1, ts: 1, prog: { total: 3 }, bk: [] });
+  eq('an older (v1) backup is still readable', [m.ok, m.ok && m.data.v], [true, 2]);
+  eq('a backup from a newer app is refused with a clear reason', win._cloudMigrate({ v: 99 }).ok, false);
+  /method:\s*'PATCH'|PATCH/.test(src.replace(/\/\*[\s\S]*?\*\//g, '')) ? fail('a backup still overwrites an existing file') : pass('a backup never overwrites an earlier one (no PATCH)');
+  /MAX_VERSIONS\s*=\s*5/.test(src) ? pass('the newest 5 versions are kept') : fail('MAX_VERSIONS is not 5');
+  /_cloudChecksum\(parsed\)\s*!==\s*parsed\.sum/.test(src) ? pass('a damaged backup is detected before it is applied') : fail('restore does not verify the checksum');
+  /DATA\._applyImport\(migrated\.data\)/.test(src) ? pass('restore adds to the device through the safe merge (nothing removed)') : fail('restore no longer uses the additive merge');
+  /slice\(-500\)/.test(src) ? fail('the backup still cuts lists to 500') : pass('the backup is complete (no 500-item cut)');
+})();
+
+group('Scoped progress reset (device behaviour)');
+(function resetModuleTests(){
+  const app = readFile('app.js') || '';
+  const grab = name => {
+    const st = app.indexOf('const ' + name + ' = {'); if (st === -1) return '';
+    let d = 0, en = -1;
+    for (let i = app.indexOf('{', st); i < app.length; i++) { if (app[i] === '{') d++; else if (app[i] === '}' && --d === 0) { en = i + 1; break; } }
+    return app.slice(st, en);
+  };
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  function device() {
+    const store = {};
+    const S = { prog: { total: 40, correct: 30, badges: { b1: 1 }, sessions: [
+        { at: 100, mode: 'exam', fid: 'f1', chapter: 'Soil \u2014 B1' }, { at: 200, mode: 'flashcard', fid: 'f2', chapter: 'RCC \u2014 B1' }, { at: 300, mode: 'exam', fid: 'f2', chapter: 'RCC \u2014 B1' }] },
+      chapStats: { 'Soil \u2014 B1': { attempted: 10, correct: 5, lastAt: 100 }, 'RCC \u2014 B1': { attempted: 30, correct: 25, lastAt: 300 } },
+      cov: { f1: { p: '1', a: 1, c: 1, t: 100 }, f2: { p: '12', a: 2, c: 1, t: 300 } },
+      wr: [{ uid: 'f1_0', fileId: 'f1' }, { uid: 'f2_0', fileId: 'f2' }], bk: [{ uid: 'bk' }], fl: [{ uid: 'fl' }], stk: { days: ['2026-10-01'], last: '2026-10-01' }, fcount: { x: 1 }, tt: { sessions: [{ id: 1 }] } };
+    store.abhyas_sprint_start = '2026-08-01';
+    const LS = { PROG: 'p', CHAPSTATS: 'c', COV: 'v', BK: 'b', FL: 'f', WR: 'w', STK: 's', FCOUNT: 'fc', TT: 't', EXAM_SNAP: 'es' };
+    const refs = [{ fid: 'f1', lv: 7, ch: 1, book: 'B1' }, { fid: 'f2', lv: 7, ch: 2, book: 'B1' }];
+    const ChapterData = { allFileRefs: () => refs, chapterName: (lv, ch) => ({ 1: 'Soil', 2: 'RCC' }[ch]) };
+    let synced = 0;
+    const env = { S, LS, ChapterData, esc: x => String(x), openMod(){}, closeMod(){}, toast(){}, toastUndo(){}, _save: (k, v) => { store[k] = JSON.stringify(v); },
+      localStorage: { getItem: k => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: k => { delete store[k]; } },
+      HOME: { render(){}, updateBadges(){} }, PROG: { render(){} }, REV: { renderList(){} }, SPRINT: { render(){} }, PSYNC: { scheduleSync(){ synced++; } },
+      DATA: { exportAll(){} }, Date, JSON, Object, Array, Set, Number, String, console, document: { getElementById(){ return null; } } };
+    const src = grab('PROGRESS_RESET') + ';' + grab('RESET_SNAPSHOT') + ';';
+    const mod = new Function(...Object.keys(env), src + 'return {PR: PROGRESS_RESET, RS: RESET_SNAPSHOT};')(...Object.values(env));
+    return Object.assign({ S, store, synced: () => synced }, mod);
+  }
+  let d = device(); d.PR.run('all');
+  eq('reset all: totals, sessions, chapters, coverage, wrong bank and study days go to zero', [d.S.prog.total, d.S.prog.correct, d.S.prog.sessions.length, Object.keys(d.S.chapStats).length, Object.keys(d.S.cov).length, d.S.wr.length, d.S.stk.days.length], [0, 0, 0, 0, 0, 0, 0]);
+  eq('reset all keeps bookmarks, flags, earned badges and the study plan', [d.S.bk.length, d.S.fl.length, d.S.prog.badges.b1, d.S.tt.sessions.length], [1, 1, 1, 1]);
+  eq('reset all leaves a marker and asks for a sync', [!!d.PR.load().all, d.synced() > 0], [true, true]);
+  eq('reset all restarts the sprint today', d.store.abhyas_sprint_start === '2026-08-01', false);
+  d = device(); d.PR.run('wr');
+  eq('reset wrong bank empties only the bank', [d.S.wr.length, d.S.prog.sessions.length, d.S.prog.total, Object.keys(d.S.chapStats).length], [0, 3, 40, 2]);
+  d = device(); d.PR.run('sprint');
+  eq('reset sprint only restarts the sprint', [d.store.abhyas_sprint_start === '2026-08-01', d.S.prog.sessions.length, d.S.wr.length], [false, 3, 2]);
+  d = device(); d.PR.run('exams');
+  eq('reset exam history removes exam sessions only', d.S.prog.sessions.map(x => x.mode), ['flashcard']);
+  d = device(); d.PR.run('chapter', 'Soil \u2014 B1');
+  eq('reset one chapter removes only that chapter', [d.S.prog.sessions.map(x => x.fid), Object.keys(d.S.chapStats), Object.keys(d.S.cov), d.S.wr.map(x => x.uid)], [['f2', 'f2'], ['RCC \u2014 B1'], ['f2'], ['f2_0']]);
+  eq('an unknown chapter changes nothing', (d = device(), d.PR.run('chapter', 'Nope'), d.S.prog.sessions.length), 3);
+  d = device(); d.PR.run('all');
+  d.RS.restore();
+  eq('undo brings everything back, including the sprint date', [d.S.prog.total, d.S.prog.sessions.length, d.S.wr.length, d.store.abhyas_sprint_start], [40, 3, 2, '2026-08-01']);
+  eq('undo cancels the marker so other devices stop applying it', [d.PR.load().all, (d.PR.load().un || []).length], [undefined, 1]);
+  d = device(); d.PR.noteRemoved('f1_0');
+  eq('removing one wrong-bank question leaves a marker for that question', Object.keys(d.PR.load().rm), ['f1_0']);
+  d = device(); const T = d.PR.noteWrongCleared(); d.PR.lift([T]);
+  eq('undoing a cleared wrong bank lifts its marker', [d.PR.load().wr, d.PR.load().un.length], [undefined, 1]);
+  eq('loading an old backup on purpose lifts earlier resets', (d = device(), d.PR.run('wr'), d.PR.liftAll(), d.PR.load().wr), undefined);
+  eq('every reset kind needs a typed word', Object.keys(d.PR.SCOPES).every(k => /^(START FRESH|RESET)$/.test(d.PR.SCOPES[k].word)), true);
+  eq('"reset all" needs START FRESH', d.PR.SCOPES.all.word, 'START FRESH');
+})();
+
+group('Reset markers (a reset survives sync)');
+(function resetMarkerTests(){
+  const vm = require('vm');
+  const ctx = { window: { addEventListener(){}, removeEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} } };
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.merge=mergeSyncData;this.mr=mergeResets;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+  const T = 1000;
+  /* device A reset everything at T; device B is stale and still holds old data */
+  const A = { prog: { total: 0, correct: 0, gen: T, sessions: [{ at: 1500, fid: 'f1', chapter: 'C1', mode: 'exam' }] }, chapStats: {}, cov: { f1: { p: '1', a: 1, c: 1, t: 1500 } },
+              bk: [{ uid: 'bk1' }], fl: [], wr: [{ uid: 'f1_5', fileId: 'f1', _addedAt: 1500 }], stk: { days: [] }, resets: { all: T } };
+  const B = { prog: { total: 500, correct: 300, sessions: [{ at: 10, fid: 'f1', chapter: 'C1', mode: 'exam' }, { at: 20, fid: 'f2', chapter: 'C2' }] },
+              chapStats: { C1: { attempted: 50, lastAt: 20 } }, cov: { f2: { p: '1', a: 1, c: 1 } }, bk: [{ uid: 'bk2' }], fl: [{ uid: 'fl1' }],
+              wr: [{ uid: 'old_1', fileId: 'f2' }], stk: { days: ['1960-01-01'] } };
+  const m = ctx.merge(A, B);
+  eq('stale sessions from before the reset do not come back', m.prog.sessions.map(s => s.at), [1500]);
+  eq('stale totals do not come back', [m.prog.total, m.prog.correct], [0, 0]);
+  eq('stale chapter stats and coverage do not come back', [Object.keys(m.chapStats).length, Object.keys(m.cov)], [0, ['f1']]);
+  eq('stale wrong-bank items do not come back; new ones stay', m.wr.map(x => x.uid), ['f1_5']);
+  eq('stale study days do not come back', m.stk.days, []);
+  eq('bookmarks and flags are never touched by a reset', [m.bk.map(x => x.uid), m.fl.map(x => x.uid)], [['bk1', 'bk2'], ['fl1']]);
+  eq('the marker travels with the merged copy', m.resets, { all: T });
+  eq('merging the other way gives the same answer', ctx.merge(B, A).wr.map(x => x.uid), ['f1_5']);
+
+  /* one chapter */
+  const C = { prog: { sessions: [{ at: 10, fid: 'f1', chapter: 'C1' }, { at: 20, fid: 'f2', chapter: 'C2' }] }, chapStats: { C1: { attempted: 5, lastAt: 10 }, C2: { attempted: 7, lastAt: 20 } },
+              cov: { f1: { p: '1', a: 1, c: 1, t: 10 }, f2: { p: '1', a: 1, c: 1, t: 20 } }, wr: [{ uid: 'f1_1', fileId: 'f1', _addedAt: 10 }, { uid: 'f2_1', fileId: 'f2', _addedAt: 20 }], resets: { ch: { f1: T * 0 + 100, C1: 100 } } };
+  const mc = ctx.merge(C, null);
+  eq('resetting one chapter removes only that chapter', [mc.prog.sessions.map(s => s.fid), Object.keys(mc.chapStats), Object.keys(mc.cov), mc.wr.map(x => x.uid)], [['f2'], ['C2'], ['f2'], ['f2_1']]);
+
+  /* wrong bank only, and single removals */
+  const D = { prog: { total: 9, correct: 4, sessions: [{ at: 10 }] }, wr: [{ uid: 'a', _addedAt: 10 }, { uid: 'b', _addedAt: 10 }, { uid: 'c', _addedAt: 10 }], resets: { rm: { b: 50 } } };
+  eq('a question removed from the wrong bank stays removed after a merge', ctx.merge(D, { wr: [{ uid: 'b', _addedAt: 10 }] }).wr.map(x => x.uid), ['a', 'c']);
+  eq('a question that is wrong again later is kept', ctx.merge(D, { wr: [{ uid: 'b', _addedAt: 90 }] }).wr.map(x => x.uid), ['a', 'c', 'b']);
+  const mw = ctx.merge({ prog: D.prog, wr: D.wr, resets: { wr: 60 } }, null);
+  eq('reset wrong bank clears the bank but keeps sessions and totals', [mw.wr.length, mw.prog.sessions.length, mw.prog.total], [0, 1, 9]);
+  const me = ctx.merge({ prog: { sessions: [{ at: 10, mode: 'exam' }, { at: 11, mode: 'flashcard' }] }, resets: { exams: 100 } }, null);
+  eq('reset exam history removes only exam sessions', me.prog.sessions.map(s => s.mode), ['flashcard']);
+  eq('restarted sprint wins over the old start date', ctx.merge({ sprint: '2026-10-05', resets: { sprint: 5 } }, { sprint: '2026-08-01' }).sprint, '2026-10-05');
+  eq('markers combine by taking the newest of each', ctx.mr({ all: 5, ch: { x: 1 } }, { all: 9, ch: { x: 3, y: 2 } }), { all: 9, ch: { x: 3, y: 2 } });
+  eq('data with no markers merges exactly as before', ctx.merge({ wr: [{ uid: 'z' }] }, null).wr.length, 1);
+})();
+
 
 /* ═══════════════════════════════════════════════════════════════════════
    Behaviour: backend password rule + revision comparison (gas/code.gs)
@@ -642,6 +878,17 @@ group('No marks during an exam');
   /toast\(|classList\.add\('(?:correct|wrong|ok|bad)'\)|\.score|0\.2/.test(exAnswer)
     ? fail('exAnswer shows correctness or marks while answering') : pass('answering in an exam shows no correctness or marks');
   /wrong \* 0\.2|wrong\*0\.2/.test(obj) ? pass('result page applies negative marking (−0.2 per wrong)') : fail('negative marking missing from results');
+})();
+
+group('Timed exam: unselect and clear response');
+(function examClearTests(){
+  const obj = readFile('objective.js') || '';
+  /S\.quiz\.ans\[qi\]\s*===\s*oi\)\s*\?\s*null/.test(obj)
+    ? pass('tapping the selected option again unselects it') : fail('exAnswer no longer toggles a selected option off');
+  /clearAnswer\s*\(qi\)/.test(obj) && /ex-clear-\$\{qi\}/.test(obj)
+    ? pass('every exam question has a Clear response button') : fail('Clear response button missing from exam cards');
+  const html = readFile('user.html') || '';
+  /\.ex-clear\[hidden\]/.test(html) ? pass('Clear response button hides when nothing is selected') : fail('.ex-clear[hidden] style missing');
 })();
 
 
@@ -1094,7 +1341,7 @@ group('Question reports (backend rules)');
 (function reportRuleTests(){
   const src = readFile('gas/code.gs') || '';
   const grab = re => { const m = src.match(re); return m ? m[0] : ''; };
-  const code = grab(/function sanitizeSheetField_[\s\S]*?\n}\n/) + '\n' + grab(/const QREPORT_SECTIONS\s*=\s*\[[^\]]*\];/) + '\n' + grab(/function normalizeReportPayload_[\s\S]*?\n}\n/) + '\n' +
+  const code = grab(/function sanitizeSheetField_[\s\S]*?\n}\n/) + '\n' + grab(/const QREPORT_REASONS\s*=\s*\[[^\]]*\];/) + '\n' + grab(/const QREPORT_SECTIONS\s*=\s*\[[^\]]*\];/) + '\n' + grab(/function normalizeReportPayload_[\s\S]*?\n}\n/) + '\n' +
     grab(/function updateCorrectionsMap_[\s\S]*?\n}\n/) + '\n' + grab(/function correctionsSince_[\s\S]*?\n}\n/) + '\nreturn {norm: normalizeReportPayload_, upd: updateCorrectionsMap_, since: correctionsSince_};';
   let f; try { f = new Function(code)(); } catch (e) { fail('report helpers failed to load: ' + e.message); return; }
   const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
@@ -1103,6 +1350,8 @@ group('Question reports (backend rules)');
   eq('a full report keeps the options, the marked answer, the student pick and the section', [r.fileId, JSON.parse(r.optionsSnapshot), r.correctIndex, r.chosenIndex, r.section], ['FILE123', ['a', 'b', 'c', 'd'], 2, 1, 'weekly']);
   eq('an old app (no extra fields) still works', [!!f.norm({ uid: 'F_1', reason: 'typo' }).value, f.norm({ uid: 'F_1', reason: 'typo' }).value.section, f.norm({ uid: 'F_1', reason: 'typo' }).value.chosenIndex], [true, 'other', '']);
   eq('a missing question reference is refused', !!f.norm({ reason: 'typo' }).error, true);
+  eq('the two new categories are accepted by the server', ['incomplete', 'image_problem'].map(x => !!f.norm({ uid: 'F_1', reason: x }).value), [true, true]);
+  eq('an unknown category is still refused', !!f.norm({ uid: 'F_1', reason: 'rude' }).error, true);
   eq('a reference with odd characters is refused', !!f.norm({ uid: 'F_1<script>', reason: 'typo' }).error, true);
   eq('an unknown reason is refused', !!f.norm({ uid: 'F_1', reason: 'spam' }).error, true);
   eq('an unknown section becomes "other"', f.norm({ uid: 'F_1', reason: 'typo', section: 'x' }).value.section, 'other');

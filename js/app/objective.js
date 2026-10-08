@@ -600,13 +600,13 @@ const REV = {
   addWrong(question){
     const existing = S.wr.find(x=>x.uid===question.uid);
     if(existing){ existing._streak = 0; existing._nextDue = Date.now(); _save(LS.WR, S.wr); HOME.updateBadges(); return; }
-    S.wr.push({...REV._stripHeavy(question), _streak:0, _nextDue: Date.now()});
+    S.wr.push({...REV._stripHeavy(question), _streak:0, _nextDue: Date.now(), _addedAt: Date.now()});
     _save(LS.WR, S.wr);
     HOME.updateBadges();
   },
   removeWrong(uid){
     const i=S.wr.findIndex(x=>x.uid===uid);
-    if(i>-1){ S.wr.splice(i,1); _save(LS.WR, S.wr); HOME.updateBadges(); }
+    if(i>-1){ S.wr.splice(i,1); _save(LS.WR, S.wr); HOME.updateBadges(); if(typeof PROGRESS_RESET!=='undefined') PROGRESS_RESET.noteRemoved(uid); }
   },
   trackAnswer(question, isCorrect){
     if(isCorrect){
@@ -725,18 +725,32 @@ const REV = {
   _removeOne(kind, uid){
     const arr=REV._store(kind);
     const i=arr.findIndex(x=>x.uid===uid);
-    if(i>-1){arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();}
+    if(i>-1){
+      const item = arr[i];
+      arr.splice(i,1);_save(REV._lsKey(kind),arr);REV.renderList(kind);HOME.updateBadges();
+      if(kind==='wr' && typeof PROGRESS_RESET!=='undefined'){
+        PROGRESS_RESET.noteRemoved(uid);
+        toastUndo('Removed from wrong bank', ()=>{
+          /* put it back as a fresh entry (newer than the removal marker, so sync keeps it) */
+          if(S.wr.some(x=>x.uid===uid)) return;
+          S.wr.push({...item, _addedAt: Date.now()});
+          _save(LS.WR, S.wr); REV.renderList('wr'); HOME.updateBadges();
+          if(typeof PSYNC!=='undefined') PSYNC.scheduleSync();
+        });
+      }
+    }
   },
   clearAll(kind){
     const prev = JSON.parse(JSON.stringify(REV._store(kind)));
     if(kind==='bk'){S.bk=[];_save(LS.BK,[]);}
     else if(kind==='fl'){S.fl=[];_save(LS.FL,[]);}
     else {S.wr=[];_save(LS.WR,[]);}
+    const clearedAt = (kind==='wr' && typeof PROGRESS_RESET!=='undefined') ? PROGRESS_RESET.noteWrongCleared() : 0;
     REV.renderList(kind); HOME.updateBadges();
     toastUndo('🗑 List cleared', ()=>{
       if(kind==='bk'){S.bk=prev;_save(LS.BK,prev);}
       else if(kind==='fl'){S.fl=prev;_save(LS.FL,prev);}
-      else {S.wr=prev;_save(LS.WR,prev);}
+      else {S.wr=prev;_save(LS.WR,prev); if(clearedAt) PROGRESS_RESET.lift([clearedAt]); if(typeof PSYNC!=='undefined') PSYNC.scheduleSync();}
       REV.renderList(kind); HOME.updateBadges();
       toast('↩️ Restored');
     });
@@ -1021,6 +1035,7 @@ const QUIZ = {
       idx:0, timer:null, elapsed:0,
       left: examSeconds,
       examEndAt: mode==='exam' ? Date.now() + examSeconds*1000 : 0,
+      examTotal: mode==='exam' ? examSeconds : 0, warned: [],
       active:true, ch: chapterName||'Study', scope, skipped:new Set(), shown:new Set(),
       startedAt: Date.now(),
       reviewOnly: reviewMode
@@ -1134,6 +1149,7 @@ const QUIZ = {
         S.quiz.left = Math.max(0, Math.round((S.quiz.examEndAt - Date.now())/1000));
         const tEl=document.getElementById('ex-tmr'); if(tEl) tEl.textContent=fmt(S.quiz.left);
         if(S.quiz.left<=0){ toast('⏰ Time\'s up!'); QUIZ.submitExam(); return; }
+        QUIZ._timerWarn(S.quiz.left);
         if(S.quiz.left % 15 === 0) QUIZ._snapshotExam();
       } else {
         S.quiz.elapsed++;
@@ -1142,6 +1158,33 @@ const QUIZ = {
     },1000);
   },
   _stopTimer(){ if(S.quiz.timer){ clearInterval(S.quiz.timer); S.quiz.timer=null; } },
+  /* 10 / 5 / 1 minute warnings: a toast, a screen-reader announcement, and a red timer in the last 5 minutes */
+  _timerWarn(left){
+    const total = S.quiz.examTotal || 0;
+    const r = examWarning(left, total, S.quiz.warned || []);
+    S.quiz.warned = r.warned;
+    const tEl = document.getElementById('ex-tmr');
+    if(tEl) tEl.style.color = left <= 300 ? 'var(--danger)' : '';
+    if(!r.fire) return;
+    const msg = r.fire >= 60 && r.fire % 60 === 0 ? (r.fire/60) + (r.fire === 60 ? ' minute' : ' minutes') + ' left' : r.fire + ' seconds left';
+    toast('⏳ ' + msg);
+    QUIZ._announce(msg);
+  },
+  _announce(msg){
+    let el = document.getElementById('sr-live');
+    if(!el){ el = document.createElement('div'); el.id = 'sr-live'; el.className = 'sr-only'; el.setAttribute('role','status'); el.setAttribute('aria-live','assertive'); document.body.appendChild(el); }
+    el.textContent = ''; setTimeout(()=>{ el.textContent = msg; }, 50);
+  },
+  /* the question the student is on in the timed exam: the first card whose bottom is below the header */
+  _exCurrent(){
+    const cards = document.querySelectorAll('#ex-qs .eqc');
+    for(let i=0;i<cards.length;i++){ if(cards[i].getBoundingClientRect().bottom > 110) return i; }
+    return Math.max(0, cards.length - 1);
+  },
+  _exGo(qi){
+    const c = document.getElementById('eqc-'+qi);
+    if(c){ c.scrollIntoView({block:'start', behavior:'smooth'}); const o = c.querySelector('.eo'); if(o) o.focus({preventScroll:true}); }
+  },
 
   toggleMark(qi){
     if(!S.quiz.marked) S.quiz.marked = new Set();
@@ -1260,6 +1303,7 @@ const QUIZ = {
       qs: snap.qs, ans: snap.ans, mode:'exam', idx:0, timer:null, elapsed:0,
       left: adjustedLeft,
       examEndAt: Date.now() + adjustedLeft*1000,
+      examTotal: (snap && snap.qs ? snap.qs.length : 0) * 90, warned: [],
       active:true, ch: snap.ch, skipped:new Set(), shown:new Set(),
       scope: snap.scope || null, startedAt,
       reviewOnly: false
@@ -1516,6 +1560,8 @@ const QUIZ = {
           <option value="wrong_answer">The marked answer looks wrong</option>
           <option value="unclear">The question or options are unclear</option>
           <option value="typo">Typo or formatting issue</option>
+          <option value="incomplete">The question is incomplete (missing text or an option)</option>
+          <option value="image_problem">An image, table or diagram is missing or wrong</option>
           <option value="other">Something else</option>
         </select>
       </div>
@@ -1525,33 +1571,65 @@ const QUIZ = {
     const sendBtn = document.getElementById('qr-send-btn');
     if(sendBtn) sendBtn.onclick = ()=> QUIZ._submitReport();
   },
+  _reportBody(rep, reason, note){
+    const q = rep.q;
+    return {
+      action:'reportQuestion', username:S.user.username, token:S.user.token,
+      uid: q.uid, reason, note, questionSnapshot: (q.q||'').slice(0,1000),
+      optionsSnapshot: (q.options || []).slice(0, 6), correctIndex: isNaN(Number(q.correct)) ? '' : Number(q.correct),
+      chosenIndex: rep.chosen == null ? '' : rep.chosen, section: rep.section,
+      appVersion: (typeof APP_VERSION !== 'undefined') ? APP_VERSION : ''
+    };
+  },
   async _submitReport(){
     const rep = QUIZ._rep;
     const q = rep && rep.q;
     if(!q){ closeMod(); return; }
     const reason = document.getElementById('qr-reason')?.value || 'other';
-    const note = (document.getElementById('qr-note')?.value || '').trim();
+    const note = (document.getElementById('qr-note')?.value || '').trim().slice(0, 500);
     if(!S.user?.username || !S.user?.token){ toast('Please sign in again to report a question.'); return; }
-    if(!S.online || S.forcedOffline){ toast('You are offline. Connect to the internet to send a report.', 5000); return; }
     closeMod();
+    /* offline: keep the report and send it when the connection is back */
+    if(!S.online || S.forcedOffline){ QUIZ._queueReport(rep, reason, note); return; }
     toast('Sending report\u2026');
     try{
-      const r = await netFetch(APPS, {
-        method:'POST', headers:{'Content-Type':'text/plain'},
-        body: JSON.stringify({
-          action:'reportQuestion', username:S.user.username, token:S.user.token,
-          uid: q.uid, reason, note, questionSnapshot: (q.q||'').slice(0,1000),
-          optionsSnapshot: (q.options || []).slice(0, 6), correctIndex: isNaN(Number(q.correct)) ? '' : Number(q.correct),
-          chosenIndex: rep.chosen == null ? '' : rep.chosen, section: rep.section,
-          appVersion: (typeof APP_VERSION !== 'undefined') ? APP_VERSION : ''
-        })
-      }, 15000);
+      const r = await netFetch(APPS, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(QUIZ._reportBody(rep, reason, note)) }, 15000);
       const res = await r.json();
       if(res.success) toast('\u2705 ' + (res.message || 'Thanks, report sent.'));
       else toast('\u274c ' + (res.error || 'Could not send report.'));
     }catch(e){
-      toast('\u26a0\ufe0f Could not send report. Check your connection and try again.');
+      QUIZ._queueReport(rep, reason, note);
     }
+  },
+  /* ── offline report queue ── */
+  _rqLoad(){ try{ const v = JSON.parse(localStorage.getItem('abhyas_report_queue') || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } },
+  _rqSave(list){ try{ localStorage.setItem('abhyas_report_queue', JSON.stringify(list)); }catch(e){} },
+  _queueReport(rep, reason, note){
+    const q = rep.q;
+    const item = { uid:q.uid, reason, note, section:rep.section, chosen:rep.chosen, q:(q.q||'').slice(0,1000), options:(q.options||[]).slice(0,6), correct:(isNaN(Number(q.correct)) ? '' : Number(q.correct)) };
+    QUIZ._rqSave(reportQueueAdd(QUIZ._rqLoad(), item, Date.now()));
+    toast('Saved. Your report will be sent when you are back online.', 5000);
+  },
+  async flushReports(){
+    if(QUIZ._rqBusy) return;
+    if(!S.user?.username || !S.user?.token || !S.online || S.forcedOffline) return;
+    let list = QUIZ._rqLoad();
+    if(!list.length) return;
+    QUIZ._rqBusy = true;
+    let sent = 0;
+    try{
+      for(const it of list.slice()){
+        const rep = { q:{ uid:it.uid, q:it.q, options:it.options, correct:it.correct }, chosen:it.chosen, section:it.section };
+        try{
+          const r = await netFetch(APPS, { method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(QUIZ._reportBody(rep, it.reason, it.note)) }, 15000);
+          const res = await r.json();
+          /* sent, or the server has a permanent answer (already reported, invalid): either way, drop it */
+          if(res.success || /invalid|already|missing/i.test(String(res.error || ''))){ list = reportQueueRemove(list, it); QUIZ._rqSave(list); if(res.success) sent++; }
+          else if(/too many/i.test(String(res.error || ''))) break;      /* rate-limited: try again later */
+        }catch(e){ break; }                                            /* still offline: keep the rest */
+      }
+    } finally { QUIZ._rqBusy = false; }
+    if(sent) toast('\u2705 ' + sent + ' queued report' + (sent === 1 ? '' : 's') + ' sent. Thank you.');
   },
   _tagCurrent(tag){
     if(S.quiz.reviewOnly) return;
@@ -1589,6 +1667,7 @@ const QUIZ = {
             <div class="ok">${String.fromCharCode(65+oi)}</div><div>${esc(opt)}</div>
           </div>`;
         }).join('')}
+        <button type="button" class="ex-clear" id="ex-clear-${qi}" onclick="QUIZ.clearAnswer(${qi})" aria-label="Clear response for question ${qi+1}"${savedAns===null||savedAns===undefined?' hidden':''}><i class="ph ph-eraser"></i> Clear response</button>
       </div>
     `}).join('');
     renderMath(el);
@@ -1600,22 +1679,38 @@ const QUIZ = {
   },
   exAnswer(qi, oi){
     if(!S.quiz.active)return;
-    S.quiz.ans[qi]=oi;
+    /* v1.33: tapping the option that is already selected unselects it (back to unanswered) */
+    const next = (S.quiz.ans[qi] === oi) ? null : oi;
+    S.quiz.ans[qi] = next;
     const card = document.getElementById(`eqc-${qi}`);
     if(!card) return;
     /* v1.32: query inside the one card instead of searching the whole document on every tap */
     card.querySelectorAll('.eo').forEach((e,i)=>{
-      const sel = i===oi;
+      const sel = next !== null && i===next;
       e.classList.toggle('sel', sel);
       e.setAttribute('aria-pressed', String(sel));
     });
-    card.classList.add('answered');
-    const answered = S.quiz.ans.filter(a=>a!==null).length;
-    document.getElementById('ex-ctr').textContent = `${answered}/${S.quiz.qs.length}`;
-    document.getElementById('ex-ans').textContent = answered;
-    document.getElementById('ex-pf').style.width = `${(answered/S.quiz.qs.length)*100}%`;
+    card.classList.toggle('answered', next !== null);
+    const clr = document.getElementById(`ex-clear-${qi}`);
+    if(clr) clr.hidden = (next === null);
+    QUIZ._refreshExamCounts();
     QUIZ._snapshotExam();
     QUIZ._updateSkippedNav();
+    if(document.getElementById('pal-grid')) QUIZ.showPalette(true);
+  },
+  /* v1.33: clear the response for one question without having to pick another option */
+  clearAnswer(qi){
+    if(!S.quiz || !S.quiz.active || S.quiz.mode !== 'exam') return;
+    if(S.quiz.ans[qi] === null || S.quiz.ans[qi] === undefined) return;
+    const cur = S.quiz.ans[qi];
+    /* exAnswer on the selected option toggles it off; going through it keeps the wrappers in sync */
+    QUIZ.exAnswer(qi, cur);
+  },
+  _refreshExamCounts(){
+    const answered = S.quiz.ans.filter(a=>a!==null && a!==undefined).length;
+    const ctr = document.getElementById('ex-ctr'); if(ctr) ctr.textContent = `${answered}/${S.quiz.qs.length}`;
+    const an = document.getElementById('ex-ans'); if(an) an.textContent = answered;
+    const pf = document.getElementById('ex-pf'); if(pf) pf.style.width = `${(answered/S.quiz.qs.length)*100}%`;
   },
   _updateSkippedNav(){
     const btn = document.getElementById('ex-skip-nav');
@@ -2001,6 +2096,16 @@ document.addEventListener('keydown', e=>{
   if(e.key==='Escape'){ if(S.quiz.active) QUIZ.quit(); return; }
   if(e.ctrlKey || e.metaKey || e.altKey) return;
   if(S.quiz.reviewOnly) return;
+  if(S.quiz.mode==='exam'){
+    /* timed exam: 1-5 pick (again to unselect), C clear, M mark, N next, P previous */
+    const cur = QUIZ._exCurrent(), n = S.quiz.qs.length, k = e.key.toLowerCase();
+    if(['1','2','3','4','5'].includes(k)){ const i = Number(k)-1; if(S.quiz.qs[cur]?.options[i]!==undefined){ e.preventDefault(); QUIZ.exAnswer(cur, i); } }
+    else if(k==='c'){ QUIZ.clearAnswer(cur); }
+    else if(k==='m'){ QUIZ.toggleMark(cur); }
+    else if(k==='n'){ if(cur < n-1) QUIZ._exGo(cur+1); }
+    else if(k==='p'){ if(cur > 0) QUIZ._exGo(cur-1); }
+    return;
+  }
   if(S.quiz.mode!=='exam'){
     if(e.key==='ArrowRight') QUIZ.fcNav(1);
     if(e.key==='ArrowLeft') QUIZ.fcNav(-1);

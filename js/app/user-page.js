@@ -985,6 +985,28 @@ window.SB_HINTS = {
 /* Chapters screen: chapter cards with progress, a Continue card, and a set
    picker, instead of four dropdowns. The dropdowns stay below as "step by
    step" for anyone who prefers them. */
+/* MASTERY: one place that answers "is this chapter complete?" using chapterMastery() from shared.js. */
+window.MASTERY = {
+  _fids(lv, ch){ return ChapterData.chapterFileRefs(lv, ch).map(r => r.fid); },
+  chapter(lv, ch){
+    return chapterMastery({ fids: this._fids(lv, ch), fcount: S.fcount, cov: S.cov, wr: S.wr });
+  },
+  /* the chapters the 60-day sprint is planned over: Level 7 and General Knowledge */
+  filteredChapters(){
+    const out = [];
+    SPRINT_LEVELS.forEach(lv => {
+      try { Object.keys(ChapterData.chapters(lv)).forEach(ch => { if (ChapterData.chapterFileRefs(lv, ch).length) out.push({ lv, ch }); }); } catch(e){}
+    });
+    return out;
+  },
+  summary(){
+    const list = this.filteredChapters();
+    let done = 0;
+    list.forEach(c => { if (this.chapter(c.lv, c.ch).state === 'complete') done++; });
+    return { done, total: list.length };
+  }
+};
+
 window.CH_GRID = {
   lv: '',
   LEVELS: [['level7', 'Level 7'], ['level5', 'Level 5'], ['gk', 'General Knowledge']],
@@ -1035,15 +1057,18 @@ window.CH_GRID = {
       const st = this._stats(refs);
       const pct = (st.complete && st.total) ? Math.min(100, Math.round(st.seen / st.total * 100)) : null;
       const missed = (typeof WRONGBY !== 'undefined') ? WRONGBY.countForChapter(this.lv, ch) : 0;
+      const mst = has ? MASTERY.chapter(this.lv, ch) : null;
+      const done = !!mst && mst.state === 'complete';
+      const gate = (mst && mst.state === 'in-progress' && mst.needs.length) ? mst.needs[0] : '';
       const meta = !has ? 'Coming soon'
-        : (pct !== null ? pct + '% seen · ' : (st.seen ? st.seen + ' seen · ' : '')) + refs.length + (refs.length === 1 ? ' set' : ' sets') +
-          (missed ? ' · ' + missed + ' missed' : '');
+        : (done ? 'Complete \u00b7 ' + Math.round(mst.accuracy * 100) + '% accuracy \u00b7 ' : (pct !== null ? pct + '% seen \u00b7 ' : (st.seen ? st.seen + ' seen \u00b7 ' : ''))) + refs.length + (refs.length === 1 ? ' set' : ' sets') +
+          (missed ? ' \u00b7 ' + missed + ' missed' : '') + (gate ? ' \u00b7 ' + gate : '');
       const missedBadge = missed
         ? '<span class="ctag tr" style="position:absolute;top:.4rem;right:.4rem">' + missed + ' missed</span>'
         : '';
       return '<button type="button" class="chg-card" style="position:relative"' + (has ? '' : ' disabled') + ' onclick="CH_GRID.open(\'' + this.lv + '\',\'' + ch + '\')">' +
         missedBadge +
-        '<span class="chg-name">' + esc(chs[ch]) + '</span>' +
+        '<span class="chg-name">' + (done ? '<i class="ph ph-seal-check" style="color:var(--success)" aria-label="Complete"></i> ' : '') + esc(chs[ch]) + '</span>' +
         (has ? '<span class="pb" style="display:block"><span class="pb-f" style="display:block;width:' + (pct === null ? 0 : pct) + '%"></span></span>' : '') +
         '<span class="chg-meta">' + esc(meta) + '</span></button>';
     }).join('');
@@ -2011,7 +2036,8 @@ window.SPRINT = {
   _inputs(){
     let total = 0, covered = 0;
     try {
-      const refs = ChapterData.allFileRefs();
+      /* v1.33: the sprint covers Level 7 and General Knowledge only (Level 5 is a separate paper) */
+      const refs = sprintRefs(ChapterData.allFileRefs());
       total = refs.length;
       covered = refs.filter(r => { const c = (S.cov || {})[r.fid]; return c && c.a > 0; }).length;
     } catch(e){}
@@ -2054,9 +2080,11 @@ window.SPRINT = {
     bits.push(plan.doneQ + '/' + plan.qTarget + (plan.mock ? ' paper' : ' questions'));
     bits.push(this._minutesToday() + '/' + plan.mins + ' min');
     bits.push(plan.coveragePct + '% covered');
+    try { const m = MASTERY.summary(); if (m.total) bits.push(m.done + '/' + m.total + ' chapters mastered'); } catch(e){}
     box.innerHTML =
       '<div class="sprint-head"><span><i class="ph ph-rocket-launch"></i>Day ' + plan.day + ' of ' + SPRINT_DAYS + ' \u00b7 ' + esc(plan.label) + '</span>' +
-      '<span class="pct ' + paceCls + '">' + paceTxt + (plan.goalMet ? ' \u00b7 goal done \u2705' : '') + '</span></div>' +
+      '<span class="pct ' + paceCls + '">' + paceTxt + '</span></div>' +
+      (plan.goalMet ? '<div class="sprint-done" role="status"><i class="ph ph-check-circle"></i> Daily target met</div>' : '') +
       '<div class="sprint-bar"><div style="width:' + dayPct + '%"></div></div>' +
       '<div class="sprint-meta">' + bits.map(esc).join(' \u00b7 ') +
       ' <button class="linkish" type="button" onclick="SPRINT.reset()" title="Restart the 60 days from today">restart</button></div>';
@@ -4231,23 +4259,37 @@ window.CLOUD_UI = (function(){
     toast('Backing up to your Drive…');
     CLOUD.backup().then(r => {
       if (!r.success) { toast(r.error, 5000); return; }
-      toast('Backed up — ' + Math.round(r.bytes / 1024) + ' KB');
+      toast(r.unchanged ? 'Nothing has changed since your last Drive backup.'
+        : 'Backed up (' + Math.round(r.bytes / 1024) + ' KB). Your newest 5 versions are kept.');
       render();
     });
   }
   function restore(){
-    if (!confirm('Replace the progress, saved questions and miss list on this device with the copy in your Google Drive?\n\nThis cannot be undone here.')) return;
-    toast('Restoring from your Drive…');
-    CLOUD.restore().then(r => {
+    toast('Looking for your backups…');
+    CLOUD.listVersions().then(r => {
       if (!r.success) { toast(r.error, 5000); return; }
-      toast('Restored from Drive (saved ' + (r.ts ? new Date(r.ts).toLocaleString() : 'just now') + ')');
+      if (!r.versions.length) { toast('No backup found in your Drive yet.', 4000); return; }
+      const rows = r.versions.map((v, i) =>
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.5rem 0;border-bottom:1px solid var(--sep)">' +
+        '<div><b>' + esc(new Date(v.at).toLocaleString()) + '</b>' + (i === 0 ? ' <span class="ctag tg">Newest</span>' : '') + (v.legacy ? ' <span class="ctag">Older format</span>' : '') +
+        '<div class="t-cap">' + Math.max(1, Math.round(v.size / 1024)) + ' KB</div></div>' +
+        '<button class="btn btn-quiet btn-sm" onclick="CLOUD_UI.restoreVersion(\'' + esc(v.id) + '\')">Add this copy</button></div>').join('');
+      openMod('Restore from Drive',
+        '<p class="t-callout mb3">Adding a copy brings back anything this device is missing. <b>Nothing on this device is removed</b>, and a safety copy is saved first (Data &gt; Recover). If a copy is damaged you will be told and nothing changes.</p>' + rows);
+    });
+  }
+  function restoreVersion(id){
+    closeMod();
+    toast('Restoring from your Drive…');
+    CLOUD.restore(id).then(r => {
+      if (!r.success) { toast(r.error, 6000); return; }
       render();
     });
   }
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && UI.cur === 'progress') render();
   });
-  return { render, signIn, signOut, backup, restore };
+  return { render, signIn, signOut, backup, restore, restoreVersion };
 })();
 
 document.addEventListener('click', function warm(e){
