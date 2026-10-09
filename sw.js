@@ -5,7 +5,7 @@
    • API (script.google.com)  → never touched. POSTs and question files go
                                 straight to the network; app.js keeps the
                                 question cache in IndexedDB (QDB).
-   • App shell (same origin)  → network-first, but with a 4 s timeout when a
+   • App shell (same origin)  → network-first, but with a 2.5 s timeout when a
                                 cached copy exists, so a weak connection or
                                 load-shedding never hangs the app. Falls back
                                 to the cached copy, then to a friendly offline
@@ -23,7 +23,7 @@
 importScripts('./js/core/version.js');
 const CACHE_NAME = 'abhyas-v' + APP_VERSION;
 const CDN_CACHE = 'abhyas-cdn-v1';
-const NETWORK_TIMEOUT_MS = 4000;
+const NETWORK_TIMEOUT_MS = 2500;   /* weak connection: use the saved copy sooner */
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 
 /* ── PUSH NOTIFICATIONS (Firebase Cloud Messaging) ──
@@ -242,6 +242,15 @@ async function networkFirst(req) {
   }
 }
 
+/* Fonts, icons, KaTeX, pdf.js and the other vendor files never change inside one release
+   (the cache name carries the version), so serve them straight from the saved copy and
+   only touch the network when a file is missing. Saves data and time on a slow line. */
+async function localCacheFirst(req) {
+  const hit = await caches.match(req);
+  if (hit) return hit;
+  return networkFirst(req);
+}
+
 async function cdnCacheFirst(req) {
   const cache = await caches.open(CDN_CACHE);
   const hit = await cache.match(req.url);
@@ -266,6 +275,8 @@ self.addEventListener('fetch', e => {
   if (CDN_HOSTS.indexOf(url.hostname) !== -1) { e.respondWith(cdnCacheFirst(req)); return; }
   if (url.origin !== self.location.origin) return;
   if (url.pathname.endsWith('/admin.html')) return;       // admin is never cached
+
+  if (/\/vendor\//.test(url.pathname) || /\/(icon-\d+|favicon)\.png$/.test(url.pathname)) { e.respondWith(localCacheFirst(req)); return; }
 
   e.respondWith(networkFirst(req));
 });

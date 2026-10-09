@@ -2375,6 +2375,10 @@ html.focus-mode .marquee-bar{display:none!important}
           <div id="cache-txt" class="t-callout mb3"></div>
           <div class="cpb" id="cpb"><div class="cpf" id="cpf"></div></div>
           <div id="cptxt" class="t-foot" style="margin:var(--sp-1) 0" aria-live="polite"></div>
+          <div id="dl-ctl" class="bg" style="display:none;margin:var(--sp-2) 0">
+            <button class="btn btn-quiet btn-sm" id="dl-pause-btn" onclick="CACHE.togglePause()"><i class="ph ph-pause"></i> Pause</button>
+            <button class="btn btn-r btn-sm" onclick="CACHE.stopDl()"><i class="ph ph-stop"></i> Stop</button>
+          </div>
           <label class="flex center between" for="autosync-toggle" style="gap:var(--sp-3);padding:var(--sp-3) 0 0;cursor:pointer">
             <span class="t-callout" style="color:var(--ink)">Save new chapters automatically on Wi-Fi<br><span class="t-foot">Off by default, so it never uses your mobile data.</span></span>
             <input type="checkbox" id="autosync-toggle" onchange="try{localStorage.setItem('abhyas_autosync',JSON.stringify(this.checked))}catch(e){} if(this.checked) CACHE.autoSync();">
@@ -2385,7 +2389,14 @@ html.focus-mode .marquee-bar{display:none!important}
             <button class="btn btn-r" onclick="CACHE.clr()"><i class="ph ph-trash"></i> Remove all</button>
           </div>
         </div>
-        <div class="card"><div class="card-hd"><h3>By level</h3></div><div class="cg" id="cache-grid"></div></div>
+        <div class="card"><div class="card-hd"><h3>By level</h3></div>
+          <p class="t-foot mb2">Tick the groups you want, then download only those. Sets already on this device are skipped.</p>
+          <div class="cg" id="cache-grid"></div>
+          <div class="bg mt3">
+            <button class="btn btn-solid" id="dl-selected-btn" onclick="CACHE.dlSelected()" disabled><i class="ph ph-download-simple"></i> Pick a group to download</button>
+            <button class="btn btn-quiet" onclick="CACHE.removeSelected()"><i class="ph ph-trash"></i> Remove selected</button>
+          </div>
+        </div>
         <div class="card"><div class="card-hd"><h3>Saved sets</h3></div><div id="cache-list"></div></div>
       </div>
 

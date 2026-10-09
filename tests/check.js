@@ -1605,6 +1605,35 @@ group('Loksewa scheme (backend check)');
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Downloads: group picker, pause/stop, waiting for connection, slow-line savers
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  const app = readFile('app.js') || '', uh = readFile('user.html') || '', obj = readFile('objective.js') || '';
+  const sw = readFile('sw.js') || '', ld = readFile('chapters-loader.js') || '';
+  console.log('\nDownloads and slow-connection savers');
+  /dl-selected-btn/.test(uh) && /CACHE\.dlSelected\(\)/.test(uh) && /async dlSelected\(/.test(app)
+    ? pass('Downloads page has a "Download selected" button wired to CACHE.dlSelected') : fail('Download selected is not wired');
+  /class="dl-group"/.test(app) && /abhyas_dl_groups/.test(app)
+    ? pass('each level has a checkbox and the choice is remembered on the device') : fail('group checkboxes or their memory are missing');
+  /async dl\(groups\)/.test(app) && /only\.has\(r\.lv\)/.test(app)
+    ? pass('CACHE.dl can be limited to the ticked groups') : fail('CACHE.dl does not filter by group');
+  /togglePause\(\)/.test(uh) && /stopDl\(\)/.test(uh) && /_paused/.test(app) && /_stop/.test(app)
+    ? pass('Pause / Resume / Stop controls exist') : fail('pause or stop controls are missing');
+  /CACHE\._running\)\{ toast\('A download is already running/.test(app)
+    ? pass('a second download cannot start while one is running') : fail('double-start guard is missing');
+  /!S\.online \|\| S\.forcedOffline\) && !CACHE\._stop/.test(app)
+    ? pass('a running download waits for the connection instead of failing files') : fail('download does not wait for the connection');
+  /async removeSelected\(/.test(app) && /ASK\.confirm/.test(app.slice(app.indexOf('async removeSelected(')))
+    ? pass('removing a group asks first and only runs when the person taps it') : fail('removeSelected is missing or unconfirmed');
+  /prefetchNext\(fileId\)/.test(obj) && /saveData/.test(app.slice(app.indexOf('async prefetchNext(')))
+    ? pass('the next set is prefetched, but not on mobile data or data saver') : fail('prefetch is missing or ignores data saver');
+  /localCacheFirst/.test(sw) && /NETWORK_TIMEOUT_MS = 2500/.test(sw)
+    ? pass('service worker serves vendor files from the saved copy and gives up on a weak line sooner') : fail('service worker savers are missing');
+  /weakConnection\(\)/.test(ld) && /60 \* 60 \* 1000/.test(ld)
+    ? pass('chapter list checks run less often on a weak connection') : fail('chapter loader is not throttled');
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
    Summary
    ═══════════════════════════════════════════════════════════════════════ */
 Promise.all(PENDING).then(() => {

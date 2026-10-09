@@ -885,6 +885,7 @@ const QUIZ = {
       QUIZ._hideLoader();
       if(!qsArr.length){ toast('❌ No valid questions found in this file. Check the file format.'); return; }
       QUIZ.startWith(qsArr, mode, chapterName, scope);
+      setTimeout(()=>{ try{ CACHE.prefetchNext(fileId); }catch(e){} }, 4000);
     } catch(err){
       clearTimeout(msgTimer); clearTimeout(msgTimer2);
       QUIZ._hideLoader();

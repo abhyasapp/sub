@@ -2351,12 +2351,18 @@ const CACHE = {
       tag.className = 'ctag ' + (cachedCount===refs.length && refs.length ? 'tg' : cachedCount>0 ? 'ta' : 'tr');
       txt.textContent = `${cachedCount} of ${refs.length} question ${refs.length===1?'set':'sets'} cached on this device for offline use.`;
       const levels = ChapterData.levels();
+      const picked = new Set(CACHE._picked(levels));
       grid.innerHTML = levels.map(lv=>{
         const lvRefs = refs.filter(r=>r.lv===lv);
         const lvCached = lvRefs.filter(r=>_isCached(r.key)).length;
-        return `<div class="ci"><div class="ci-n">${esc(ChapterData.levelLabel(lv))}</div>
-          <div class="ci-s"><div class="cd ${lvCached===lvRefs.length&&lvRefs.length?'y':'n'}"></div>${lvCached}/${lvRefs.length} cached</div></div>`;
+        return `<label class="ci" style="cursor:pointer;display:block">
+          <div class="flex center between" style="gap:var(--sp-2)">
+            <div class="ci-n" style="margin:0">${esc(ChapterData.levelLabel(lv))}</div>
+            <input type="checkbox" class="dl-group" value="${esc(lv)}" ${picked.has(lv)?'checked':''} aria-label="Select ${esc(ChapterData.levelLabel(lv))} for download" onchange="CACHE.pick()">
+          </div>
+          <div class="ci-s"><div class="cd ${lvCached===lvRefs.length&&lvRefs.length?'y':'n'}"></div>${lvCached}/${lvRefs.length} cached</div></label>`;
       }).join('');
+      CACHE._syncPickBtn(refs, cachedKeys);
     }
 
     const el = document.getElementById('cache-list');
@@ -2393,8 +2399,38 @@ const CACHE = {
   },
   async clr(){ return CACHE.clearAll(); },
 
-  async dl(){
-    const refs = ChapterData.allFileRefs();
+  /* Which download groups (level5 / level7 / gk) are ticked. Remembered on this device. */
+  _picked(levels){
+    const all = levels || ChapterData.levels();
+    const saved = _load('abhyas_dl_groups', null);
+    return Array.isArray(saved) ? saved.filter(lv => all.includes(lv)) : [];
+  },
+  pick(){
+    const ticked = [...document.querySelectorAll('#cache-grid .dl-group:checked')].map(i => i.value);
+    _save('abhyas_dl_groups', ticked);
+    CACHE.render();
+  },
+  async _syncPickBtn(refs, cachedKeys){
+    const btn = document.getElementById('dl-selected-btn');
+    if(!btn) return;
+    refs = refs || ChapterData.allFileRefs();
+    cachedKeys = cachedKeys || new Set(await QDB.keys());
+    const picked = new Set(CACHE._picked());
+    const chosen = refs.filter(r => picked.has(r.lv));
+    const missing = chosen.filter(r => !cachedKeys.has(r.key)).length;
+    btn.disabled = !picked.size;
+    btn.innerHTML = '<i class="ph ph-download-simple"></i> ' + (!picked.size ? 'Pick a group to download'
+      : missing ? `Download selected (${missing} new)` : 'Selected groups already saved');
+  },
+  async dlSelected(){
+    const picked = CACHE._picked();
+    if(!picked.length){ toast('Tick Level 5, Level 7 or GK first'); return; }
+    return CACHE.dl(picked);
+  },
+
+  async dl(groups){
+    const only = Array.isArray(groups) && groups.length ? new Set(groups) : null;
+    const refs = ChapterData.allFileRefs().filter(r => !only || only.has(r.lv));
     if(!refs.length){ toast('No content configured to cache'); return; }
     if(!S.online){ toast('❌ You need to be online to download the cache'); return; }
     const pb = document.getElementById('cpb');
@@ -2410,7 +2446,16 @@ const CACHE = {
       if(leftSec < 45) return ' · under a minute left';
       return ` · about ${Math.ceil(leftSec/60)} min left`;
     };
+    if(CACHE._running){ toast('A download is already running'); return; }
+    CACHE._running = true; CACHE._paused = false; CACHE._stop = false;
+    CACHE._ctl(true);
+    let stopped = false;
     for(const ref of refs){
+      while((CACHE._paused || !S.online || S.forcedOffline) && !CACHE._stop){
+        if(txt && !CACHE._paused) txt.textContent = `Waiting for your connection… ${done} of ${refs.length} saved so far`;
+        await new Promise(r=>setTimeout(r,500));
+      }
+      if(CACHE._stop){ stopped = true; break; }
       if(txt) txt.textContent = `Downloading ${done+1} of ${refs.length}${etaText()}`;
       if(pf) pf.style.width = `${(done/refs.length)*100}%`;
       try{
@@ -2427,13 +2472,68 @@ const CACHE = {
       done++;
       if(pf) pf.style.width = `${(done/refs.length)*100}%`;
     }
+    CACHE._running = false; CACHE._paused = false; CACHE._ctl(false);
     const ok = done - failed;
+    if(stopped){
+      if(txt) txt.textContent = `Stopped. ${ok} of ${refs.length} saved. Tap download again to continue where you left off.`;
+      toast(`Download stopped — ${ok} of ${refs.length} saved`);
+      CACHE.render();
+      return;
+    }
     if(txt) txt.textContent = failed>0
       ? `Downloaded ${ok} of ${refs.length}. ${failed} did not come through — try again on a steadier connection.`
-      : `All ${done} sets are on this device.`;
-    toast(failed>0 ? `${ok} of ${refs.length} downloaded — ${failed} failed` : 'Everything is downloaded for offline study');
+      : `All ${done} sets${only ? ' in the selected groups' : ''} are on this device.`;
+    toast(failed>0 ? `${ok} of ${refs.length} downloaded — ${failed} failed` : (only ? 'Selected groups are downloaded for offline study' : 'Everything is downloaded for offline study'));
     CACHE.render();
   },
+
+  async removeSelected(){
+    const picked = new Set(CACHE._picked());
+    if(!picked.size){ toast('Tick a group first'); return; }
+    const keys = new Set(ChapterData.allFileRefs().filter(r=>picked.has(r.lv)).map(r=>r.key));
+    const have = (await QDB.keys()).filter(k=>keys.has(k));
+    if(!have.length){ toast('Nothing from those groups is saved on this device'); return; }
+    const names = [...picked].map(lv=>ChapterData.levelLabel(lv)).join(', ');
+    if(!(await ASK.confirm({title:`Remove ${names} downloads?`, body:`This frees space by removing ${have.length} saved question sets from this device. Your progress stays. You can download them again any time.`, ok:'Remove', danger:true}))) return;
+    for(const k of have) await QDB.del(k);
+    CACHE.render();
+    toast(`🗑 Removed ${have.length} sets`);
+  },
+
+  /* While you study one set, quietly save the next set of the same chapter so it opens instantly.
+     Skipped on mobile data, data saver, offline, or while a bulk download is running. */
+  async prefetchNext(fileId){
+    try{
+      if(!S.online || S.forcedOffline || CACHE._running) return;
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if(conn && (conn.saveData || conn.type==='cellular' || /^(slow-2g|2g)$/i.test(conn.effectiveType||''))) return;
+      const refs = ChapterData.allFileRefs();
+      const i = refs.findIndex(r=>r.fid===fileId);
+      if(i<0) return;
+      const cur = refs[i];
+      const next = refs.slice(i+1).find(r=>r.lv===cur.lv && r.ch===cur.ch);
+      if(!next) return;
+      if((await QDB.keys()).includes(next.key)) return;
+      await QUIZ._fetch(next.fid, next.key, 1, 'bg');
+    }catch(e){}
+  },
+
+  _running:false, _paused:false, _stop:false,
+  _ctl(show){
+    const box = document.getElementById('dl-ctl');
+    if(box) box.style.display = show ? '' : 'none';
+    const pb = document.getElementById('dl-pause-btn');
+    if(pb) pb.innerHTML = '<i class="ph ph-pause"></i> Pause';
+  },
+  togglePause(){
+    if(!CACHE._running) return;
+    CACHE._paused = !CACHE._paused;
+    const pb = document.getElementById('dl-pause-btn');
+    if(pb) pb.innerHTML = CACHE._paused ? '<i class="ph ph-play"></i> Resume' : '<i class="ph ph-pause"></i> Pause';
+    const txt = document.getElementById('cptxt');
+    if(txt && CACHE._paused) txt.textContent += ' · paused (your connection is free)';
+  },
+  stopDl(){ if(CACHE._running){ CACHE._stop = true; CACHE._paused = false; } },
 
   async purgeStale(){
     let purged = 0;

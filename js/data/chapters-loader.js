@@ -113,9 +113,20 @@ if(!hasGlobals()){
    minutes. Never auto-reload — a student might be mid-quiz. Offer a toast. */
 let _inFlight = false;
 
+let _lastFresh = 0;
+function weakConnection(){
+  const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  return !!(c && (c.saveData || c.type === 'cellular' || /^(slow-2g|2g|3g)$/i.test(c.effectiveType || '')));
+}
 function fetchFresh(reason){
   if(_inFlight) return;
   if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
+  /* repeated tab switches and the timer should not keep hitting a slow line */
+  if(reason === 'visible' || reason === 'interval'){
+    const gap = weakConnection() ? 60 * 60 * 1000 : 5 * 60 * 1000;
+    if(Date.now() - _lastFresh < gap) return;
+  }
+  _lastFresh = Date.now();
   _inFlight = true;
 
   fetch(URL + '&_=' + Date.now(), { cache: 'no-store' })
