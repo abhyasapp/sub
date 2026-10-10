@@ -2435,8 +2435,8 @@ const CACHE = {
      also limits each student to 360 files a minute. If the server is an older version without getFiles, the download
      falls back to one file per request with CONCURRENCY requests at once. Fewer workers on data saver or a 2G line. */
   CONCURRENCY: 4,
-  BATCH_SIZE: 6,
-  BATCH_WORKERS: 3,
+  BATCH_SIZE: 12,
+  BATCH_WORKERS: 4,
   _noBatch: false,
   _poolSize(){
     const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;

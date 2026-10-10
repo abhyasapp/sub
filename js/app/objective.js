@@ -874,8 +874,45 @@ const QUIZ = {
        { rateLimited:true, waitSec }     server asked us to slow down; nothing was saved, try the same refs again later
        { saved:[ref], failed:[{ref,error}], deferred:[ref] }   deferred = the server left them out to keep the answer small
      Throws for an expired session or ended access (every file would fail the same way) and for network errors. */
-  async _fetchBatch(refs){
+    async _fetchBatch(refs){
     if(!S.online || S.forcedOffline) throw new Error('You are offline.');
+
+    /* v1.36: the CDN carries every chapter MCQ file. Try it first, in
+       parallel. Files not on the CDN (weekly sets, subjective bank) come
+       back as 404 and are handled by the Apps Script fallback below. */
+    if(refs.length > 1){
+      const cdnResults = await Promise.all(refs.map(async ref => {
+        try{
+          const data = await QUIZ._fetchFromCDN(ref.fid, 12000);
+          const ok = await QDB.set(ref.key, data);
+          return { ref, ok, cdn: true, error: ok ? '' : 'Device storage is full.' };
+        }catch(e){
+          return { ref, ok: false, cdn: false, error: e.message };
+        }
+      }));
+      const allOk = cdnResults.every(r => r.ok);
+      if(allOk){
+        return { saved: refs.slice(), failed: [], deferred: [] };
+      }
+      /* If some of the batch isn't on the CDN, retry the whole batch through
+         Apps Script so weekly sets and subjective files still work. */
+      const savedOnCdn = cdnResults.filter(r => r.ok).map(r => r.ref);
+      const notOnCdn   = cdnResults.filter(r => !r.ok && !r.cdn).map(r => r.ref);
+      const cdnFailed  = cdnResults.filter(r => !r.ok && r.cdn).map(r => ({ ref: r.ref, error: r.error }));
+      /* If none failed due to "not on CDN", we've done all we can via CDN —
+         report what we got and don't hit Apps Script for files that 404'd. */
+      if(notOnCdn.length === 0){
+        return { saved: savedOnCdn, failed: cdnFailed, deferred: [] };
+      }
+      refs = notOnCdn;
+      if(refs.length === 0){
+        return { saved: savedOnCdn, failed: cdnFailed, deferred: [] };
+      }
+      /* Fall through and hand the rest to Apps Script. The CDN saved ones
+         are already in IndexedDB. */
+      var _cdnPrefix = { saved: savedOnCdn, failed: cdnFailed };
+    }
+
     if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take('fg');
     const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
     const r = await netFetch(`${APPS}?${qs({action:'getFiles', fileIds: refs.map(x => x.fid).join(','), ...auth})}`, {redirect:'follow'}, 60000);
@@ -894,11 +931,23 @@ const QUIZ = {
     }
     if(data.sessionInvalid) throw new Error('Your session expired. Sign out and sign in again to keep studying.');
     if(data.needsPayment) throw new Error('Your access has ended. Complete the payment to open new chapters — anything already downloaded still works offline.');
-    if(data.success === false && /^unknown action/i.test(String(data.error || ''))) return { unsupported:true };
+    if(data.success === false && /^unknown action/i.test(String(data.error || ''))){
+      /* Older backend — fall back to per-file fetches through the CDN path. */
+      const out = _cdnPrefix || { saved:[], failed:[] };
+      for(const ref of refs){
+        try{
+          const cdnData = await QUIZ._fetchFromCDN(ref.fid, 12000).catch(() => QUIZ._fetch(ref.fid, ref.key));
+          const ok = await QDB.set(ref.key, cdnData);
+          if(ok) out.saved.push(ref); else out.failed.push({ ref, error:'Device storage is full.', storageFull:true });
+        }catch(e){ out.failed.push({ ref, error: e.message }); }
+      }
+      return out;
+    }
     if(data.success !== true || !data.files || typeof data.files !== 'object'){
       throw new Error(data.error || 'Server returned an error for these files.');
     }
-    const out = { saved:[], failed:[], deferred:[] };
+    const out = _cdnPrefix || { saved:[], failed:[], deferred:[] };
+    if(!out.deferred) out.deferred = [];
     const later = new Set(Array.isArray(data.deferred) ? data.deferred : []);
     for(const ref of refs){
       if(later.has(ref.fid)){ out.deferred.push(ref); continue; }
@@ -912,7 +961,7 @@ const QUIZ = {
       const ok = await QDB.set(ref.key, v);
       if(!ok && !QUIZ._cacheWarned){
         QUIZ._cacheWarned = true;
-        toast('⚠️ Device storage is full — quizzes still work, but new sets won\'t be saved for offline use. Clear some cached sets from the Offline Cache tab to free space.', 6000);
+        toast('⚠️ Device storage is full — quizzes still work, but new sets won\'t be saved for offline use.', 6000);
       }
       if(ok) out.saved.push(ref);
       else out.failed.push({ ref, error:'Device storage is full.', storageFull:true });
@@ -932,8 +981,17 @@ const QUIZ = {
         .finally(() => { delete QUIZ._reval[cacheKey]; });
     }catch(e){}
   },
-  async _revalidateQuiet(fileId, cacheKey){
+    async _revalidateQuiet(fileId, cacheKey){
     if(!S.online || S.forcedOffline) return false;
+    /* v1.36: revalidate against the CDN, not Apps Script. Falls through to
+       the old path only if the CDN doesn't have the file. */
+    try{
+      const data = await QUIZ._fetchFromCDN(fileId, 12000);
+      return await QDB.set(cacheKey, data);
+    }catch(e){
+      if(String(e.message || '').indexOf('CDN 404') === -1) return false;
+      /* Not on CDN — fall through to Apps Script as before. */
+    }
     if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take('bg');
     const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
     const r = await netFetch(`${APPS}?${qs({action:'getFile', fileId, ...auth})}`, {redirect:'follow'}, 25000);

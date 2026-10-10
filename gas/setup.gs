@@ -160,6 +160,10 @@ function ensurePushTriggers_() {
   if (!triggers.some(t => t.getHandlerFunction() === "checkTrialExpiryWarnings")) {
     ScriptApp.newTrigger("checkTrialExpiryWarnings").timeBased().everyMinutes(30).create();
   }
+    if (!triggers.some(t => t.getHandlerFunction() === "warmContainer")) {
+    ScriptApp.newTrigger("warmContainer").timeBased().everyMinutes(5).create();
+  }
+  
   if (!triggers.some(t => t.getHandlerFunction() === "checkWeeklySetUnlocks_")) {
     ScriptApp.newTrigger("checkWeeklySetUnlocks_").timeBased().everyMinutes(15).create();
   }
@@ -183,4 +187,14 @@ function ensurePushTriggers_() {
       .atHour(8)
       .create();
   }
+}
+/* v1.36: keep the Apps Script container warm so the first real request
+   after a quiet period doesn't pay the 1-3 s cold start. Runs every
+   5 minutes. The function body is a no-op — invoking it is enough. */
+function warmContainer() {
+  try {
+    /* Touch a cheap, dependency-free read. This wakes the container. */
+    PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  } catch (e) { /* ignore */ }
+  return 'warm';
 }
