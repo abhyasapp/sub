@@ -22,8 +22,8 @@
     }
     if (t === 'dark') {
       document.documentElement.classList.add('dark');
-      var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', '#080B14');
+      var metas = document.querySelectorAll('meta[name="theme-color"]');
+      for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', '#080B14');
     }
   } catch(e) {}
 })();</script>
@@ -894,12 +894,16 @@ const LS_ADMIN = 'abhyas_admin';
 const $ = id => document.getElementById(id);
 
 /* shared.js ships a theme toggle, but it doesn't move the browser
-   chrome colour with it. Override so the phone status bar matches. */
+   chrome colour with it. Override so the phone status bar matches.
+   Both <meta name="theme-color"> tags must be updated — the browser
+   picks whichever matches the OS preference, and a student who
+   overrides the theme inside the app would otherwise see a status bar
+   that contradicts what is on screen. */
 window.toggleTheme = function(){
   const dark = document.documentElement.classList.toggle('dark');
   try { localStorage.setItem('abhyas_theme', JSON.stringify(dark ? 'dark' : 'light')); } catch(e){}
-  const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', dark ? '#080B14' : '#F2F4F3');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m =>
+    m.setAttribute('content', dark ? '#080B14' : '#F2F4F3'));
 };
 
 function togglePw(btn){
@@ -1055,6 +1059,8 @@ const APP = {
   settings: {},
   _gReady: false,
   _payRefreshTimer: null,
+  _payBusy: false,
+  _userSwitched: false,
 
   async init(){
     this.checkNet();
@@ -1180,11 +1186,17 @@ const APP = {
     }
   },
 
+  /* v1.28: the offline queue means the submit button must stay usable
+     without a connection. While offline the label tells the student what
+     will actually happen — the submission is saved on the device and sent
+     automatically when the signal returns. `_payBusy` stops the periodic
+     connection check from re-enabling the button while a submit is
+     already in flight. */
   updatePayButtonState(){
     const btn = $('btn-pay');
-    if (!btn) return;
-    btn.disabled = !this.online;
-    btn.textContent = this.online ? 'Send for verification' : 'Offline — reconnect to pay';
+    if (!btn || this._payBusy) return;
+    btn.disabled = false;
+    btn.textContent = this.online ? 'Send for verification' : 'Save & send later';
   },
 
   /* ── Session storage ────────────────────────────────────────────── */
@@ -1525,12 +1537,21 @@ const APP = {
   async loadPaymentStatus(){
     if (!this.session) return;
 
+    /* Paint the default sent-state first, so the queued branch below can
+       override it without leaving stale text on screen when it clears. */
+    const titleEl = $('st-title');
+    const iconEl  = $('st-icon');
+    if (titleEl) titleEl.textContent = 'Payment sent';
+    if (iconEl)  iconEl.innerHTML = '<i class="ph ph-clock-countdown"></i>';
+
     /* v1.28: if the last submission was queued offline, say so clearly
        until the server actually has a record. */
     const queued = this.session.queued;
     if (queued){
       const mine = PAY_QUEUE.forUser(this.session.username);
       if (mine.length){
+        if (titleEl) titleEl.textContent = 'Payment saved';
+        if (iconEl)  iconEl.innerHTML = '<i class="ph ph-cloud-slash"></i>';
         const msgEl = $('st-msg');
         if (msgEl){
           msgEl.innerHTML =
@@ -1854,12 +1875,16 @@ const APP = {
       return;
     }
 
+    /* Guarded so the 30-second connection poll cannot re-enable the
+       button while this fetch is still in flight. */
+    this._payBusy = true;
     this.setLoading('btn-pay', true);
     const res = await this.api('submitPayment', {
       username: this.session.username, token: this.session.token,
       name: this.session.name, email: this.session.email, mobile: this.session.mobile,
       txId: txn, remarks: rem, screenshot: this.fileData || ''
     }, 'POST');
+    this._payBusy = false;
     this.setLoading('btn-pay', false);
 
     if (!res.success) return this.showErr(res.error || 'Couldn\u2019t send that. Try again.');
@@ -1940,7 +1965,12 @@ const APP = {
   }
 };
 
-/* Sample questions so a visitor can feel the app before signing up. */
+/* Sample questions so a visitor can feel the app before signing up.
+
+   Option order is shuffled on every render: a visitor who taps the first
+   button three times in a row should not see three greens, or the demo
+   teaches them the wrong thing about the app. `_order` maps the position
+   the student sees to the index the answer key uses. */
 const TRY_Q = {
   QS: [
     { q: 'Which of the following is the SI unit of dynamic viscosity?',
@@ -1954,30 +1984,41 @@ const TRY_Q = {
       e: 'Steel is about 2 × 10⁵ MPa (200 GPa). Concrete is far softer, roughly 25 to 30 GPa.' }
   ],
   i: -1,
+  _order: null,
   next(){ this.i = (this.i + 1) % this.QS.length; this.render(); },
   render(){
     const c = this.QS[this.i];
     const q = $('try-q'), o = $('try-opts'), e = $('try-exp'), n = $('try-next');
     if (!q || !o) return;
     q.textContent = c.q; e.hidden = true; n.hidden = true; o.innerHTML = '';
-    c.o.forEach((t, k) => {
+
+    const order = c.o.map((_, k) => k);
+    for (let k = order.length - 1; k > 0; k--){
+      const j = Math.floor(Math.random() * (k + 1));
+      [order[k], order[j]] = [order[j], order[k]];
+    }
+    this._order = order;
+
+    order.forEach((origIdx, displayIdx) => {
       const b = document.createElement('button');
       b.type = 'button'; b.className = 'btn btn-sec';
       b.style.cssText = 'justify-content:flex-start;text-align:left;white-space:normal;margin-top:0';
-      b.textContent = String.fromCharCode(65 + k) + '.  ' + t;
-      b.onclick = () => TRY_Q.pick(k);
+      b.textContent = String.fromCharCode(65 + displayIdx) + '.  ' + c.o[origIdx];
+      b.onclick = () => TRY_Q.pick(displayIdx);
       o.appendChild(b);
     });
   },
-  pick(k){
+  pick(displayIdx){
     const c = this.QS[this.i];
+    const order = this._order || c.o.map((_, k) => k);
+    const correctDisplay = order.indexOf(c.a);
     Array.from($('try-opts').children).forEach((b, j) => {
       b.disabled = true;
-      if (j === c.a) { b.style.background = 'var(--success-soft)'; b.style.color = 'var(--success)'; }
-      else if (j === k) { b.style.background = 'var(--danger-soft)'; b.style.color = 'var(--danger)'; }
+      if (j === correctDisplay) { b.style.background = 'var(--success-soft)'; b.style.color = 'var(--success)'; }
+      else if (j === displayIdx) { b.style.background = 'var(--danger-soft)'; b.style.color = 'var(--danger)'; }
     });
     const e = $('try-exp');
-    e.textContent = (k === c.a ? 'Correct. ' : 'Not quite. ') + c.e;
+    e.textContent = (displayIdx === correctDisplay ? 'Correct. ' : 'Not quite. ') + c.e;
     e.hidden = false;
     $('try-next').hidden = false;
   }

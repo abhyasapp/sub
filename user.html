@@ -11,7 +11,19 @@
 <meta name="apple-mobile-web-app-title" content="Abhyas">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex,nofollow">
-<script>try{var _fs=JSON.parse(localStorage.getItem('abhyas_fs')||'100');if(_fs>100)document.documentElement.style.fontSize=_fs+'%'}catch(e){}</script>
+<script>
+/* v1.34: abhyas_display.fs (set by display-prefs.js) is the newer, richer
+   preference and takes precedence. The legacy abhyas_fs percentage only
+   applies when the student has never touched the display panel, so the two
+   systems no longer fight over the same root font size. */
+try{
+  var _d = JSON.parse(localStorage.getItem('abhyas_display')||'null')||{};
+  if (['small','medium','large'].indexOf(_d.fs) === -1) {
+    var _fs = JSON.parse(localStorage.getItem('abhyas_fs')||'100');
+    if (_fs > 100) document.documentElement.style.fontSize = _fs + '%';
+  }
+}catch(e){}
+</script>
 <script>if(window.top!==window.self){window.top.location=window.self.location;}</script>
 <script>(function(){
   try{
@@ -22,8 +34,12 @@
     }
     if (t === 'dark') {
       document.documentElement.classList.add('dark');
-      var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', '#080B14');
+      /* Both theme-color metas must update together — the browser picks
+         whichever matches the OS preference, and a student who has
+         overridden the theme inside the app should not see a status bar
+         that disagrees with what is on screen. */
+      var metas = document.querySelectorAll('meta[name="theme-color"]');
+      for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', '#080B14');
     }
   } catch(e) {}
 })();</script>
@@ -312,7 +328,6 @@ button,a,label,summary,.eo,input[type=checkbox],input[type=radio]{touch-action:m
 .tb-btn:hover{background:var(--bg-sunken);color:var(--ink)}
 .tb-btn:active{transform:scale(.94)}
 .tb-btn.danger:hover{background:var(--danger-soft);color:var(--danger)}
-@media (max-width:560px){.tb-btn .tb-label{display:none}}
 
 .card{
   background:var(--surface);border:1px solid var(--sep);
@@ -543,6 +558,14 @@ input[type=checkbox],input[type=radio]{width:17px;height:17px;accent-color:var(-
   border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite
 }
 #sg .sg-txt{font-size:var(--fs-callout);color:var(--ink-2);font-weight:550}
+#sg .sg-hint{
+  font-size:var(--fs-cap);color:var(--ink-3);text-align:center;
+  max-width:32ch;line-height:1.5;margin-top:var(--sp-3)
+}
+#sg .sg-hint button{
+  color:var(--accent);font-weight:650;text-decoration:underline;
+  padding:.35rem .5rem;font-family:var(--font)
+}
 
 #app{display:none;flex-direction:column;min-height:100vh;min-height:100dvh}
 #app.on{display:flex}
@@ -1441,6 +1464,17 @@ html[data-amoled="1"].dark{--bg:#000;--bg-sunken:#000;--surface:#050505;--surfac
 .toolbar input{flex:1;min-width:180px}
 .toolbar input:focus,.toolbar select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 
+/* Progress tabs */
+.tabbar{display:flex;gap:var(--sp-5);border-bottom:1px solid var(--sep);margin-bottom:var(--sp-5);overflow-x:auto;scrollbar-width:none}
+.tabbar::-webkit-scrollbar{display:none}
+.tabbar button{position:relative;padding:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-callout);font-weight:600;
+  color:var(--ink-3);display:flex;align-items:center;gap:var(--sp-2);white-space:nowrap;
+  background:none;border:none;cursor:pointer;font-family:var(--font);
+  transition:color var(--dur-fast) var(--ease)}
+.tabbar button:hover{color:var(--ink-2)}
+.tabbar button.active{color:var(--ink)}
+.tabbar button.active::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--accent);border-radius:2px}
+
 @media print{
   html,body{background:#fff!important;color:#000!important;font-size:11pt}
   #tb,#sb,#bnav,#ov,#toasts,#bn-sheet,#bn-sheet-backdrop,#cache-autobadge,
@@ -1596,11 +1630,6 @@ html[data-amoled="1"].dark{--bg:#000;--bg-sunken:#000;--surface:#050505;--surfac
   .qnote-input{font-size:16px}
 }
 </style>
-<style id="patch-129">
-/* v1.29 — print button on chapter rows */
-.ch-row-print{background:var(--bg-sunken);color:var(--ink-2);border-color:var(--sep)}
-.ch-row-print:hover{background:var(--ink);color:var(--bg);border-color:transparent}
-</style>
 <style id="patch-123">
 /* v1.23: per-question history line */
 .qhist-line{
@@ -1650,7 +1679,6 @@ html.focus-mode .streak-card,
 html.focus-mode .readiness,
 html.focus-mode #badges-strip,
 html.focus-mode #weekly-board-slot,
-html.focus-mode #misconception-slot,
 html.focus-mode #recovery-slot,
 html.focus-mode .marquee-bar{display:none!important}
 .focus-banner{
@@ -1784,7 +1812,7 @@ html.focus-mode .marquee-bar{display:none!important}
   .chapter-breakdown td{color:#000!important;border-top:1px solid #ccc!important}
 }
 </style>
-<style id="patch-122">
+<style id="patch-122b">
 /* v1.22 exam copy protection (the live score tile was removed in v1.32) */
 /* Disable text selection while an exam is open so a student cannot
    Ctrl+A / Ctrl+C the whole paper into WhatsApp in one go. */
@@ -1799,6 +1827,10 @@ html.focus-mode .marquee-bar{display:none!important}
 <div id="sg">
   <div class="sg-spin"></div>
   <div class="sg-txt" id="sg-txt">Checking your session…</div>
+  <div class="sg-hint" id="sg-hint" hidden>
+    Taking longer than usual. If this doesn't clear in a moment,
+    <button type="button" onclick="location.reload()">reload the page</button>.
+  </div>
 </div>
 
 <div id="app">
@@ -1884,7 +1916,6 @@ html.focus-mode .marquee-bar{display:none!important}
         <div class="due-strip" id="due-strip" hidden></div>
 
         <div id="recovery-slot"></div>
-        <div id="misconception-slot"></div>
         <div id="resume-slot"></div>
 
         <div id="practice-resume-slot"></div>
@@ -1899,16 +1930,11 @@ html.focus-mode .marquee-bar{display:none!important}
           <p id="greeting">Loksewa Civil Engineering practice, online or off.</p>
           <div id="sprint-card" class="sprint-strip" style="display:none"></div>
           <div id="today-body"></div>
-          <div class="today-actions">
-            <button class="btn btn-solid" id="today-start" onclick="TODAY_PLAN.start()">
-              <i class="ph ph-play-circle"></i> Start today's plan
-            </button>
-            <button class="btn btn-a" onclick="TODAY_PLAN.quick5()" title="Just 5 questions — about 2 minutes">
-              <i class="ph ph-lightning"></i> Just 5
-            </button>
-          </div>
+          <button class="btn-start" id="session-start" onclick="SESSION.start()">
+            <i class="ph ph-play-circle"></i> Start 30-minute session
+          </button>
           <div class="start-alt">
-            <button class="btn btn-quiet" onclick="QUIZ.adaptive()"><i class="ph ph-target"></i> Weak topics</button>
+            <button class="btn btn-quiet" onclick="TODAY_PLAN.quick5()"><i class="ph ph-lightning"></i> Just 5</button>
             <button class="btn btn-quiet" onclick="UI.go('online')"><i class="ph ph-books"></i> Pick a chapter</button>
           </div>
           <p class="t-foot home-foot"><i class="ph ph-clock"></i> <span id="hs-time">0m</span> studied in the last 7 days</p>
@@ -1916,14 +1942,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
         <div id="digest-slot"></div>
 
-        <!-- GOAL: exam date and predicted readiness together -->
-        <section class="card goal-card" id="exam-card">
-          <div class="card-hd">
-            <h3><i class="ph ph-calendar-star"></i> Your exam</h3>
-            <button class="btn btn-sm btn-quiet" id="exam-date-edit" type="button" onclick="EXAM_DATE.edit()">Set date</button>
-          </div>
-          <div id="exam-card-body" class="t-callout">Set your exam date to see a countdown and how much to do each day.</div>
-          <section class="readiness" id="readiness-card" hidden>
+        <section class="readiness" id="readiness-card" hidden>
           <div class="readiness-top">
             <div>
               <div class="t-cap" style="font-weight:700;color:var(--ink-2)">Exam readiness</div>
@@ -1934,7 +1953,6 @@ html.focus-mode .marquee-bar{display:none!important}
           <div class="readiness-bar"><div class="readiness-bar-fill" id="readiness-fill" style="width:0%"></div></div>
           <div class="readiness-detail" id="readiness-detail"></div>
         </section>
-        </section>
 
         <section class="streak-card">
           <div class="streak-top">
@@ -1942,7 +1960,6 @@ html.focus-mode .marquee-bar{display:none!important}
             <span class="stk-tag" id="stk-tag">0 days</span>
           </div>
           <div class="sk-bar" id="sk-bar"></div>
-          <p class="t-cap" id="streak-insurance" style="text-align:center;margin-top:var(--sp-2);opacity:.75"></p>
         </section>
 
         <section class="card">
@@ -1981,6 +1998,7 @@ html.focus-mode .marquee-bar{display:none!important}
           </div>
         </div>
       </div>
+
       <!-- ─────────────── HOURLY CHALLENGE ─────────────── -->
       <div class="view" id="view-hourly">
         <div class="pg-head" data-head="hourly"></div>
@@ -2018,7 +2036,6 @@ html.focus-mode .marquee-bar{display:none!important}
         </div>
       </div>
 
-
       <!-- ─────────────── QUESTION OF THE DAY ─────────────── -->
       <div class="view" id="view-subj-qotd">
         <div class="pg-head" data-head="subj-qotd"></div>
@@ -2042,7 +2059,6 @@ html.focus-mode .marquee-bar{display:none!important}
         </div>
       </div>
 
-
       <!-- ─────────────── MODEL ANSWERS & NOTES (admin-uploaded PDFs) ─────────────── -->
       <div class="view" id="view-studydocs">
         <div class="pg-head" data-head="studydocs"></div>
@@ -2059,7 +2075,7 @@ html.focus-mode .marquee-bar{display:none!important}
       <!-- ─────────────── FULL PAPER ─────────────── -->
       <div class="view" id="view-subj-exam">
         <div class="pg-head" data-head="subj-exam"></div>
-        
+
         <div id="subj-exam-body">
           <div class="card"><div class="empty"><div class="empty-i"><i class="ph ph-circle-notch"></i></div><p>Loading…</p></div></div>
         </div>
@@ -2224,28 +2240,15 @@ html.focus-mode .marquee-bar{display:none!important}
         </div>
       </div>
 
-      <!-- ─────────────── FLAGGED ─────────────── -->
-      <div class="view" id="view-flagged">
-        <div class="pg-head" data-head="flagged"></div>
-        <div class="card">
-          <div class="card-hd">
-            <h3>Your flagged questions</h3>
-            <div class="bg">
-              <button class="btn btn-sm btn-a" onclick="REV.start('fl','flashcard')"><i class="ph ph-cards"></i> Practise</button>
-              <button class="btn btn-sm btn-quiet" onclick="REV.start('fl','exam')"><i class="ph ph-note-pencil"></i> Test</button>
-              <button class="btn btn-sm btn-r" onclick="REV.clearAll('fl')" aria-label="Clear flagged questions"><i class="ph ph-trash"></i></button>
-            </div>
-          </div>
-          <div class="toolbar" style="margin-bottom:var(--sp-2)">
-            <input type="search" id="fl-search" placeholder="Search flagged questions" oninput="REV.filterList('fl', this.value)" aria-label="Search flagged questions">
-          </div>
-          <div id="fl-list"></div>
-        </div>
-      </div>
-
-      <!-- ─────────────── QUESTIONS YOU MISSED ─────────────── -->
+      <!-- ─────────────── WEAK SPOTS (was "Questions you missed") ─────────────── -->
       <div class="view" id="view-wrong">
         <div class="pg-head" data-head="wrong"></div>
+        <div class="tabbar" id="ws-tabs" role="tablist">
+          <button class="active" data-tab="due" onclick="WRONGBY.tab('due')" role="tab">Due now</button>
+          <button data-tab="all" onclick="WRONGBY.tab('all')" role="tab">All missed</button>
+          <button data-tab="misconceptions" onclick="WRONGBY.tab('misconceptions')" role="tab">Misconceptions</button>
+          <button data-tab="hardest" onclick="WRONGBY.tab('hardest')" role="tab">Hardest 20</button>
+        </div>
         <div class="card">
           <div class="card-hd">
             <h3>Your miss list</h3>
@@ -2267,6 +2270,14 @@ html.focus-mode .marquee-bar{display:none!important}
       <div class="view" id="view-progress">
         <div class="pg-head" data-head="progress"></div>
 
+        <div class="tabbar" id="prog-tabs" role="tablist">
+          <button class="active" data-tab="accuracy" onclick="PROG.tab('accuracy')" role="tab">Accuracy</button>
+          <button data-tab="heatmap" onclick="PROG.tab('heatmap')" role="tab">Heatmap</button>
+          <button data-tab="coverage" onclick="PROG.tab('coverage')" role="tab">Coverage</button>
+        </div>
+
+        <div id="prog-tab-accuracy">
+
         <div class="g4" id="prog-stats" style="margin-bottom:var(--sp-4)"></div>
         <div id="predict-card" style="margin-bottom:var(--sp-4)"></div>
         <section class="card" id="insights-card" style="margin-bottom:var(--sp-4)"></section>
@@ -2274,9 +2285,6 @@ html.focus-mode .marquee-bar{display:none!important}
         <div class="card">
           <div class="card-hd"><h3><i class="ph ph-wrench"></i> Your tools</h3></div>
           <div class="bg">
-            <button class="btn btn-secondary" onclick="UI.go('heatmap')">
-              <i class="ph ph-squares-four"></i> Syllabus heatmap
-            </button>
             <button class="btn btn-secondary" onclick="SHARECARD.run()">
               <i class="ph ph-share-network"></i> Share my progress
             </button>
@@ -2287,14 +2295,6 @@ html.focus-mode .marquee-bar{display:none!important}
               <i class="ph ph-magnifying-glass"></i> Search questions
             </button>
           </div>
-        </div>
-
-        <div class="card" style="border-color:var(--accent-line)">
-          <div class="card-hd"><h3><i class="ph ph-target"></i> Focused drills</h3></div>
-          <p class="t-foot" style="margin-bottom:var(--sp-3);line-height:1.55">One tap builds a session from your own history \u2014 no setup.</p>
-          <button class="btn btn-solid btn-blk" onclick="HARDEST20.start()">
-            <i class="ph ph-target"></i> Drill my 20 hardest questions
-          </button>
         </div>
 
         <div id="forecast-slot"></div>
@@ -2308,7 +2308,7 @@ html.focus-mode .marquee-bar{display:none!important}
 
         <div class="card">
           <div class="card-hd"><h3>Backup to your account</h3><span class="ctag tg">Automatic</span></div>
-          <p class="t-callout mb3">Your progress saves to your Abhyas account whenever you're online. Syncing only ever <b>adds</b> to your data: when two devices differ, they are combined, and nothing is removed.</p>
+          <p class="t-callout mb3">Your totals, chapter stats and coverage save to your Abhyas account automatically. Your <b>wrong bank, saved questions and notes</b> stay on this device and travel through your own Google Drive backup below. Connect Drive once so a lost phone doesn't cost you your review list.</p>
           <div id="psync-status" class="t-foot mb3">Not backed up yet this session.</div>
           <div class="bg">
             <button class="btn btn-a" onclick="DATA.syncNow()"><i class="ph ph-cloud-arrow-up"></i> Back up now</button>
@@ -2333,38 +2333,23 @@ html.focus-mode .marquee-bar{display:none!important}
           <p class="t-callout mb3" id="push-status-desc">Get told when your trial is about to end, when a payment is verified, and when a written answer is graded.</p>
           <div class="bg"><button class="btn btn-a" id="push-enable-btn" onclick="PUSH.enable()"><i class="ph ph-bell"></i> Turn on notifications</button></div>
         </div>
-      </div>
 
-      <!-- ─────────────── COVERAGE BY FILE ─────────────── -->
-      <div class="view" id="view-server-progress">
-        <div class="pg-head" data-head="server-progress"></div>
+        </div><!-- /prog-tab-accuracy -->
 
-        <div class="card">
-          <div class="card-hd">
-            <h3>Per-file progress</h3>
-            <div class="bg">
-              <button class="btn btn-sm btn-quiet" onclick="SERVER_PROG.load(true)"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
-              <button class="btn btn-sm btn-quiet" onclick="SERVER_PROG.toggleSort()"><i class="ph ph-sort-ascending"></i> <span id="srv-sort-label">Most done first</span></button>
-            </div>
-          </div>
+        <div id="prog-tab-heatmap" hidden><div id="heatmap-body"></div></div>
 
+        <div id="prog-tab-coverage" hidden>
           <div class="toolbar">
             <select id="srv-filter-level" onchange="SERVER_PROG.render()" aria-label="Filter by level"><option value="">All levels</option></select>
             <input type="search" id="srv-search" placeholder="Search chapter, book or subtopic" oninput="SERVER_PROG.render()" aria-label="Search files">
             <label class="t-foot" style="display:flex;align-items:center;gap:.4rem;white-space:nowrap;font-weight:600">
               <input type="checkbox" id="srv-only-started" onchange="SERVER_PROG.render()"> Started only
             </label>
+            <button class="btn btn-sm btn-quiet spacer" onclick="SERVER_PROG.toggleSort()"><i class="ph ph-sort-ascending"></i> <span id="srv-sort-label">Most done first</span></button>
           </div>
-
           <div id="srv-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-2);margin-bottom:var(--sp-3)"></div>
           <div id="srv-list" class="stack2"></div>
         </div>
-      </div>
-
-      <!-- ─────────────── SYLLABUS HEATMAP ─────────────── -->
-      <div class="view" id="view-heatmap">
-        <div class="pg-head" data-head="heatmap"></div>
-        <div id="heatmap-body"></div>
       </div>
 
       <!-- ─────────────── DOWNLOADS ─────────────── -->
@@ -2445,7 +2430,6 @@ html.focus-mode .marquee-bar{display:none!important}
           </div>
         </div>
 
-        <!-- ABHYAS_PATCH_1_13 -->
         <div class="card">
           <div class="card-hd"><h3>Your data on the server</h3><span class="ctag tr">Permanent</span></div>
           <p class="t-callout mb4">"Reset this device" only clears this browser &mdash; while you are logged in, your cloud backup is restored on the next visit. To really start over, reset it here.</p>
@@ -2552,7 +2536,7 @@ html.focus-mode .marquee-bar{display:none!important}
             <div class="qm"><span class="qn" id="fc-qn">Q1</span><div class="fc-acts" id="fc-acts"></div></div>
             <div class="qt" id="fc-q">Loading…</div>
             <div id="fc-img-wrap" style="display:none;margin:var(--sp-3) 0">
-              <img id="fc-img" alt="Question figure" loading="lazy" style="border-radius:var(--r-input);border:1px solid var(--sep)" onerror="this.parentElement.style.display='none'">
+              <img id="fc-img" alt="Question figure" loading="lazy" style="border-radius:var(--r-input);border:1px solid var(--sep)" onerror="this.parentElement.style.display='none'" onload="this.parentElement.style.display=''">
             </div>
             <div class="fc-tools" id="fc-tools"></div>
             <div id="fc-opts"></div>
@@ -2710,7 +2694,22 @@ if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
 <script src="js/app/storage-health.js"></script>
 <script src="js/app/display-prefs.js"></script>
 <script src="js/app/pdf-viewer.js"></script>
-<script src="js/app/user-page.js"></script></body>
+<script src="js/app/user-page.js"></script>
+<script>
+/* v1.34: if the boot gate never clears — a thrown script, an old service
+   worker serving stale code, a network call that hangs — the student is
+   stuck on an infinite spinner with no obvious way out. After 15 s, offer
+   a reload. The gate is not hidden; a legitimately slow auth still works,
+   because app.js hides #sg as usual and takes the hint with it. */
+setTimeout(function(){
+  var sg = document.getElementById('sg');
+  if (!sg) return;
+  if (getComputedStyle(sg).display === 'none') return;
+  var hint = document.getElementById('sg-hint');
+  if (hint) hint.hidden = false;
+}, 15000);
+</script>
+</body>
 </html>
 <!-- abhyas-hourly-challenge-v1 -->
 <!-- abhyas-hourly-sprint-loader-v2 -->

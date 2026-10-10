@@ -826,9 +826,11 @@ const PSYNC = {
   _beaconSync(){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     try{
-      /* The page is closing, so nothing can be compressed or awaited here. Only a copy that fits as it is
-         is sent; otherwise the next normal save (which compresses) does it. The device always keeps everything. */
-      const json = JSON.stringify(this._fullLocal());
+      /* v1.36: the beacon sends the same small, always-fits payload as a
+         normal save — totals, chapter stats, coverage, study days. The
+         wrong bank, bookmarks and notes stay on this device and in the
+         student's own Google Drive backup. */
+      const json = JSON.stringify(this._syncPayloadForServer());
       if(json.length > this._SYNC_PAYLOAD_CEILING) return;
       const body = JSON.stringify({ action:'saveProgress', username: S.user.username, token: S.user.token, data: json, baseUpdatedAt: this._rev() });
       navigator.sendBeacon?.(APPS, new Blob([body], {type:'text/plain'}));
@@ -939,19 +941,37 @@ const PSYNC = {
   _rev(){ try { return localStorage.getItem(this._REV_KEY) || ''; } catch(e){ return ''; } },
   _setRev(v){ try { if(v) localStorage.setItem(this._REV_KEY, String(v)); } catch(e){} },
 
+  /* v1.36: what travels to the server. Fixed-size, ~2 KB no matter how big
+     the wrong bank grows. The wrong bank, bookmarks, notes and full session
+     list stay on this device and travel only through the student's own
+     Google Drive backup. This removes the 45,000-character ceiling forever. */
+  _syncPayloadForServer(){
+    const p = S.prog || {};
+    let sprint = '';
+    try { sprint = localStorage.getItem('abhyas_sprint_start') || ''; } catch(e){}
+    return {
+      prog: { total: Number(p.total) || 0, correct: Number(p.correct) || 0, sessions: [] },
+      chapStats: S.chapStats || {},
+      cov: S.cov || {},
+      stk: S.stk || { days: [], last: '' },
+      sprint,
+      resets: (typeof PROGRESS_RESET !== 'undefined') ? PROGRESS_RESET.load() : {},
+      wr: [], bk: [], fl: [], qnotes: {}
+    };
+  },
+
   async pushNow(_isRetry){
     if(!S.online || S.forcedOffline || !S.user || !S.user.token) return;
     clearTimeout(this._timer);
     this._timer = null;
     this._setState('syncing');
-    /* The cloud copy is the COMPLETE state, compressed when it is large. If it still does not fit, nothing is
-       cut down and nothing is sent: the data stays whole on this device. */
-    const payload = await syncEncode(JSON.stringify(this._fullLocal()), this._SYNC_PAYLOAD_CEILING);
+    const payload = await syncEncode(JSON.stringify(this._syncPayloadForServer()), this._SYNC_PAYLOAD_CEILING);
     if(payload === null){
-      this._setStatus('Your data is too large for the cloud copy right now. It is safe on this device; export a backup file from Data.');
+      this._setStatus('Cloud copy failed. Your data is safe on this device. Download a backup file from Data.');
       this._setState('error');
       return;
     }
+  
     try{
       const r = await netFetch(APPS, {
         method:'POST',
@@ -1673,7 +1693,7 @@ const UI = {
      opens instead of wrapping UI._goRaw again and again:
        UI.onEnter('heatmap', fn)   runs when that screen opens
        UI.onEnterAny(fn)           runs on every screen change (fn receives the view id) */
-  ALIAS: { 'subjective':'subj-qotd' },
+  ALIAS: { 'subjective':'subj-qotd', 'heatmap':'progress', 'server-progress':'progress' },
   _enter: {},
   _enterAny: [],
   onEnter(view, fn){ (UI._enter[view] = UI._enter[view] || []).push(fn); },
@@ -1703,7 +1723,6 @@ const UI = {
       online:()=>ONPROG.render(),
       offline:()=>CACHE.render(),
       bookmarks:()=>REV.renderList('bk'),
-      flagged:()=>REV.renderList('fl'),
       wrong:()=>REV.renderList('wr'),
       timetable:()=>TT.render(),
       psycho:()=>PSY.init()
@@ -1987,17 +2006,16 @@ const HOME = {
   updateBadges(){
     const set = (id,v)=>{ const e=document.getElementById(id); if(e) e.textContent = v; };
     const dueWr = (typeof REV !== 'undefined' && REV.dueCount) ? REV.dueCount() : 0;
-    set('bkc', S.bk.length); set('flc', S.fl.length); set('wrc', S.wr.length);
+    set('bkc', S.bk.length); set('wrc', S.wr.length);
     const wrDueEl = document.getElementById('wrc-due');
     if(wrDueEl) wrDueEl.textContent = dueWr;
-    const total = S.bk.length + S.fl.length + dueWr;
+    const total = S.bk.length + dueWr;
     const bnBadge = document.getElementById('bn-badge');
     if(bnBadge){
       if(total>0){ bnBadge.textContent = total>99?'99+':total; bnBadge.style.display=''; }
       else bnBadge.style.display='none';
     }
     set('nav-bk-badge', S.bk.length);
-    set('nav-fl-badge', S.fl.length);
     set('nav-wr-badge', S.wr.length);
     const oldDueBadge = document.getElementById('nav-wr-due-badge');
     if(oldDueBadge){ oldDueBadge.textContent = dueWr; oldDueBadge.style.display = dueWr>0?'':'none'; }
@@ -3133,50 +3151,12 @@ const TUTORIAL = {
   _idx: 0,
   _steps: [
     { icon: '<i class="ph ph-hand-waving"></i>', title: 'Welcome to Abhyas',
-      body: `<p>This is your Smart Study Hub for Nepal Engineering (Level 5/7) and PSC/Loksewa prep. Once a chapter is cached it works fully offline — handy for load-shedding or weak signal.</p>` },
-    { icon: '<i class="ph ph-key"></i>', title: 'Your account status',
-      body: `<p>Check the sidebar under your name for your current status:</p>
-        <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b><i class="ph ph-hourglass"></i> Trial</b> — free access, counts down live. Pay anytime from the payment screen to go permanent.</li>
-          <li><b><i class="ph ph-check-circle"></i> Permanent</b> — verified, unlimited access forever, fully usable offline.</li>
-          <li><b><i class="ph ph-calendar-blank"></i> Yearly</b> — active until the renewal date shown in the sidebar.</li>
-        </ul>` },
-    { icon: '<i class="ph ph-house"></i>', title: 'Your Dashboard',
-      body: `<p>The Dashboard (<i class="ph ph-house"></i>) is home base:</p>
-        <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b><i class="ph ph-star"></i> Daily Challenge</b> — 30 mixed questions, keeps your streak alive.</li>
-          <li><b><i class="ph ph-lightning"></i> Adaptive Practice</b> — pulls the questions you're actually struggling with first.</li>
-          <li>Quick stats and Quick Action tiles for everything else.</li>
-        </ul>` },
-    { icon: '<i class="ph ph-book-open"></i>', title: 'Studying a chapter',
-      body: `<p>Open <b>Online Study</b> or <b>Local File</b>, pick a chapter, choose how many questions and whether to shuffle, then pick a mode:</p>
-        <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b>Practice</b> — instant feedback.</li>
-          <li><b>Exam</b> — timed, graded at the end.</li>
-          <li><b>Flashcard</b> — quick flip-through review.</li>
-        </ul>
-        <p style="margin-top:.5rem">Shortcuts: <b>A/B/C/D</b> or <b>1–5</b> to answer, <b>←/→</b> between cards, <b>Esc</b> to quit.</p>` },
-    { icon: '<i class="ph ph-star"></i>', title: 'Bookmarks, Flags & Wrong Bank',
-      body: `<p>Tag any question while studying:</p>
-        <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b><i class="ph ph-star"></i> Bookmarks</b> — save with a label.</li>
-          <li><b><i class="ph ph-flag"></i> Flagged</b> — a quick "come back to this".</li>
-          <li><b><i class="ph ph-x-circle"></i> Wrong Bank</b> — auto-collected; comes back after 1, 3, 7 and 14 days; get it right each time and it retires.</li>
-        </ul>` },
-    { icon: '<i class="ph ph-calendar-check"></i>', title: 'Weekly Sets',
-      body: `<p>Every so often a fresh question set unlocks on the Dashboard. You get <b>exactly one attempt</b> — a graded, timed exam. Once you submit, you can only review.</p>` },
-    { icon: '<i class="ph ph-pencil-line"></i>', title: 'Subjective',
-      body: `<p>Under <b>Subjective</b> in the sidebar, three panels:</p>
-        <ul style="margin:0 0 0 1.1rem;padding:0">
-          <li><b>Q of the Day</b> — one question, timed write, then upload photos or a PDF of your answer.</li>
-          <li><b>Proper Exam</b> — a full 100-mark paper on demand.</li>
-          <li><b>Question List</b> — topic-wise index.</li>
-        </ul>` },
-    { icon: '<i class="ph ph-calendar-blank"></i>', title: 'Timetable & Progress',
-      body: `<p><b>Timetable</b> blocks out study sessions by day/time — the Dashboard clock shows what's on now. <b>Progress</b> tracks accuracy and predicts likely exam marks.</p>` },
-    { icon: '<i class="ph ph-package"></i>', title: 'Offline & installing the app',
-      body: `<p>Chapters you open get cached automatically for offline use — check <b>Offline Cache</b> to manage what's stored.</p>
-        <p style="margin-top:.5rem">Tap the <b><i class="ph ph-device-mobile"></i></b> icon in the top bar to install Abhyas to your home screen.</p>` }
+      body: `<p><b>Practice</b> — pick a chapter, or start the 30-minute session on Home for the right mix of reviews, weak spots, and new material.</p>
+        <p><b>Written answers</b> — a timed question every day, plus full papers. Photograph your answer and upload as one PDF.</p>
+        <p><b>Review</b> — saved and missed questions come back on a spacing schedule until you get them right four times.</p>
+        <p><b>Progress</b> — accuracy, weak chapters, your plan.</p>
+        <p><b>Tools</b> — offline downloads, backup, study plan.</p>
+        <p style="margin-top:.6rem">Once you open a chapter, it works with no signal.</p>` }
   ],
 
   maybeAutoOpen(user){
@@ -3197,44 +3177,24 @@ const TUTORIAL = {
         <div id="tut-dots" style="display:flex;gap:.3rem;margin-bottom:.9rem;justify-content:center"></div>
         <div style="flex:1;overflow-y:auto;min-height:0" id="tut-body"></div>
         <div style="display:flex;gap:.4rem;margin-top:1rem">
-          <button id="tut-back" style="padding:.6rem .9rem;background:var(--b0);border:1px solid var(--b1);border-radius:var(--r2);color:var(--t2);font-size:.82rem;cursor:pointer;font-family:var(--ff)">← Back</button>
-          <button id="tut-next" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:var(--on-accent);font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Next →</button>
+          <button id="tut-next" style="flex:1;padding:.62rem;background:linear-gradient(135deg,var(--amb2),var(--amb));border:none;border-radius:var(--r2);color:var(--on-accent);font-weight:700;font-size:.85rem;cursor:pointer;font-family:var(--ff)">Got it — let's study! →</button>
         </div>
         <button id="tut-skip" style="margin-top:.55rem;background:none;border:none;color:var(--t3);font-size:.72rem;cursor:pointer;font-family:var(--ff);text-decoration:underline">Skip tutorial</button>
       </div>`;
     document.body.appendChild(modal);
-    document.getElementById('tut-back').onclick = ()=>TUTORIAL._go(-1);
-    document.getElementById('tut-next').onclick = ()=>TUTORIAL._go(1);
+    document.getElementById('tut-next').onclick = ()=>TUTORIAL._finish();
     document.getElementById('tut-skip').onclick = ()=>TUTORIAL._finish();
     TUTORIAL._render();
   },
 
-  _go(dir){
-    const n = TUTORIAL._idx + dir;
-    if(n < 0) return;
-    if(n >= TUTORIAL._steps.length){ TUTORIAL._finish(); return; }
-    TUTORIAL._idx = n;
-    TUTORIAL._render();
-  },
-
   _render(){
-    const step = TUTORIAL._steps[TUTORIAL._idx];
+    const step = TUTORIAL._steps[0];
     const body = document.getElementById('tut-body');
     if(!body) return;
     body.innerHTML = `
       <div style="font-size:1.6rem;margin-bottom:.3rem">${step.icon}</div>
       <div style="font-family:var(--fd);font-size:1rem;font-weight:700;color:var(--t1);margin-bottom:.5rem">${step.title}</div>
       <div style="font-size:.82rem;color:var(--t2);line-height:1.55">${step.body}</div>`;
-    const dots = document.getElementById('tut-dots');
-    if(dots){
-      dots.innerHTML = TUTORIAL._steps.map((_,i)=>
-        `<div style="width:${i===TUTORIAL._idx?'18px':'6px'};height:6px;border-radius:3px;background:${i===TUTORIAL._idx?'var(--amb)':'var(--b1)'};transition:.2s"></div>`
-      ).join('');
-    }
-    const backBtn = document.getElementById('tut-back');
-    if(backBtn) backBtn.style.visibility = TUTORIAL._idx===0 ? 'hidden' : 'visible';
-    const nextBtn = document.getElementById('tut-next');
-    if(nextBtn) nextBtn.textContent = TUTORIAL._idx===TUTORIAL._steps.length-1 ? "Got it — let's study! →" : 'Next →';
   },
 
   _finish(){
@@ -3259,6 +3219,20 @@ const APP = {
     if(verEl) verEl.textContent = `${APP_NAME} (v${typeof APP_VERSION!=='undefined'?APP_VERSION:'—'})`;
 
     await QDB.migrateFromLocalStorage();
+
+    /* v1.36: flags merged into bookmarks. One-time migration. */
+    if(Array.isArray(S.fl) && S.fl.length){
+      const seen = new Set((S.bk || []).map(b => b.uid));
+      S.fl.forEach(item => {
+        if(!item || !item.uid || seen.has(item.uid)) return;
+        S.bk.push(Object.assign({}, item, { tag: item.tag || 'Need Check' }));
+        seen.add(item.uid);
+      });
+      _save(LS.BK, S.bk);
+      S.fl = [];
+      _save(LS.FL, S.fl);
+    }
+
     if(typeof migrateSessionScopes === 'function') migrateSessionScopes();
     if(!Object.keys(S.chapStats).length && S.prog.sessions?.length) CHAPSTATS.rebuildFromSessions();
     if(!S.cov || !Object.keys(S.cov).length) COV.rebuildFromSessions();

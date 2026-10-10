@@ -62,7 +62,7 @@ function _cloudPrune(files, keep) {
 }
 
 /* ── Persistence keys ── */
-const LS_CLOUD = 'abhyas_cloud';   // { fid, email, savedAt }
+const LS_CLOUD = 'abhyas_cloud';   // { fid, email, savedAt, lastSum, savedTotal }
 const LS_PROFILE = 'abhyas_profile';
 
 /* ── In-memory session state ── */
@@ -267,7 +267,7 @@ const CLOUD = {
     try {
       const file = await this._upload(json, this._snapName(payload.ts));
       _fileId = file.id;
-      saved = { fid: _fileId, email: _userEmail || saved.email || null, savedAt: Date.now(), lastSum: payload.sum };
+      saved = { fid: _fileId, email: _userEmail || saved.email || null, savedAt: Date.now(), lastSum: payload.sum, savedTotal: saved.savedTotal };
       try { localStorage.setItem(LS_CLOUD, JSON.stringify(saved)); } catch (e) { /* ignore */ }
       this._noteBackup('drive');
       let kept = null;
@@ -604,6 +604,123 @@ async function _fetchUserEmail() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+   AUTO-BACKUP — quiet safety net.
+
+   Runs in the background while the student studies. It tops up the
+   student's own Drive copy when their work would otherwise drift, but
+   only when ALL FOUR of these are true:
+
+     • the app has been open at least 5 minutes
+     • it has been 3+ days since the last backup
+     • 50+ answers have accumulated since the last backup
+     • they are signed in to Google Drive
+
+   Silent on success — no banner, no toast, no button. A failure while
+   signed in DOES surface, because a broken backup should not go
+   unnoticed. Reuses CLOUD.backup(), so the "unchanged payload"
+   short-circuit still applies: nothing is uploaded when nothing has
+   moved.
+   ═══════════════════════════════════════════════════════════════════════ */
+const AUTO_BACKUP = {
+  OPEN_MS:     5 * 60 * 1000,       // wait this long after boot before the first check
+  GAP_MS:      3 * 24 * 60 * 60 * 1000,
+  ANSWER_GAP:  50,
+  CHECK_MS:    10 * 60 * 1000,      // how often to re-check while the tab is visible
+
+  _openedAt:  Date.now(),
+  _inflight:  false,
+  _timer:     null,
+  _booted:    false,
+
+  _saved(){
+    try { return JSON.parse(localStorage.getItem(LS_CLOUD) || '{}') || {}; }
+    catch (e) { return {}; }
+  },
+  _writeSaved(obj){
+    try { localStorage.setItem(LS_CLOUD, JSON.stringify(obj)); } catch (e) {}
+  },
+  _totalAnswers(){
+    try { return Number(window.S && S.prog && S.prog.total) || 0; } catch (e) { return 0; }
+  },
+
+  _due(){
+    if (!CLOUD.status().signedIn) return { due: false, reason: 'signed-out' };
+    if (Date.now() - this._openedAt < this.OPEN_MS) return { due: false, reason: 'warming' };
+
+    const saved = this._saved();
+    const gap = saved.savedAt ? (Date.now() - saved.savedAt) : Infinity;
+    const answers = this._totalAnswers();
+    const since = (saved.savedTotal != null)
+      ? Math.max(0, answers - saved.savedTotal)
+      : Infinity;
+
+    if (gap >= this.GAP_MS)       return { due: true, reason: 'days',    days: Math.floor(gap / 86400000) };
+    if (since >= this.ANSWER_GAP) return { due: true, reason: 'answers', count: since };
+    return { due: false, reason: 'recent' };
+  },
+
+  async run(){
+    if (this._inflight) return;
+    const d = this._due();
+    if (!d.due) return;
+    this._inflight = true;
+    try {
+      const r = await CLOUD.backup();
+      if (r && r.success) {
+        /* An "unchanged" reply still means we checked and there is
+           nothing new to push, so the next gap check starts from now.
+           savedTotal is set here (CLOUD.backup() already set savedAt
+           and lastSum) so the 50-answers trigger has a fresh baseline. */
+        const saved = this._saved();
+        saved.savedAt = Date.now();
+        saved.savedTotal = this._totalAnswers();
+        this._writeSaved(saved);
+        /* Tell the storage-health banner so its "time for a backup" card
+           clears itself without the student tapping anything. */
+        try { if (typeof window.BACKUP_NUDGE !== 'undefined' && BACKUP_NUDGE.record) BACKUP_NUDGE.record('drive'); } catch (e) {}
+      } else if (!(r && r.error && /sign in|not signed/i.test(r.error))) {
+        /* Surface a real failure. A "not signed in" reply is normal if the
+           student signed out mid-session and would be noise. */
+        try {
+          if (typeof toast === 'function') {
+            toast('Auto-backup to Drive did not go through: ' +
+              ((r && r.error) || 'unknown error') +
+              '. Your work is safe on this device.', 6500);
+          }
+        } catch (e) {}
+      }
+    } catch (e) {
+      /* Network blip — try again on the next tick. */
+    } finally {
+      this._inflight = false;
+    }
+  },
+
+  start(){
+    if (this._booted) return;
+    this._booted = true;
+    /* First check is 5 minutes after boot. If nothing is due yet, the
+       next tick will catch it. */
+    setTimeout(() => this.run(), this.OPEN_MS + 3000);
+    /* Then every 10 minutes, but only while the tab is visible. */
+    this._timer = setInterval(() => { if (!document.hidden) this.run(); }, this.CHECK_MS);
+  }
+};
+
+/* Coming back to the tab is a good moment to check — the student may have
+   had it open in the background while studying offline, or on another
+   device, and the gap condition may now hold. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    setTimeout(() => { try { AUTO_BACKUP.run(); } catch (e) {} }, 2000);
+  }
+});
+
+/* Boot slightly after everything else on the page — no point competing
+   with the initial render or the session restore. */
+setTimeout(() => { try { AUTO_BACKUP.start(); } catch (e) {} }, 1500);
+
+/* ═══════════════════════════════════════════════════════════════════════
    GLOBAL EXPOSURE
    ═══════════════════════════════════════════════════════════════════════ */
 window.CLOUD = CLOUD;
@@ -612,5 +729,6 @@ window._cloudMigrate = _cloudMigrate;
 window._cloudBackupMigrations = _cloudBackupMigrations;
 window._cloudChecksum = _cloudChecksum;
 window._cloudPrune = _cloudPrune;
+window.AUTO_BACKUP = AUTO_BACKUP;
 
 })();

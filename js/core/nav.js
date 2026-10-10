@@ -70,30 +70,15 @@ const HEADS = {
   "label": "Saved",
   "text": "Questions you starred to come back to."
  },
- "flagged": {
-  "icon": "ph-flag",
-  "label": "Flagged",
-  "text": "Questions you marked to look at again later."
- },
  "wrong": {
-  "icon": "ph-arrow-counter-clockwise",
-  "label": "Questions you missed",
-  "text": "These come back on a spacing schedule. <span id=\"wrc-due\">0</span> are ready for you right now."
+  "icon": "ph-target",
+  "label": "Weak spots",
+  "text": "Your missed questions, grouped four ways. Due now is the default — nothing else needs your attention today."
  },
  "progress": {
   "icon": "ph-chart-bar",
   "label": "Your progress",
-  "text": "How you're doing overall, and which chapters need the work."
- },
- "server-progress": {
-  "icon": "ph-list-checks",
-  "label": "Coverage by file",
-  "text": "How much of each question file you've worked through, pulled from your account rather than this device."
- },
- "heatmap": {
-  "icon": "ph-squares-four",
-  "label": "Syllabus heatmap",
-  "text": "Every chapter at a glance. Green is strong, amber is workable, red needs attention. Tap a cell to start."
+  "text": "Accuracy, heatmap and coverage in one place. Switch tabs to change the view."
  },
  "offline": {
   "icon": "ph-download-simple",
@@ -129,15 +114,12 @@ const GROUPS = [
     { view:'subj-mine', sub:'What you sent, and your score', hint:{ id:'subj-mine-hint', text:'Nothing submitted yet' }, badge:{ id:'subj-mine-badge', cls:'', text:'0', hidden:true } }
   ]},
   { key:'review', label:'Review', tab:'progress', items:[
-    { view:'wrong',     sub:'Ready for another go', count:{ id:'wrc', cls:'' } },
-    { view:'bookmarks', sub:'Starred for later',    count:{ id:'bkc', cls:'ok' } },
-    { view:'flagged',   sub:'Marked to revisit',    count:{ id:'flc', cls:'' } }
+    { view:'wrong',     label:'Weak spots', icon:'ph-target', sub:'What to work on next', count:{ id:'wrc', cls:'' } },
+    { view:'bookmarks', sub:'Starred for later', count:{ id:'bkc', cls:'ok' } }
   ]},
   { key:'progress', label:'Progress & plan', tab:'progress', items:[
-    { view:'progress',        sub:'Accuracy and weak chapters' },
-    { view:'heatmap',         sub:'Every chapter at a glance' },
-    { view:'server-progress', sub:'How much of each file' },
-    { view:'timetable',       sub:'When you plan to study' }
+    { view:'progress',  sub:'Accuracy, heatmap, coverage' },
+    { view:'timetable', sub:'When you plan to study' }
   ]},
   { key:'tools', label:'Tools', tab:'more', items:[
     { view:'offline', sub:'Save sets for offline' },

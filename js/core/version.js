@@ -10,7 +10,7 @@
    Keep in sync with CODE.gs's own APP_VERSION constant (the backend
    runs in a different runtime and can't import this file directly).
 
-   ── Version history ──
+   ── Version history (newest last) ──
    1.00 — initial release
    1.01 — login enumeration fix, admin cleanup actions
    1.02 — sliding admin tokens, private screenshots, Google rate limit
@@ -37,62 +37,46 @@
           Back / Next / Finish bar above the tab bar, a density pass so a
           question and its options fit one screen, and guards against a
           double tap skipping a question or submitting twice.
-   1.13 - self-service data control: resetMyProgress + deleteMyAccount
+   1.13 — self-service data control: resetMyProgress + deleteMyAccount
           (Backup page -> "Your data on the server"); account deletion now
           also trashes Drive files and anonymises log/report references;
           per-file reset button fixed; Firebase SDK only loads when push is
           configured; sw precaches icon-512/favicon; manifest tidy-up;
           privacy page.
-   ═══════════════════════════════════════════════════════════════════════ */
-/* 1.14 - launch hardening: opt-in auto-download, cache-first question sets,
+   1.14 — launch hardening: opt-in auto-download, cache-first question sets,
           per-file coverage store, sync payload that always fits, quiz
           keyboard fix, photo-to-PDF written answers, trial pill in the top
           bar, quiz-safe session expiry, tolerant service worker with offline
-          fonts/KaTeX/pdf.js, privacy + terms pages, honest copy. */
-/* 1.15 - phase 2: unseen-first practice, real weak-topic mode, question grid
+          fonts/KaTeX/pdf.js, privacy + terms pages, honest copy.
+   1.15 — phase 2: unseen-first practice, real weak-topic mode, question grid
           and mark-for-review, exam countdown, weekly test start/resume/rank
           recorded on the server, safer uploads, cached settings, nightly
-          spreadsheet backup, client error log, self-hosted assets. */
-/* 1.16 - phase 3: question editor + growth panel + announcements in the admin
+          spreadsheet backup, client error log, self-hosted assets.
+   1.16 — phase 3: question editor + growth panel + announcements in the admin
           console, text-size button, study-plan calendar export, styled confirm
-          dialogs, landing-page sample question, automatic checks (tests/). */
-/* 1.17 - phase 4: chapter cards + Continue, sign in with email or mobile,
+          dialogs, landing-page sample question, automatic checks (tests/).
+   1.17 — phase 4: chapter cards + Continue, sign in with email or mobile,
           payment screenshot shrunk on the phone, approval-time note,
-          question-count index, Content-Security-Policy, batched progress saves. */
-/* 1.18 - solo-student 10/10: personalized Today plan, exam readiness on Home,
+          question-count index, Content-Security-Policy, batched progress saves.
+   1.18 — solo-student 10/10: personalized Today plan, exam readiness on Home,
           chapter strength verdicts, "Just 5" quick session, resume chip,
           pace feedback, streak forgiveness, image fullscreen, copy-explanation
-          button, fast-guess flag on results. */
-/* 1.19 - confidence rating (Sure / Not sure / Guessed), misconceptions card,
-          recovery mode after 3+ days away, read-aloud button. */
-/* 1.20 - chapters refresh when you're online; weekly leaderboard; badges;
-          wrong-first results; streak insurance; sidebar search; push nudge. */
-/* 1.21 - weekly test retakes: the first attempt is the official record;
+          button, fast-guess flag on results.
+   1.19 — confidence rating (Sure / Not sure / Guessed), misconceptions card,
+          recovery mode after 3+ days away, read-aloud button.
+   1.20 — chapters refresh when you're online; weekly leaderboard; badges;
+          wrong-first results; streak insurance; sidebar search; push nudge.
+   1.21 — weekly test retakes: the first attempt is the official record;
           later attempts are local-only practice, and the retake modal
           shows the last score with Review / Retake options. Every system
           Drive folder now lives under "Abhyas System Data", and uploaded
           files are renamed to a standard YYYY-MM-DD_HHMMSS_user_type.ext
-          pattern. */
-/* 1.22 - polish: rate-limit retry-after shown to the student, exam
+          pattern.
+   1.22 — polish: rate-limit retry-after shown to the student, exam
           copy protection, live Loksewa negative-marking score in the
           exam bar, boot error boundary, search inside Saved/Flagged/
-          Missed lists, faster progress flush, weekly admin summary. */
-/* 1.35 - the daily 75-mark paper now defaults to the syllabus topic table: 25 GK + the 50 Level 7 marks split as
-          Engineering Survey 7, Construction Materials 6, Geotechnical 6, Construction Management 6, Structural
-          Analysis 5, Concrete Technology 5, Estimating and Costing 5, Engineering Drawing 4, Engineering Economics 3,
-          Professional Practices 3. Chapters are matched to topics by name; a scheme saved by an admin still wins. */
-/* 1.34 - faster offline download. The Offline Cache download asks for 6 files per request (new getFiles action in
-          gas/code.gs) and keeps 3 requests going, skips files already on the device, and stops at once when the
-          session has expired or access has ended. Works with the older server too (falls back to one file per
-          request). One safe escAttrJs in shared.js instead of three different copies. Needs gas/code.gs v1.34
-          deployed to get the speed-up. */
-/* 1.33 - exam and study tools. Unselect an answer and Clear response in timed exams; 10/5/1-minute warnings;
-          exam keyboard shortcuts (1-5, C, M, N, P). Scoped "Reset progress" with backup offer, typed confirmation and
-          24-hour undo; resets and wrong-bank removals now survive sync. Storage meter with 80% warning, backup
-          reminder, versioned Google Drive backups with checksum. 85% mastery gate for chapter completion, sprint
-          limited to Level 7 + GK, "Daily target met" badge. Six report categories and an offline report queue.
-          Text size, high contrast and AMOLED black. Needs gas/code.gs v1.33 deployed. */
-/* 1.32 - weekly test hardening. Fixed the entire weekly feature:
+          Missed lists, faster progress flush, weekly admin summary.
+   1.32 — weekly test hardening. Fixed the entire weekly feature:
             • objective.js — removed a duplicate `const isWeekly`
               declaration in _showResults that was a parse-time syntax
               error. The whole file was being rejected by the browser,
@@ -125,5 +109,30 @@
               the student actually sat is now saved on the device, so
               Review and Retake always have questions to work with
               even when the chapter pools and the weekly set's Drive
-              file are both unreachable. */
+              file are both unreachable.
+   1.33 — exam and study tools. Unselect an answer and Clear response in
+          timed exams; 10/5/1-minute warnings; exam keyboard shortcuts
+          (1-5, C, M, N, P). Scoped "Reset progress" with backup offer,
+          typed confirmation and 24-hour undo; resets and wrong-bank
+          removals now survive sync. Storage meter with 80% warning, backup
+          reminder, versioned Google Drive backups with checksum. 85% mastery
+          gate for chapter completion, sprint limited to Level 7 + GK,
+          "Daily target met" badge. Six report categories and an offline
+          report queue. Text size, high contrast and AMOLED black. Needs
+          gas/code.gs v1.33 deployed.
+   1.34 — faster offline download. The Offline Cache download asks for 6
+          files per request (new getFiles action in gas/code.gs) and keeps
+          3 requests going, skips files already on the device, and stops at
+          once when the session has expired or access has ended. Works with
+          the older server too (falls back to one file per request). One safe
+          escAttrJs in shared.js instead of three different copies. Needs
+          gas/code.gs v1.34 deployed to get the speed-up.
+   1.35 — the daily 75-mark paper now defaults to the syllabus topic table:
+          25 GK + the 50 Level 7 marks split as Engineering Survey 7,
+          Construction Materials 6, Geotechnical 6, Construction Management 6,
+          Structural Analysis 5, Concrete Technology 5, Estimating and
+          Costing 5, Engineering Drawing 4, Engineering Economics 3,
+          Professional Practices 3. Chapters are matched to topics by name;
+          a scheme saved by an admin still wins.
+   ═══════════════════════════════════════════════════════════════════════ */
 const APP_VERSION = '1.35';

@@ -1527,10 +1527,9 @@ const QUIZ = {
       if(q.img && fcImgWrap && fcImg){ fcImg.src = q.img; fcImg.alt = q.imgCaption || 'Question figure'; fcImgWrap.style.display = ''; }
       else if(fcImgWrap){ fcImgWrap.style.display = 'none'; }
 
-      const isStarred = REV.has('bk', q.uid), isFlagged = REV.has('fl', q.uid);
+            const isStarred = REV.has('bk', q.uid);
       const reviewControls = S.quiz.reviewOnly ? '' : `
-        <button class="ib ${isStarred?'bk-on':''}" onclick="QUIZ._star()" title="Bookmark" aria-label="Bookmark this question" aria-pressed="${isStarred?'true':'false'}"><i class="ph ph-star"></i></button>
-        <button class="ib ${isFlagged?'fl-on':''}" onclick="QUIZ._flag()" title="Flag" aria-label="Flag this question" aria-pressed="${isFlagged?'true':'false'}"><i class="ph ph-flag"></i></button>
+        <button class="ib ${isStarred?'bk-on':''}" onclick="QUIZ._star()" title="Save this question" aria-label="Save this question" aria-pressed="${isStarred?'true':'false'}"><i class="ph ph-star"></i></button>
       `;
       document.getElementById('fc-acts').innerHTML = `
         ${reviewControls}
@@ -1668,15 +1667,7 @@ const QUIZ = {
       toastUndo('⭐ Saved', function(){ REV.toggle('bk', q); QUIZ._renderFlashcard(); });
     }
   },
-  _flag(){
-    if(S.quiz.reviewOnly) return;
-    const q=S.quiz.qs[S.quiz.idx];
-    const added = REV.toggle('fl', q);
-    QUIZ._renderFlashcard();
-    if(added && typeof toastUndo === 'function'){
-      toastUndo('🚩 Flagged', function(){ REV.toggle('fl', q); QUIZ._renderFlashcard(); });
-    }
-  },
+  
   /* ── Reporting a question. One reporter serves every section; each entry point only says which
      question, which section, and what the student had picked. ── */
   _reportCurrent(){

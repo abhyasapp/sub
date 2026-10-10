@@ -14,26 +14,35 @@
 <meta name="robots" content="noindex,nofollow">
 <script src="js/core/config.js"></script>
 <script>(function(){
+  /* Both theme-color metas must be updated together — the browser picks
+     whichever matches the OS preference, and a student who has overridden
+     the theme inside the app should not see a status bar that disagrees.
+     The two dark values must match too: #0F1213 everywhere. */
   try{
+    var THEME_LIGHT = '#F6F7F6', THEME_DARK = '#0F1213';
+    function paint(colour){
+      var metas = document.querySelectorAll('meta[name="theme-color"]');
+      for (var i = 0; i < metas.length; i++) metas[i].setAttribute('content', colour);
+    }
     var raw = localStorage.getItem('abhyas_theme');
     var t = raw ? JSON.parse(raw) : null;
-    if (t !== 'dark' && t !== 'light') {
-      t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
-    }
     if (t === 'dark') {
       document.documentElement.classList.add('dark');
-      var m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', '#101314');
+      paint(THEME_DARK);
+    } else if (t === 'light') {
+      paint(THEME_LIGHT);
     }
   } catch(e) {}
 })();</script>
 <!-- ─── Session bridge: hide the password form on first paint if a
      student session exists. ADMIN.init() will try to exchange it for
-     an admin token via adminSwitchFromUser before showing the gate. -->
+     an admin token via adminSwitchFromUser before showing the gate.
+     The gate here checks the same four token fields as USER_SESSION.token()
+     below — missing userToken caused a brief form flash on older devices. -->
 <script>(function(){
   try{
     var s = JSON.parse(localStorage.getItem('abhyas_session') || 'null');
-    if (s && s.type === 'user' && s.username && (s.token || s.sessionToken || s.authToken)) {
+    if (s && s.type === 'user' && s.username && (s.token || s.sessionToken || s.authToken || s.userToken)) {
       document.documentElement.classList.add('session-bridge');
     }
   }catch(e){}
@@ -1383,6 +1392,12 @@ const GAS_URL  = ABHYAS_CONFIG.GAS_URL;
 const LS_ADMIN = 'abhyas_admin';
 const LS_USER  = 'abhyas_session';
 
+/* Both theme-color metas must move together — see the head script. */
+const THEME_COLORS = { light: '#F6F7F6', dark: '#0F1213' };
+function _paintThemeColor(colour){
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', colour));
+}
+
 const $  = id => document.getElementById(id);
 const $$ = sel => Array.from(document.querySelectorAll(sel));
 
@@ -1438,8 +1453,7 @@ if (typeof window.toggleTheme !== 'function') {
   window.toggleTheme = function(){
     const dark = document.documentElement.classList.toggle('dark');
     try { localStorage.setItem('abhyas_theme', JSON.stringify(dark ? 'dark' : 'light')); } catch(e){}
-    const m = document.querySelector('meta[name="theme-color"]');
-    if (m) m.setAttribute('content', dark ? '#0F1213' : '#F6F7F6');
+    _paintThemeColor(dark ? THEME_COLORS.dark : THEME_COLORS.light);
   };
 }
 function togglePw(btn){
@@ -1563,6 +1577,11 @@ const MODAL = {
 const CONFIRM = {
   _resolve: null,
   ask({ title, body, confirmText, tone, requireType }){
+    /* Refuse a second confirm while one is open rather than orphaning
+       the previous caller's promise. The periodic refresh timer and the
+       offline/online handlers could otherwise both fire asks in the
+       same tick. A caller receiving false simply does not do the thing. */
+    if (this._resolve) return Promise.resolve(false);
     return new Promise(resolve => {
       this._resolve = resolve;
       $('tt-confirm').textContent = title || 'Confirm';
@@ -1654,7 +1673,10 @@ const ADMIN = {
     document.documentElement.classList.add('session-bridge');
 
     /* If the exchange never settles — a hung request, a dead deployment —
-       fall back to the password form rather than a permanent spinner. */
+       fall back to the password form rather than a permanent spinner.
+       The 11s timeout on the POST aborts the fetch itself, so a very slow
+       server cannot resolve later and unlock after the admin has started
+       typing credentials. */
     clearTimeout(this._bridgeTimer);
     this._bridgeTimer = setTimeout(() => {
       this._gateBusy(false);
@@ -1663,7 +1685,7 @@ const ADMIN = {
 
     this.post('adminSwitchFromUser',
               { username: s.username, token: userToken },
-              { skipTokenCheck: true })
+              { skipTokenCheck: true, timeoutMs: 11000 })
       .then(res => {
         if (!res || !res.success || !res.adminToken) {
           throw new Error((res && res.error) || 'Not an admin account.');
@@ -1777,17 +1799,36 @@ const ADMIN = {
   },
   hideErr(){ $('gate-err').classList.remove('show'); },
 
+  /* Every call carries its own deadline. Apps Script can hang for a long
+     time on a poor connection, and an un-cancelled fetch leaves the busy
+     bar sweeping forever with no way for the admin to know if the action
+     went through. The default 30 s is generous enough for the slowest
+     scans (trends, most-missed) and short enough that a truly dead server
+     surfaces as a toast instead of a freeze. */
   async post(action, params = {}, opts = {}){
     if (!opts.skipTokenCheck && !this.creds?.token) throw new Error('Not signed in.');
     const body = { action, ...params, adminToken: this.creds?.token };
+    const timeoutMs = opts.timeoutMs || 30000;
+    const ctl = ('AbortController' in window) ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), timeoutMs) : null;
     let r;
     try {
-      r = await fetch(GAS_URL, { method:'POST', headers:{ 'Content-Type':'text/plain' }, body: JSON.stringify(body) });
+      r = await fetch(GAS_URL, {
+        method:'POST',
+        headers:{ 'Content-Type':'text/plain' },
+        body: JSON.stringify(body),
+        signal: ctl && ctl.signal
+      });
     } catch (netErr) {
+      if (timer) clearTimeout(timer);
+      if (netErr && netErr.name === 'AbortError') {
+        throw new Error('That took too long. Check your connection and try again.');
+      }
       throw new Error(navigator.onLine
         ? 'Could not reach the server. Try again in a moment.'
         : 'You are offline — reconnect and try again.');
     }
+    if (timer) clearTimeout(timer);
     if (!r.ok) throw new Error('The server is unreachable right now (' + r.status + ').');
     const data = await r.json();
     if (data && data.success === false && /admin auth failed/i.test(data.error || '')) {
@@ -1858,7 +1899,12 @@ const ADMIN = {
         weeklysets: () => this.post('adminListWeeklySets').catch(() => ({success:false, sets:[]})),
         qreports:   () => this.post('adminListQuestionReports').catch(() => ({success:false, reports:[]}))
       };
-      const results = await Promise.all(want.map(k => fetchers[k]()));
+      /* An unknown scope in the list would throw synchronously in the map
+         and skip the rest — surface it as a failed fetch instead. */
+      const results = await Promise.all(want.map(k => {
+        const fn = fetchers[k];
+        return fn ? fn() : Promise.resolve({ success: false, error: 'Unknown scope: ' + k });
+      }));
       const failures = [];
       want.forEach((k, i) => {
         const r = results[i];
@@ -3876,6 +3922,16 @@ const PDF_ANNOTATE = {
     }
   },
 
+  /* The ink overlays arrive as data URLs; extract the base64 payload with a
+     clear error rather than letting a malformed string throw a TypeError
+     deep inside pdf-lib with no clue what went wrong. */
+  _base64FromDataUrl(dataUrl){
+    const s = String(dataUrl || '');
+    const i = s.indexOf(',');
+    if (i < 0 || i === s.length - 1) throw new Error('A mark overlay arrived without data.');
+    return s.slice(i + 1);
+  },
+
   /* Overlay-on-original where possible; flatten only if pdf-lib cannot
      reopen the file or a page is rotated, and say so when that happens. */
   async _stamp(overlays, info){
@@ -3887,7 +3943,8 @@ const PDF_ANNOTATE = {
         const page = pages[o.page - 1];
         if (!page) throw new Error('missing page ' + o.page);
         if (((page.getRotation().angle % 360) + 360) % 360 !== 0) throw new Error('rotated page');
-        const png = await doc.embedPng(Uint8Array.from(atob(o.dataUrl.split(',')[1]), c => c.charCodeAt(0)));
+        const base64 = this._base64FromDataUrl(o.dataUrl);
+        const png = await doc.embedPng(Uint8Array.from(atob(base64), c => c.charCodeAt(0)));
         const size = page.getSize();
         page.drawImage(png, { x: 0, y: 0, width: size.width, height: size.height });
       }
@@ -3899,34 +3956,62 @@ const PDF_ANNOTATE = {
     }
   },
 
+  /* Flatten at three quality tiers, stopping as soon as the output fits
+     inside the upload ceiling. A 30-page paper at scale 2 hits 9–12 MB,
+     over what the endpoint and the browser's own file input will accept —
+     degrading quality is better than failing the whole save. */
   async _flatten(overlays, info){
     if (typeof pdfjsLib === 'undefined') throw new Error('The PDF engine is not available.');
     const src = await pdfjsLib.getDocument({ data: info.bytes.slice() }).promise;
     const byPage = {};
     overlays.forEach(o => { byPage[o.page] = o; });
-    const out = await PDFLib.PDFDocument.create();
-    for (let n = 1; n <= src.numPages; n++) {
-      const page = await src.getPage(n);
-      const vp = page.getViewport({ scale: 2 });
-      const c = document.createElement('canvas');
-      c.width = Math.round(vp.width); c.height = Math.round(vp.height);
-      const cx = c.getContext('2d');
-      await page.render({ canvasContext: cx, viewport: vp }).promise;
-      if (byPage[n]) {
-        await new Promise(res => {
-          const img = new Image();
-          img.onload = () => { cx.drawImage(img, 0, 0, c.width, c.height); res(); };
-          img.onerror = res;
-          img.src = byPage[n].dataUrl;
-        });
+
+    const MAX_BYTES = 8 * 1024 * 1024;
+    const tiers = [
+      { scale: 2.0, quality: 0.92 },
+      { scale: 1.6, quality: 0.80 },
+      { scale: 1.3, quality: 0.65 }
+    ];
+
+    let lastBytes = null;
+    try {
+      for (let t = 0; t < tiers.length; t++) {
+        const { scale, quality } = tiers[t];
+        const out = await PDFLib.PDFDocument.create();
+        for (let n = 1; n <= src.numPages; n++) {
+          const page = await src.getPage(n);
+          const vp = page.getViewport({ scale });
+          const c = document.createElement('canvas');
+          c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+          const cx = c.getContext('2d');
+          await page.render({ canvasContext: cx, viewport: vp }).promise;
+          if (byPage[n]) {
+            await new Promise(res => {
+              const img = new Image();
+              img.onload = () => { cx.drawImage(img, 0, 0, c.width, c.height); res(); };
+              img.onerror = res;
+              img.src = byPage[n].dataUrl;
+            });
+          }
+          const jpeg = c.toDataURL('image/jpeg', quality);
+          const emb = await out.embedJpg(Uint8Array.from(atob(jpeg.split(',')[1]), ch => ch.charCodeAt(0)));
+          const p = out.addPage([emb.width, emb.height]);
+          p.drawImage(emb, { x: 0, y: 0, width: emb.width, height: emb.height });
+        }
+        const bytes = await out.save();
+        lastBytes = bytes;
+        if (bytes.length <= MAX_BYTES) return bytes;
+        if (t < tiers.length - 1) {
+          TOAST.show('Paper is large — re-rendering at lower quality to fit the upload limit.', 'warning', 4000);
+        }
       }
-      const jpeg = c.toDataURL('image/jpeg', 0.92);
-      const emb = await out.embedJpg(Uint8Array.from(atob(jpeg.split(',')[1]), ch => ch.charCodeAt(0)));
-      const p = out.addPage([emb.width, emb.height]);
-      p.drawImage(emb, { x: 0, y: 0, width: emb.width, height: emb.height });
+    } finally {
+      try { src.destroy(); } catch(e){}
     }
-    try { src.destroy(); } catch(e){}
-    return await out.save();
+
+    const mb = (lastBytes ? (lastBytes.length / 1048576).toFixed(1) : '8+');
+    throw new Error('This paper is too long to flatten inside the browser — the smallest copy is ' + mb +
+      ' MB, over the 8 MB upload limit. Use "Replace PDF" to upload a compressed copy instead.');
   }
 };
 
@@ -4761,6 +4846,12 @@ const USERS = {
   }
 };
 
+/* The selection set is keyed on username, not payment id, because
+   adminReviewPaymentsBatch accepts a list of usernames and the review
+   flow is deliberately one-outstanding-payment-per-student. If the
+   backend ever starts keeping multiple pending payments per student,
+   this has to become a Set of payment ids and the batch endpoint has to
+   change with it. */
 const PAYMENTS = {
   selected: new Set(), _lastIdx: null, _rows: [], _t: null,
   _sortKey: 'submittedAt', _sortDir: -1,
@@ -5149,6 +5240,25 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* While a paper is open for marking with unsaved ink, closing the tab or
+   navigating away loses every stroke with no warning. Guard the close
+   where the browser allows it; if the viewer does not expose an
+   "unsaved" flag yet, err on the side of caution and guard whenever it
+   is open in annotate mode. */
+window.addEventListener('beforeunload', e => {
+  if (!window.PDFVIEW || typeof PDFVIEW.isOpen !== 'function' || !PDFVIEW.isOpen()) return;
+  const hasUnsaved = (typeof PDFVIEW.hasUnsavedMarks === 'function')
+    ? PDFVIEW.hasUnsavedMarks()
+    : (typeof PDFVIEW.isAnnotating === 'function' ? PDFVIEW.isAnnotating() : false);
+  if (!hasUnsaved) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+/* Periodic refresh, scoped to the current view. Views not in the map do
+   not auto-refresh — studydocs, subjective and data would each do heavy
+   work every minute for no benefit, and the admin already has a manual
+   Refresh button in the top bar. */
 setInterval(() => {
   if (document.hidden || !ADMIN.creds) return;
   if (document.querySelector('.overlay.show, #palette.show') || (window.PDFVIEW && PDFVIEW.isOpen())) return;

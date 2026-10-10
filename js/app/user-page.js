@@ -1,12 +1,265 @@
-
 /* ═══════════════════════════════════════════════════════════════════════
    Abhyas — page layer.
    ═══════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
-
 const $   = id => document.getElementById(id);
 const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+
+/* ═══════════════════════════════════════════════════════════════════════
+   SESSION — one button, one 30-minute session, with a preview sheet.
+
+   Builds the right mix based on where the student is in the 60-day plan:
+     Learn (days 1–35) : reviews due → misconceptions → new material → fill
+     Drill (days 36–52): reviews due → misconceptions → weakest chapters → fill
+     Mock  (days 53–60): reviews due → mixed content from every level
+
+   Reviews and misconceptions always come first because they're the
+   questions the student is about to forget or has already got wrong.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.SESSION = {
+  COUNT: 30,
+  REVIEW_CAP_LEARN: 8,
+  REVIEW_CAP_DRILL: 12,
+  MISCONCEPTION_CAP_LEARN: 4,
+  MISCONCEPTION_CAP_DRILL: 8,
+  _pending: null,
+  _cache: { at: 0, data: null },
+
+  _phase(){
+    try {
+      const start = localStorage.getItem('abhyas_sprint_start') || '';
+      if (!start) return 'learn';
+      const exam = localStorage.getItem('abhyas_exam_date') || '';
+      const day = sprintDayNumber(start, new Date());
+      const total = sprintTotalDays(start, exam);
+      const learnEnd = Math.round(total * 35 / 60);
+      const drillEnd = Math.round(total * 52 / 60);
+      if (!day || day < 1) return 'learn';
+      if (day <= learnEnd) return 'learn';
+      if (day <= drillEnd) return 'drill';
+      return 'mock';
+    } catch(e){ return 'learn'; }
+  },
+
+  async _buildWithBreakdown(){
+    const phase = this._phase();
+    const out = [], seen = new Set();
+    const push = q => {
+      if (!q || !q.uid || seen.has(q.uid)) return false;
+      if (out.length >= this.COUNT) return false;
+      seen.add(q.uid); out.push(q); return true;
+    };
+    const breakdown = { reviews: 0, misconceptions: 0, fresh: 0, weak: 0, fill: 0 };
+
+    const due = (typeof REV !== 'undefined' && REV.dueWrong) ? REV.dueWrong() : [];
+    const dueCap = phase === 'drill' ? this.REVIEW_CAP_DRILL : this.REVIEW_CAP_LEARN;
+    for (const q of due) { if (out.length >= dueCap) break; if (push(q)) breakdown.reviews++; }
+
+    const misc = (S.wr || []).filter(q => q._misconception && !q._withdrawn);
+    const miscCap = out.length + (phase === 'drill' ? this.MISCONCEPTION_CAP_DRILL : this.MISCONCEPTION_CAP_LEARN);
+    for (const q of misc) { if (out.length >= miscCap) break; if (push(q)) breakdown.misconceptions++; }
+
+    if (phase === 'learn') {
+      const fresh = await this._fresh(this.COUNT - out.length);
+      for (const q of fresh) { if (push(q)) breakdown.fresh++; }
+    } else if (phase === 'drill') {
+      const weak = await this._weak(this.COUNT - out.length);
+      for (const q of weak) { if (push(q)) breakdown.weak++; }
+    } else {
+      const mixed = await this._randomFill(this.COUNT - out.length);
+      for (const q of mixed) { if (push(q)) breakdown.weak++; }
+    }
+
+    if (out.length < this.COUNT) {
+      const fill = await this._randomFill(this.COUNT - out.length);
+      for (const q of fill) { if (push(q)) breakdown.fill++; }
+    }
+
+    const headCount = Math.min(out.length, breakdown.reviews + breakdown.misconceptions);
+    const ordered = out.slice(0, headCount).concat(shuf(out.slice(headCount)));
+    return { qs: ordered, breakdown };
+  },
+
+  async _fresh(limit){
+    if (limit <= 0) return [];
+    const cov = S.cov || {};
+    const fcount = S.fcount || {};
+    const refs = (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : [];
+    const scored = refs.map(r => {
+      const c = cov[r.fid];
+      const total = fcount[r.fid] || 0;
+      const seen = c ? (c.a || 0) : 0;
+      return { ref: r, pct: total ? seen / total : 0, total };
+    }).filter(x => x.total > 0 && x.pct < 0.85);
+    scored.sort((a, b) => a.pct - b.pct);
+
+    const picked = [];
+    for (const s of scored) {
+      if (picked.length >= limit) break;
+      try {
+        const raw = await QUIZ._fetch(s.ref.fid, s.ref.key);
+        const qs = normQ(raw, s.ref.fid);
+        const c = cov[s.ref.fid];
+        const unseen = qs.filter(q => {
+          const parts = q.uid.split('_');
+          const idx = parseInt(parts[parts.length - 1], 10);
+          return !c || !c.p || c.p[idx] === '0';
+        });
+        const pool = shuf(unseen.length ? unseen : qs);
+        for (const q of pool) { picked.push(q); if (picked.length >= limit) break; }
+      } catch(e){}
+    }
+    return picked;
+  },
+
+  async _weak(limit){
+    if (limit <= 0) return [];
+    let entries = [];
+    try { entries = (typeof CHAPSTATS !== 'undefined') ? CHAPSTATS.entries() : []; } catch(e){}
+    const weak = entries
+      .filter(e => e.attempted >= 5 && e.accuracy < 85)
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 6);
+
+    const picked = [];
+    for (const w of weak) {
+      if (picked.length >= limit) break;
+      const refs = ChapterData.allFileRefs().filter(r =>
+        ChapterData.chapterName(r.lv, r.ch) === w.chapter
+      );
+      for (const ref of refs) {
+        if (picked.length >= limit) break;
+        try {
+          const raw = await QUIZ._fetch(ref.fid, ref.key);
+          for (const q of shuf(normQ(raw, ref.fid))) {
+            picked.push(q); if (picked.length >= limit) break;
+          }
+        } catch(e){}
+      }
+    }
+    return picked;
+  },
+
+  async _randomFill(limit){
+    if (limit <= 0) return [];
+    const refs = (typeof ChapterData !== 'undefined') ? ChapterData.allFileRefs() : [];
+    const picked = [];
+    for (const ref of shuf(refs)) {
+      if (picked.length >= limit) break;
+      try {
+        const raw = await QUIZ._fetch(ref.fid, ref.key);
+        for (const q of shuf(normQ(raw, ref.fid))) {
+          picked.push(q); if (picked.length >= limit) break;
+        }
+      } catch(e){}
+    }
+    return picked;
+  },
+
+  async start(){
+    if (S.quiz && S.quiz.active) {
+      const ok = await ASK.confirm({
+        title: 'Session already running',
+        body:  'A quiz is in progress. Start a fresh 30-minute session anyway?',
+        ok:    'Start new'
+      });
+      if (!ok) return;
+    }
+
+    const now = Date.now();
+    if (this._cache.data && now - this._cache.at < 60000) {
+      this._pending = this._cache.data.qs;
+      this._showPreview(this._cache.data.qs, this._cache.data.breakdown);
+      return;
+    }
+
+    QUIZ._showLoader('Building your session\u2026');
+    let qs = [], breakdown = { reviews: 0, misconceptions: 0, fresh: 0, weak: 0, fill: 0 };
+    try { const r = await this._buildWithBreakdown(); qs = r.qs; breakdown = r.breakdown; }
+    catch(e){ console.warn('[SESSION] build failed', e); }
+    QUIZ._hideLoader();
+
+    if (!qs.length) {
+      toast('Nothing to practice yet. Open Chapters once while online to download a set.', 6000);
+      return;
+    }
+
+    this._cache = { at: Date.now(), data: { qs, breakdown } };
+    this._pending = qs;
+    this._showPreview(qs, breakdown);
+  },
+
+  _showPreview(qs, breakdown){
+    const phase = this._phase();
+    const phaseName = phase === 'learn' ? 'Learn' : phase === 'drill' ? 'Drill' : 'Mock';
+    const phaseIcon = phase === 'learn' ? 'ph-books' : phase === 'drill' ? 'ph-target' : 'ph-note-pencil';
+    const mins = Math.max(5, Math.round(qs.length * 0.8));
+
+    const row = (icon, label, count, tone) => count > 0
+      ? '<div class="sprint-row" style="padding:var(--sp-2) var(--sp-3)">' +
+          '<i class="ph ' + icon + '" style="color:var(--' + (tone || 'ink-3') + ')"></i>' +
+          '<span class="grow"><b>' + esc(label) + '</b>' +
+            '<span class="t-cap" style="display:block;color:var(--ink-3)">' + this._describe(label) + '</span>' +
+          '</span>' +
+          '<span class="mono" style="font-weight:700;color:var(--ink)">' + count + '</span>' +
+        '</div>'
+      : '';
+
+    const rows =
+      row('ph-arrow-counter-clockwise', 'Reviews due', breakdown.reviews, 'accent') +
+      row('ph-warning-circle', 'Misconceptions', breakdown.misconceptions, 'warning') +
+      (phase === 'learn'
+        ? row('ph-sparkle', 'New material', breakdown.fresh, 'accent')
+        : row('ph-target', 'Weakest chapters', breakdown.weak, 'accent')) +
+      (breakdown.fill ? row('ph-shuffle', 'Mixed fill', breakdown.fill, 'ink-3') : '');
+
+    const body =
+      '<div class="qotd-head" style="margin-bottom:var(--sp-3)">' +
+        '<div>' +
+          '<div class="qotd-meta">' + phaseName + ' session</div>' +
+          '<div style="font-size:.9rem;font-weight:700;color:var(--ink);margin-top:.15rem">' +
+            qs.length + ' questions \u00b7 about ' + mins + ' min' +
+          '</div>' +
+        '</div>' +
+        '<div class="qotd-marks"><i class="ph ' + phaseIcon + '"></i></div>' +
+      '</div>' +
+      '<p class="t-callout" style="margin-bottom:var(--sp-3);line-height:1.55">' + this._why(phase) + '</p>' +
+      '<div class="sprint-list" style="margin-bottom:var(--sp-4)">' + rows + '</div>' +
+      '<button class="btn btn-solid btn-lg btn-blk" onclick="MODAL.close(\'sheet\');SESSION._begin()">' +
+        '<i class="ph ph-play-circle"></i> Begin session' +
+      '</button>' +
+      '<button class="btn btn-quiet btn-blk mt2" onclick="MODAL.close(\'sheet\')">Cancel</button>';
+
+    MODAL.sheet('Your 30-minute session', body, { wide: false });
+  },
+
+  _why(phase){
+    if (phase === 'learn') return 'Reviews and misconceptions first \u2014 those are the questions you\u2019re about to forget or that you\u2019ve already got wrong. Then new material from the chapters you\u2019ve covered least.';
+    if (phase === 'drill') return 'Reviews and misconceptions first, then questions from your weakest chapters. In this phase we stop adding new material and start converting what you\u2019ve seen into confident answers.';
+    return 'Reviews first, then a mixed set from every level \u2014 a simulation run so nothing feels unfamiliar on exam day.';
+  },
+
+  _describe(label){
+    if (label === 'Reviews due') return 'Ready again on their spacing schedule';
+    if (label === 'Misconceptions') return 'You were sure and got them wrong \u2014 these cost the most marks';
+    if (label === 'New material') return 'From chapters you\u2019ve covered least';
+    if (label === 'Weakest chapters') return 'Lowest accuracy so far';
+    if (label === 'Mixed fill') return 'Extra questions to reach the session length';
+    return '';
+  },
+
+  _begin(){
+    const phase = this._phase();
+    const label = phase === 'learn' ? '📚 Learn session'
+                : phase === 'drill' ? '🎯 Drill session'
+                : '📝 Mock session';
+    if (!this._pending) { toast('Session expired, tap again.'); return; }
+    const qs = this._pending;
+    this._pending = null;
+    QUIZ._doStart(qs, 'flashcard', label, false, { session: true, phase });
+  }
+};
 
 /* escAttrJs comes from shared.js (one copy) */
 
@@ -1214,13 +1467,10 @@ window.FONT = {
 
 function _renderHomeExtras(){
   try { if (typeof RECOVERY !== 'undefined') RECOVERY.render(); } catch(e){}
-  try { if (typeof MISCONCEPTIONS !== 'undefined') MISCONCEPTIONS.render(); } catch(e){}
   try { if (typeof TODAY_PLAN !== 'undefined') TODAY_PLAN.render(); } catch(e){}
   try { if (typeof TODAY_PLAN !== 'undefined') TODAY_PLAN._renderResume(); } catch(e){}
   try { if (typeof READINESS !== 'undefined') READINESS.render(); } catch(e){}
-  try { if (typeof CHAP_VERDICTS !== 'undefined') CHAP_VERDICTS.render(); } catch(e){}
   try { if (typeof PACE !== 'undefined') PACE.render(); } catch(e){}
-  try { if (typeof STREAK_INSURANCE !== 'undefined') STREAK_INSURANCE.paint(); } catch(e){}
   try { if (typeof BADGES_UI !== 'undefined') BADGES_UI.render(); } catch(e){}
   try { if (typeof WEEKLY_BOARD !== 'undefined') WEEKLY_BOARD.render(); } catch(e){}
 }
@@ -1506,7 +1756,6 @@ function _refreshHints(){
   try { if (typeof SIDEBAR   !== 'undefined') SIDEBAR.init(); } catch(e){}
   try { SB_HINTS.refresh(); } catch(e){}
   try { TRIAL_PILL.render(); } catch(e){}
-  try { EXAM_DATE.render(); } catch(e){}
   try { ANNOUNCE.load(); } catch(e){}
   try { _renderHomeExtras(); } catch(e){}
   try { HARDQ.load(); } catch(e){}
@@ -1519,8 +1768,6 @@ function _refreshHints(){
   try { if (typeof FORECAST          !== 'undefined') FORECAST.render(); } catch(e){}
   try { if (typeof SYLLABUS_PROGRESS !== 'undefined') SYLLABUS_PROGRESS.render(); } catch(e){}
 }
-
-
 
 /* ═══════════════════════════════════════════════════════════════════════
    INSIGHTS — Progress charts drawn as inline SVG (no library, no network):
@@ -1602,7 +1849,6 @@ window.INSIGHTS = {
       '<div class="t-cap" style="margin:14px 0 6px"><b>Consistency</b> \u00b7 ' + d.activeDays12w + ' study days in 12 weeks' + (d.streak ? ' \u00b7 \ud83d\udd25 ' + d.streak + '-day streak' : '') + '</div>' + this._strip(d.cells);
   }
 };
-
 
 /* ═══════════════════════════════════════════════════════════════════════
    STUDYDOCS — "Model answers & notes": PDFs the admin uploads for students.
@@ -2489,27 +2735,6 @@ window.WEEKLY_BOARD = {
 /* ═══════════════════════════════════════════════════════════════════
    STREAK_INSURANCE — surface the silent skip.
    ═══════════════════════════════════════════════════════════════════ */
-window.STREAK_INSURANCE = {
-  paint(){
-    const el = $('streak-insurance');
-    if(!el) return;
-    try{
-      const days = (S.stk && S.stk.days) || [];
-      if(days.length < 3){ el.textContent = ''; return; }
-      const set = new Set(days);
-      const pad = n => String(n).padStart(2, '0');
-      let misses = 0;
-      for(let i = 1; i <= 7; i++){
-        const d = new Date(); d.setDate(d.getDate() - i);
-        const k = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
-        if(!set.has(k)) misses++;
-      }
-      if(misses === 0) el.textContent = '1 skipped day available this week';
-      else if(misses === 1) el.textContent = 'Streak insurance used this week';
-      else el.textContent = '';
-    }catch(e){ el.textContent = ''; }
-  }
-};
 
 /* ═══════════════════════════════════════════════════════════════════
    BADGES_UI — lightweight achievements strip on Home.
@@ -2867,46 +3092,12 @@ window.FAST_GUESS = {
 };
 
 /* Exam countdown and today's question goal. Stored on this device only. */
+/* v1.36: the exam-date field lives inside the SPRINT card ("Set exam date"
+   link, which writes the same localStorage key). Only the getter is kept —
+   SPRINT and PACE read it. */
 window.EXAM_DATE = {
   KEY: 'abhyas_exam_date',
-  GOAL: 30,
-  get(){ try { return localStorage.getItem(this.KEY) || ''; } catch(e){ return ''; } },
-  edit(){
-    openMod('Your exam date',
-      '<div class="sf"><label for="ex-date">Exam date</label><input type="date" id="ex-date" value="' + esc(this.get()) + '"></div>' +
-      '<button class="btn btn-solid btn-blk" type="button" onclick="EXAM_DATE.save()">Save</button>' +
-      '<button class="btn btn-quiet btn-blk mt2" type="button" onclick="EXAM_DATE.clear()">Remove the date</button>');
-  },
-  save(){
-    const el = $('ex-date');
-    const v = el ? el.value : '';
-    if (!v) { toast('Pick a date first.'); return; }
-    try { localStorage.setItem(this.KEY, v); } catch(e){}
-    closeMod(); this.render();
-  },
-  clear(){
-    try { localStorage.removeItem(this.KEY); } catch(e){}
-    closeMod(); this.render();
-  },
-  render(){
-    const body = $('exam-card-body'), btn = $('exam-date-edit');
-    if (!body) return;
-    const v = this.get();
-    if (!v) { body.textContent = 'Set your exam date to see a countdown and how much to do each day.'; if (btn) btn.textContent = 'Set date'; return; }
-    const p = v.split('-').map(Number);
-    const target = new Date(p[0], p[1] - 1, p[2]).getTime();
-    const t0 = new Date(); t0.setHours(0, 0, 0, 0);
-    const days = Math.round((target - t0.getTime()) / 86400000);
-    let doneToday = 0;
-    ((S.prog && S.prog.sessions) || []).forEach(s => { if ((s.at || 0) >= t0.getTime()) doneToday += (s.total || 0); });
-    if (btn) btn.textContent = 'Change';
-    if (days < 0) { body.textContent = 'That exam date has passed. Set a new one, or remove it.'; return; }
-    body.innerHTML =
-      '<div style="display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap">' +
-        '<span class="mono" style="font-size:var(--fs-num-lg);font-weight:700;color:var(--ink)">' + (days === 0 ? 'Today' : days + (days === 1 ? ' day' : ' days')) + '</span>' +
-        '<span>' + (days === 0 ? 'Good luck!' : 'to go') + '</span></div>' +
-      '<div class="t-foot" style="margin-top:.3rem">Today: ' + doneToday + ' of ' + this.GOAL + ' questions' + (doneToday >= this.GOAL ? ' (goal reached)' : '') + '</div>';
-  }
+  get(){ try { return localStorage.getItem(this.KEY) || ''; } catch(e){ return ''; } }
 };
 
 /* Trial time left, visible on every screen, with a one-tap route to payment. */
@@ -4670,7 +4861,6 @@ window.SERVER_PROG = SERVER_PROG;
   window.addEventListener('offline', paint);
 })();
 
-
 /* ═══════════════════════════════════════════════════════════════════════
    HOURLY — one written question + one 50-question sprint, every hour.
 
@@ -5417,7 +5607,6 @@ window.HOURLY = {
   }
 };
 
-
 /* ══ HOURLY wiring ══════════════════════════════════════════════════ */
 (function(){
   // Route UI.go('hourly') into HOURLY.mount(); tear the timers down on every other screen.
@@ -5490,7 +5679,6 @@ window.HOURLY = {
 })();
 
 })();
-
 
 /* ═══════════════════════════════════════════════════════════════════════
    PERF — v1.32. Must stay the LAST thing in the last script.

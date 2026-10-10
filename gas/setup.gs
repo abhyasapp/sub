@@ -1,12 +1,23 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   setup.gs — Run-once setup helpers for Abhyas V1  (v1.11)
+   setup.gs — Setup and scheduled helpers for Abhyas V1  (v1.11)
 
-   These functions are only invoked manually from the Apps Script
-   editor (Run → setup). They are NOT reachable from any doGet/doPost
-   endpoint. They still need SpreadsheetApp/DriveApp/ScriptApp, which
-   is why they live in the project rather than client-side.
+   ── What this file contains ──
+   Most functions here are run-once setup helpers, invoked manually from
+   the Apps Script editor (Run → setup). They are NOT reachable from any
+   doGet/doPost endpoint.
 
-   To run: open the editor, choose setup from the function dropdown,
+   ONE function — warmContainer() — is different. It is installed as a
+   5-minute trigger by ensurePushTriggers_() and is invoked by the Apps
+   Script scheduler, not by a person. Do NOT delete this file: the warm
+   trigger would fail every five minutes and the Apps Script container
+   would go cold again between real requests. If you want to remove the
+   warm trigger, remove it from ensurePushTriggers_() first, then run
+   setup() once more so the trigger is cleaned up.
+
+   They still need SpreadsheetApp/DriveApp/ScriptApp, which is why they
+   live in the project rather than client-side.
+
+   To run setup: open the editor, choose setup from the function dropdown,
    click Run. Safe to re-run — every operation is idempotent.
 
    v1.11:
@@ -190,7 +201,12 @@ function ensurePushTriggers_() {
 }
 /* v1.36: keep the Apps Script container warm so the first real request
    after a quiet period doesn't pay the 1-3 s cold start. Runs every
-   5 minutes. The function body is a no-op — invoking it is enough. */
+   5 minutes. The function body is a no-op — invoking it is enough.
+
+   NOTE: unlike the run-once helpers at the top of this file, this
+   function IS reachable from outside — the Apps Script scheduler calls
+   it. Do not delete this file without first removing the trigger in
+   ensurePushTriggers_() above, or cold starts come back. */
 function warmContainer() {
   try {
     /* Touch a cheap, dependency-free read. This wakes the container. */
