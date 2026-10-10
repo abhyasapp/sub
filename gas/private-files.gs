@@ -401,7 +401,7 @@ function makeContentFilesPrivate() {
     try { makePrivate(DriveApp.getFileById(id)); }
     catch (e) { failed++; console.error(id + ': ' + e); }
   });
-  ['WeeklySets', 'SubjectiveQuestions'].forEach(name => {
+  ['WeeklySets', 'SubjectiveQuestions', 'StudyDocs'].forEach(name => {
     const it = DriveApp.getFoldersByName(name);
     while (it.hasNext()) {
       const files = it.next().getFiles();

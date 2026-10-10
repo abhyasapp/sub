@@ -267,8 +267,11 @@ function applyTheme(dark){
   document.documentElement.classList.toggle('dark', dark);
   document.body.classList.remove('dark');
   try { localStorage.setItem('abhyas_theme', JSON.stringify(dark ? 'dark' : 'light')); } catch(e){}
-  const m = document.querySelector('meta[name="theme-color"]');
-  if (m) m.setAttribute('content', dark ? '#080B14' : '#F2F4F3');
+  /* Both theme-color metas must move together — the browser picks whichever
+     matches the OS preference. querySelector only returns the first, so a
+     dark-OS device that switches to light keeps a dark status bar. */
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m =>
+    m.setAttribute('content', dark ? '#080B14' : '#F2F4F3'));
 }
 if (typeof UI !== 'undefined') {
   UI.theme = function(){ applyTheme(!document.documentElement.classList.contains('dark')); };
@@ -1025,8 +1028,6 @@ UI.onEnter('subj-mine', () => { if (typeof MY_SUBJ !== 'undefined') MY_SUBJ.load
   if (view === 'subj-list') setTimeout(_populateChapterFilter, 80);
 }));
 
-UI.onEnter('server-progress', () => { if (typeof SERVER_PROG !== 'undefined') SERVER_PROG.load(false); });
-UI.onEnter('heatmap',         () => { if (typeof HEATMAP !== 'undefined') HEATMAP.render(); });
 UI.onEnter('progress',        () => { if (typeof CLOUD_UI !== 'undefined' && CLOUD_UI.render) setTimeout(CLOUD_UI.render, 0); });
 ['home', 'progress'].forEach(view => UI.onEnter(view, () => { if (typeof APP_SWITCH !== 'undefined') APP_SWITCH.refresh(); }));
 
@@ -5706,4 +5707,81 @@ window.HOURLY = {
       }
     });
   } catch (e) { console.error('perf coalescing skipped:', e); }
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PROGRESS TABS — self-contained switcher.
+
+   The tab bar's onclick calls PROG.tab() in app.js. When PROG.tab does not
+   switch panels, or switches them but does not render their contents, the
+   tabs feel dead. HEATMAP and SERVER_PROG both live in this file, so the
+   wiring belongs here too.
+
+   Runs alongside PROG.tab: its own behaviour still runs first, this is
+   idempotent on top of it.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function progressTabs(){
+  const TABS = ['accuracy', 'heatmap', 'coverage'];
+  const bar  = document.getElementById('prog-tabs');
+  if (!bar) return;
+
+  function show(name){
+    if (TABS.indexOf(name) === -1) name = 'accuracy';
+
+    /* 1. Buttons */
+    bar.querySelectorAll('button').forEach(b => {
+      const on = b.dataset.tab === name;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+
+    /* 2. Panels */
+    TABS.forEach(t => {
+      const el = document.getElementById('prog-tab-' + t);
+      if (el) el.hidden = (t !== name);
+    });
+
+    /* 3. Paint the visible panel's content */
+    try {
+      if (name === 'heatmap'  && typeof HEATMAP !== 'undefined')      HEATMAP.render();
+      if (name === 'coverage' && typeof SERVER_PROG !== 'undefined')  SERVER_PROG.load(false);
+      if (name === 'accuracy') {
+        if (typeof PROG !== 'undefined' && typeof PROG.render === 'function') PROG.render();
+        if (typeof INSIGHTS !== 'undefined') INSIGHTS.render();
+      }
+    } catch (e) { console.warn('[progress tabs] render failed:', e); }
+  }
+
+  bar.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => setTimeout(() => show(btn.dataset.tab), 0));
+  });
+
+  try {
+    if (typeof PROG !== 'undefined' && typeof PROG.tab === 'function' && !PROG.tab.__wired) {
+      const orig = PROG.tab.bind(PROG);
+      PROG.tab = function(name){
+        const r = orig(name);
+        try { setTimeout(() => show(name), 0); } catch (e) {}
+        return r;
+      };
+      PROG.tab.__wired = true;
+    }
+  } catch (e) {}
+
+  if (typeof UI !== 'undefined' && typeof UI.onEnter === 'function') {
+    UI.onEnter('progress', () => {
+      setTimeout(() => {
+        const active = bar.querySelector('button.active');
+        show((active && active.dataset.tab) || 'accuracy');
+      }, 80);
+    });
+  }
+
+  let tries = 0;
+  (function settle(){
+    const ready = typeof HEATMAP !== 'undefined' && typeof SERVER_PROG !== 'undefined';
+    if (!ready && ++tries < 20) return setTimeout(settle, 250);
+    const active = bar.querySelector('button.active');
+    show((active && active.dataset.tab) || 'accuracy');
+  })();
 })();

@@ -1094,6 +1094,10 @@
     openSubmission: openSubmission,
     isOpen: function () { return !!(root && root.classList.contains('on')); },
     isDirty: function () { return !!(S && S.dirty); },
+    /* True only while an annotate session has unsaved ink. Used by
+       admin.html's beforeunload guard so an admin who has just red-penned
+       a paper cannot lose it by closing the tab. */
+    hasUnsavedMarks: function () { return !!(S && S.ann && S.dirty); },
     setTool: setTool, setColor: setColor, setWidth: setWidth,
     undo: undo, redo: redo, clearPage: clearPage,
     save: function () { return save(false); }

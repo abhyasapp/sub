@@ -127,7 +127,11 @@ function fetchFresh(reason){
   _lastFresh = Date.now();
   _inFlight = true;
 
-  fetch(urlWithBust(), { cache: 'no-store' })
+  /* A hung fetch must not leave _inFlight true for the rest of the
+     session — that silently disables every future refresh. */
+  const _abortCtl = ('AbortController' in window) ? new AbortController() : null;
+  const _abortTo  = _abortCtl ? setTimeout(() => _abortCtl.abort(), 15000) : null;
+  fetch(urlWithBust(), { cache: 'no-store', signal: _abortCtl && _abortCtl.signal })
     .then(r => r.ok ? r.text() : null)
     .then(src => {
       if(!src) return;
@@ -136,6 +140,7 @@ function fetchFresh(reason){
         return;
       }
       if(!writeCache(src)) return;
+      if(cache) cache.source = src;
       try{
         window.dispatchEvent(new CustomEvent('abhyas:chapters-updated', {
           detail: { reason: reason || 'background' }
@@ -146,7 +151,10 @@ function fetchFresh(reason){
       }catch(e){}
     })
     .catch(() => {})
-    .finally(() => { _inFlight = false; });
+    .finally(() => {
+      if(_abortTo) clearTimeout(_abortTo);
+      _inFlight = false;
+    });
 }
 
 setTimeout(() => fetchFresh('boot'), 2000);
