@@ -13,4 +13,4 @@ jobs:
         with:
           node-version: 20
       - name: Run checks
-        run: node tests/check.js
+        run: node tests/check.js && node tests/download.test.js

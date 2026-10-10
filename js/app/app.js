@@ -2428,6 +2428,22 @@ const CACHE = {
     return CACHE.dl(picked);
   },
 
+  /* Speed of the offline download (v1.34).
+     Apps Script answers one request in about 1-4 s, so asking for one file at a time wastes most of the wait.
+     The download therefore asks for BATCH_SIZE files per request (server action getFiles, at most 8) and keeps
+     BATCH_WORKERS such requests going at once. Requests are still paced by GETFILE_GATE (45 a minute), and the server
+     also limits each student to 360 files a minute. If the server is an older version without getFiles, the download
+     falls back to one file per request with CONCURRENCY requests at once. Fewer workers on data saver or a 2G line. */
+  CONCURRENCY: 4,
+  BATCH_SIZE: 6,
+  BATCH_WORKERS: 3,
+  _noBatch: false,
+  _poolSize(){
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if(c && (c.saveData || /^(slow-2g|2g)$/i.test(c.effectiveType||''))) return 2;
+    return CACHE._noBatch ? CACHE.CONCURRENCY : CACHE.BATCH_WORKERS;
+  },
+
   async dl(groups){
     const only = Array.isArray(groups) && groups.length ? new Set(groups) : null;
     const refs = ChapterData.allFileRefs().filter(r => !only || only.has(r.lv));
@@ -2437,11 +2453,11 @@ const CACHE = {
     const pf = document.getElementById('cpf');
     const txt = document.getElementById('cptxt');
     if(pb) pb.style.display = '';
-    let done = 0, failed = 0;
+    let done = 0, failed = 0, fetched = 0, fatal = '', rlStreak = 0;
     const startedAt = Date.now();
     const etaText = () => {
-      if(done < 3) return '';
-      const perFile = (Date.now() - startedAt) / done;
+      if(fetched < 3) return '';
+      const perFile = (Date.now() - startedAt) / fetched;      /* wall-clock per file, so it already reflects the parallelism */
       const leftSec = Math.round((refs.length - done) * perFile / 1000);
       if(leftSec < 45) return ' · under a minute left';
       return ` · about ${Math.ceil(leftSec/60)} min left`;
@@ -2449,31 +2465,103 @@ const CACHE = {
     if(CACHE._running){ toast('A download is already running'); return; }
     CACHE._running = true; CACHE._paused = false; CACHE._stop = false;
     CACHE._ctl(true);
-    let stopped = false;
-    for(const ref of refs){
-      while((CACHE._paused || !S.online || S.forcedOffline) && !CACHE._stop){
-        if(txt && !CACHE._paused) txt.textContent = `Waiting for your connection… ${done} of ${refs.length} saved so far`;
-        await new Promise(r=>setTimeout(r,500));
-      }
-      if(CACHE._stop){ stopped = true; break; }
-      if(txt) txt.textContent = `Downloading ${done+1} of ${refs.length}${etaText()}`;
+    const paint = () => {
+      if(txt) txt.textContent = `Downloading ${Math.min(done+1, refs.length)} of ${refs.length}${etaText()}`;
       if(pf) pf.style.width = `${(done/refs.length)*100}%`;
+    };
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    /* errors that every remaining file would hit too: stop at once instead of failing each one */
+    const isFatal = m => /session expired|access has ended/i.test(m || '');
+    const isValid = v => !!v && !(typeof v === 'object' && !Array.isArray(v) && v.success === false);
+    const queue = refs.slice();
+
+    /* one file by itself, with one retry (this is also the path used when a batch could not deliver a file) */
+    const single = async ref => {
       try{
         await QUIZ._fetch(ref.fid, ref.key);
+        fetched++;
       }catch(err){
-        failed++;
+        if(isFatal(err && err.message)){ fatal = err.message; failed++; CACHE._stop = true; done++; paint(); return; }
         if(txt) txt.textContent = `Retrying ${ref.subtopic || ref.name}…`;
         try{
-          await new Promise(r=>setTimeout(r,2000));
+          await sleep(2000);
           await QUIZ._fetch(ref.fid, ref.key);
-          failed--;
-        }catch{}
+          fetched++;
+        }catch(err2){
+          failed++;
+          if(isFatal(err2 && err2.message)){ fatal = err2.message; CACHE._stop = true; }
+        }
       }
       done++;
-      if(pf) pf.style.width = `${(done/refs.length)*100}%`;
-    }
+      paint();
+    };
+    const singles = async list => { for(const ref of list){ if(CACHE._stop) return; await single(ref); } };
+
+    /* up to `size` files that are not saved yet; files already on the device are counted without any request */
+    const nextBatch = async size => {
+      const batch = [];
+      while(batch.length < size && queue.length){
+        const ref = queue.shift();
+        if(isValid(await QDB.get(ref.key))){ done++; paint(); continue; }
+        batch.push(ref);
+      }
+      return batch;
+    };
+
+    const worker = async () => {
+      for(;;){
+        while((CACHE._paused || !S.online || S.forcedOffline) && !CACHE._stop){
+          if(txt && !CACHE._paused) txt.textContent = `Waiting for your connection… ${done} of ${refs.length} saved so far`;
+          await sleep(500);
+        }
+        if(CACHE._stop) return;
+        const batch = await nextBatch(CACHE._noBatch ? 1 : CACHE.BATCH_SIZE);
+        if(!batch.length){ if(queue.length) continue; return; }
+        paint();
+        if(batch.length === 1){ await single(batch[0]); continue; }
+
+        let res;
+        try{
+          res = await QUIZ._fetchBatch(batch);
+        }catch(err){
+          if(isFatal(err && err.message)){
+            fatal = err.message; CACHE._stop = true;
+            failed += batch.length; done += batch.length; paint();
+            return;
+          }
+          await singles(batch);            /* network trouble: the one-by-one path retries and waits properly */
+          continue;
+        }
+        if(res.unsupported){ CACHE._noBatch = true; await singles(batch); continue; }
+        if(res.rateLimited){
+          if(++rlStreak > 6){ failed += batch.length; done += batch.length; paint(); continue; }
+          queue.unshift(...batch);
+          if(txt) txt.textContent = `Server is busy — waiting ${res.waitSec}s…`;
+          await sleep(res.waitSec * 1000);
+          continue;
+        }
+        rlStreak = 0;
+        done += res.saved.length; fetched += res.saved.length;
+        if(res.deferred.length) queue.unshift(...res.deferred);   /* left out by the server to keep its answer small */
+        paint();
+        for(const f of res.failed){
+          if(CACHE._stop) break;
+          if(f.storageFull){ failed++; done++; paint(); continue; }
+          await single(f.ref);
+        }
+      }
+    };
+    paint();
+    await Promise.all(Array.from({length: Math.min(CACHE._poolSize(), refs.length)}, worker));
+    const stopped = CACHE._stop && done < refs.length;
     CACHE._running = false; CACHE._paused = false; CACHE._ctl(false);
     const ok = done - failed;
+    if(fatal){
+      if(txt) txt.textContent = `${fatal} ${ok} of ${refs.length} saved.`;
+      toast(`Download stopped — ${fatal}`, 6000);
+      CACHE.render();
+      return;
+    }
     if(stopped){
       if(txt) txt.textContent = `Stopped. ${ok} of ${refs.length} saved. Tap download again to continue where you left off.`;
       toast(`Download stopped — ${ok} of ${refs.length} saved`);

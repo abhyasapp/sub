@@ -192,7 +192,7 @@ v1.26   Sidebar simplified: search / heatmap / share / export moved to the
 v1.25   Loksewa paper 75 questions at 60-minute timer, focus mode removed,
         sidebar trimmed under More tools, Daily 10 auto-hides, practice resume
 v1.24   Daily 10, study calendar, chapter forecast, weekly digest, hardest-20
-        drill, syllabus progress, daily 75-mark Loksewa paper (25 GK + 50 L7),
+        drill, syllabus progress, daily 75-mark Loksewa paper (25 GK + 50 L7 split by topic: Survey 7, Materials 6, Geotech 6, Construction Mgmt 6, Structural 5, Concrete 5, Estimating 5, Drawing 4, Economics 3, Professional Practices 3),
         compact sidebar with More tools
 v1.23   Note shown only after the question is answered; weakest-question
         flag, note sync, "practice 5 more like this", question history,

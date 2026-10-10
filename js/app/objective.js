@@ -833,6 +833,57 @@ const QUIZ = {
       throw err;
     }
   },
+  /* v1.34: fetch several question files in ONE request (action getFiles) and save each one. Used by the offline
+     download. refs = [{fid, key}]. Returns:
+       { unsupported:true }              the server is the older version without getFiles (caller falls back to _fetch)
+       { rateLimited:true, waitSec }     server asked us to slow down; nothing was saved, try the same refs again later
+       { saved:[ref], failed:[{ref,error}], deferred:[ref] }   deferred = the server left them out to keep the answer small
+     Throws for an expired session or ended access (every file would fail the same way) and for network errors. */
+  async _fetchBatch(refs){
+    if(!S.online || S.forcedOffline) throw new Error('You are offline.');
+    if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take('fg');
+    const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
+    const r = await netFetch(`${APPS}?${qs({action:'getFiles', fileIds: refs.map(x => x.fid).join(','), ...auth})}`, {redirect:'follow'}, 60000);
+    const text = await r.text();
+    if(text.trim().startsWith('<')){
+      throw new Error('Server returned an HTML page instead of JSON — the Apps Script may be down or requires re-authorisation.');
+    }
+    let data;
+    try{ data = JSON.parse(text); }
+    catch(pe){ throw new Error('Could not parse server response. The server returned an unexpected format.'); }
+    if(!data || typeof data !== 'object') throw new Error('Server returned an unexpected answer.');
+    if(data.rateLimited){
+      const waitSec = Math.min(20, Math.max(3, Number(data.retryAfterSec) || 6));
+      if(typeof GETFILE_GATE !== 'undefined') GETFILE_GATE.backoff(waitSec * 1000 + 500);
+      return { rateLimited:true, waitSec };
+    }
+    if(data.sessionInvalid) throw new Error('Your session expired. Sign out and sign in again to keep studying.');
+    if(data.needsPayment) throw new Error('Your access has ended. Complete the payment to open new chapters — anything already downloaded still works offline.');
+    if(data.success === false && /^unknown action/i.test(String(data.error || ''))) return { unsupported:true };
+    if(data.success !== true || !data.files || typeof data.files !== 'object'){
+      throw new Error(data.error || 'Server returned an error for these files.');
+    }
+    const out = { saved:[], failed:[], deferred:[] };
+    const later = new Set(Array.isArray(data.deferred) ? data.deferred : []);
+    for(const ref of refs){
+      if(later.has(ref.fid)){ out.deferred.push(ref); continue; }
+      const e = data.files[ref.fid];
+      if(!e){ out.failed.push({ ref, error:'The server did not return this file.' }); continue; }
+      if(e.success !== true){ out.failed.push({ ref, error: e.error || 'Server returned an error for this file.' }); continue; }
+      let v = e.result;
+      if(v === undefined || v === null || (typeof v === 'object' && !Array.isArray(v) && v.success === false)){
+        out.failed.push({ ref, error:'The file is empty or not valid.' }); continue;
+      }
+      const ok = await QDB.set(ref.key, v);
+      if(!ok && !QUIZ._cacheWarned){
+        QUIZ._cacheWarned = true;
+        toast('⚠️ Device storage is full — quizzes still work, but new sets won\'t be saved for offline use. Clear some cached sets from the Offline Cache tab to free space.', 6000);
+      }
+      if(ok) out.saved.push(ref);
+      else out.failed.push({ ref, error:'Device storage is full.', storageFull:true });
+    }
+    return out;
+  },
   _reval: {},
   _maybeRevalidate(fileId, cacheKey){
     try{

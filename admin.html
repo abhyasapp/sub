@@ -1298,7 +1298,7 @@ button,a,label,summary,input[type=checkbox],input[type=radio]{touch-action:manip
           </div>
           <div class="flex g2 mt4 wrap">
             <button class="btn btn-primary" id="lks-save" data-perm="settings_manage" onclick="LKS_ADMIN.save()"><i class="ph ph-check"></i> Save mark scheme</button>
-            <button class="btn btn-quiet" data-perm="settings_manage" onclick="LKS_ADMIN.useDefault()">Go back to the default (25 + 50)</button>
+            <button class="btn btn-quiet" data-perm="settings_manage" onclick="LKS_ADMIN.useDefault()">Go back to the default (topic-wise)</button>
           </div>
         </div>
 </section>
@@ -1389,10 +1389,7 @@ const $$ = sel => Array.from(document.querySelectorAll(sel));
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
-function escAttrJs(s){
-  const js = String(s == null ? '' : s).replace(/[\\'"]/g, c => '\\' + c);
-  return js.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+/* escAttrJs comes from shared.js (one copy) */
 function driveFileId(u){
   const s = String(u == null ? '' : u).trim();
   if (!s) return '';
@@ -4250,7 +4247,7 @@ const LKS_ADMIN = {
     await this._store(JSON.stringify(scheme), 'Mark scheme saved. Students get it the next time they open the app online.');
   },
   async useDefault(){
-    const ok = await CONFIRM.ask({ title: 'Go back to the default?', body: 'The daily paper returns to 25 General Knowledge + 50 Level 7 Civil Engineering.', confirmText: 'Use the default' });
+    const ok = await CONFIRM.ask({ title: 'Go back to the default?', body: 'The daily paper returns to the built-in split: 25 General Knowledge + the 50 Level 7 marks by topic (Engineering Survey 7, Construction Materials 6, Geotechnical 6, Construction Management 6, Structural Analysis 5, Concrete Technology 5, Estimating and Costing 5, Engineering Drawing 4, Engineering Economics 3, Professional Practices 3).', confirmText: 'Use the default' });
     if (!ok) return;
     await this._store('', 'Back to the default scheme.');
     this.load('');

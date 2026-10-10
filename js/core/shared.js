@@ -38,13 +38,10 @@
  * syntax error, not an injection vector, but it breaks the page.
  */
 function escAttrJs(s) {
-  return String(s == null ? '' : s).replace(/[\\'"<>]/g, c => ({
-    '\\': '\\\\',
-    "'": "\\'",
-    '"': '&quot;',
-    '<': '&lt;',
-    '>': '&gt;'
-  }[c]));
+  /* 1) escape for a single-quoted JS string, 2) HTML-escape everything, because the browser decodes the attribute
+     BEFORE running the handler (so an unescaped &#39; would turn back into a quote and end the string). */
+  const js = String(s == null ? '' : s).replace(/[\\'"]/g, c => '\\' + c);
+  return js.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 /**
@@ -1081,8 +1078,8 @@ function reportSection(scope, mode, where) {
 
    The daily paper is built from a SCHEME the admin sets from the PSC syllabus: groups, the
    marks each group carries, and which chapters feed it. The app never invents weights.
-   Until an admin sets one, the paper is 25 General Knowledge + 50 Level 7 Civil Engineering,
-   drawn evenly across chapters.
+   Until an admin sets one, the paper is 25 General Knowledge + the 50 Level 7 marks split by topic
+   (LEVEL7_TOPIC_MARKS), or, when no chapter is loaded, 25 + 50 drawn evenly across chapters.
    ═══════════════════════════════════════════════════════════════════════ */
 const LOKSEWA_NEGATIVE = 0.2;
 
@@ -1090,7 +1087,68 @@ function isLoksewaFormat(scope) {
   return !!(scope && (scope.weeklyId || scope.loksewaMock || scope.hourlySprint));
 }
 
+/* The 50 Level 7 marks, topic by topic (the syllabus table: Engineering Survey 7 ... Professional Practices 3).
+   `match` finds a loaded chapter by its NAME (the real chapter ids come from Drive, so ids cannot be fixed here).
+   `rank` is the order names are tried in when a name could fit two topics ("Reinforced Concrete" -> Concrete
+   Technology, not Structural Analysis). */
+const LEVEL7_TOPIC_MARKS = [
+  { name: 'Engineering Survey',       marks: 7, rank: 6, match: /survey/ },
+  { name: 'Construction Materials',   marks: 6, rank: 3, match: /construction material|building material/ },
+  { name: 'Geotechnical Engineering', marks: 6, rank: 5, match: /geotech|soil/ },
+  { name: 'Construction Management',  marks: 6, rank: 4, match: /construction manag|project manag/ },
+  { name: 'Structural Analysis',      marks: 5, rank: 10, match: /structur/ },
+  { name: 'Concrete Technology',      marks: 5, rank: 1, match: /concrete/ },
+  { name: 'Estimating and Costing',   marks: 5, rank: 2, match: /estimat|costing/ },
+  { name: 'Engineering Drawing',      marks: 4, rank: 7, match: /drawing|drafting/ },
+  { name: 'Engineering Economics',    marks: 3, rank: 8, match: /economic/ },
+  { name: 'Professional Practices',   marks: 3, rank: 9, match: /professional/ }
+];
+
+/* chapters: [{ id, name }] of Level 7 -> the default scheme with the 50 marks split by topic (GK stays 25), or null
+   when no chapter name fits any topic. A topic with no matching chapter loses its group; its marks go to an
+   "Other Level 7 chapters" group when there are chapters no topic claimed, otherwise the paper is that much shorter. */
+function loksewaTopicScheme(chapters) {
+  const ident = v => /^[A-Za-z0-9_.-]{1,40}$/.test(String(v));
+  const list = (Array.isArray(chapters) ? chapters : []).filter(c => c && ident(c.id));
+  if (!list.length) return null;
+  const norm = t => ' ' + String(t == null ? '' : t).toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  const order = LEVEL7_TOPIC_MARKS.map((t, i) => i).sort((a, b) => LEVEL7_TOPIC_MARKS[a].rank - LEVEL7_TOPIC_MARKS[b].rank);
+  const owner = {};
+  list.forEach(c => {
+    const n = norm(c.name || c.id);
+    for (const i of order) if (LEVEL7_TOPIC_MARKS[i].match.test(n)) { owner[c.id] = i; break; }
+  });
+  const hit = new Set(Object.keys(owner).map(k => owner[k]));
+  if (!hit.size) return null;
+  const groups = [{ key: 'g0', name: 'General Knowledge', marks: 25, level: 'gk', chapters: [] }];
+  let spare = 0;
+  LEVEL7_TOPIC_MARKS.forEach((t, i) => {
+    if (!hit.has(i)) { spare += t.marks; return; }
+    groups.push({ key: 'g' + groups.length, name: t.name, marks: t.marks, level: 'level7',
+      chapters: list.filter(c => owner[c.id] === i).map(c => String(c.id)) });
+  });
+  if (spare && list.some(c => owner[c.id] === undefined)) {
+    groups.push({ key: 'g' + groups.length, name: 'Other Level 7 chapters', marks: spare, level: 'level7', chapters: [] });
+  }
+  const total = groups.reduce((n, g) => n + g.marks, 0);
+  return { version: 1, isDefault: true, topicBased: true, total, groups };
+}
+
 function defaultLoksewaScheme() {
+  /* Level 7 chapters that are loaded right now (student page and admin console). Nothing loaded -> the plain split. */
+  try {
+    if (typeof ChapterData !== 'undefined' && ChapterData && typeof ChapterData.allFileRefs === 'function') {
+      const seen = {}, chs = [];
+      ChapterData.allFileRefs().forEach(r => {
+        if (r.lv !== 'level7' || seen[r.ch]) return;
+        seen[r.ch] = 1;
+        let name = ''; try { name = ChapterData.chapterName(r.lv, r.ch) || ''; } catch (e) {}
+        chs.push({ id: r.ch, name: name || r.chName || r.ch });
+      });
+      const t = loksewaTopicScheme(chs);
+      if (t) return t;
+    }
+  } catch (e) {}
   return { version: 1, isDefault: true, total: 75, groups: [
     { key: 'g0', name: 'General Knowledge', marks: 25, level: 'gk', chapters: [] },
     { key: 'g1', name: 'Level 7 Civil Engineering', marks: 50, level: 'level7', chapters: [] }

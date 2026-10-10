@@ -1,3 +1,59 @@
+# v1.35 changes
+
+## Daily paper: topic-wise marks by default
+- The daily 75-mark paper (and the results breakdown for it) now uses this split of the 50 Level 7 marks until an admin saves
+  their own scheme: Engineering Survey 7, Construction Materials 6, Geotechnical Engineering 6, Construction Management 6,
+  Structural Analysis 5, Concrete Technology 5, Estimating and Costing 5, Engineering Drawing 4, Engineering Economics 3,
+  Professional Practices 3. General Knowledge stays 25.
+- Level 7 chapters are matched to topics **by name** (the real chapter ids come from Drive). Matching ignores case and "&" vs
+  "and"; a name that could fit two topics goes to the more specific one (e.g. "Reinforced Concrete" -> Concrete Technology).
+- A topic with no matching chapter is left out; its marks go to an "Other Level 7 chapters" group if some chapters match no
+  topic, otherwise the paper is shorter rather than inventing questions. If no chapter name fits any topic, or nothing is loaded
+  yet, the old plain 25 + 50 split is used.
+- A scheme an admin saved in Settings still wins. "Go back to the default" in the admin editor now returns to this topic table.
+- Server: only the version number in gas/code.gs changed (1.34 -> 1.35, the project keeps them equal). If v1.34's gas/code.gs is
+  already deployed, this change needs only the website files.
+
+# v1.34 changes
+
+## Faster offline download (Offline Cache tab)
+- **Before:** one file at a time, each waiting for a full Apps Script round trip.
+- **Now:** 6 files per request (new `getFiles` action in gas/code.gs, at most 8) with 3 requests going at once. Requests are
+  still paced by the existing 45-a-minute client gate; the server also limits each student to 360 files a minute and counts a
+  batch as one request. The server stops adding files once an answer passes about 8 MB and returns the rest as `deferred`;
+  the app asks for those again, so nothing is lost.
+- Files already on the device are skipped with no request (before, each one triggered a background re-check that used up the
+  request budget).
+- An expired session or ended access now stops the download at once with the real reason (before, every remaining file failed
+  and retried).
+- A file the device cannot store (storage full) is counted as failed, not as saved.
+- **Safe to deploy in any order.** With the old server the app notices `getFiles` is unknown and falls back to one file per
+  request (4 at once). The batch speed-up needs the new gas/code.gs.
+- Pause, Stop, "waiting for your connection", the per-file retry and the group picker work as before.
+- Speed depends on how fast Apps Script answers; the real gain should be measured on a live deployment.
+
+## Security hygiene
+- `escAttrJs` existed in three different versions. The one in shared.js did not escape `&`, so a text value such as
+  `&#39;);alert(1);//` could end the JS string inside an onclick attribute. admin.html and user-page.js each replaced it with a
+  safe copy, so nothing was exploitable today, but any page using shared.js alone would have been. There is now one safe copy in
+  shared.js, the two overrides are removed, and tests check the round trip.
+
+## Tests
+- New tests/download.test.js (31 checks) runs the real client download code against the real server code (Drive, cache and login
+  mocked): batching, skipping saved files, the old-server fallback, deferred files, a blocked file, expired session, ended
+  access, Stop and resume, "server busy", and the server rules (duplicates, limits, bad ids, per-file errors). `npm test`
+  and the GitHub workflow run it. tests/check.js has 5 more checks for escAttrJs. Total: 565 + 31.
+
+## Deploy
+1. Paste the new gas/code.gs into Apps Script and create a **New deployment version**.
+2. Publish the static files; the service worker cache refreshes because APP_VERSION changed to 1.34.
+
+## Not changed (still recommended)
+- CSP still allows 'unsafe-inline' (about 400 inline onclick handlers); moving them to listeners is a large change that needs
+  browser testing of every screen.
+- Password hashing is salted SHA-256, not iterated. An upgrade must keep admin and user rows of the same person identical.
+- chapters-loader.js ships a Google API key: restrict it to your domain and the Drive API in Google Cloud Console (only you can do this).
+
 # v1.33 changes
 
 ## Exams

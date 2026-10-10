@@ -77,6 +77,15 @@
           copy protection, live Loksewa negative-marking score in the
           exam bar, boot error boundary, search inside Saved/Flagged/
           Missed lists, faster progress flush, weekly admin summary. */
+/* 1.35 - the daily 75-mark paper now defaults to the syllabus topic table: 25 GK + the 50 Level 7 marks split as
+          Engineering Survey 7, Construction Materials 6, Geotechnical 6, Construction Management 6, Structural
+          Analysis 5, Concrete Technology 5, Estimating and Costing 5, Engineering Drawing 4, Engineering Economics 3,
+          Professional Practices 3. Chapters are matched to topics by name; a scheme saved by an admin still wins. */
+/* 1.34 - faster offline download. The Offline Cache download asks for 6 files per request (new getFiles action in
+          gas/code.gs) and keeps 3 requests going, skips files already on the device, and stops at once when the
+          session has expired or access has ended. Works with the older server too (falls back to one file per
+          request). One safe escAttrJs in shared.js instead of three different copies. Needs gas/code.gs v1.34
+          deployed to get the speed-up. */
 /* 1.33 - exam and study tools. Unselect an answer and Clear response in timed exams; 10/5/1-minute warnings;
           exam keyboard shortcuts (1-5, C, M, N, P). Scoped "Reset progress" with backup offer, typed confirmation and
           24-hour undo; resets and wrong-bank removals now survive sync. Storage meter with 80% warning, backup
@@ -117,4 +126,4 @@
               Review and Retake always have questions to work with
               even when the chapter pools and the weekly set's Drive
               file are both unreachable. */
-const APP_VERSION = '1.33';
+const APP_VERSION = '1.35';

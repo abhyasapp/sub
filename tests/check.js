@@ -1505,7 +1505,7 @@ group('Loksewa scheme and where it shows');
 (function loksewaTests(){
   const vm = require('vm');
   const ctx = { window: { addEventListener(){}, removeEventListener(){} }, document: { addEventListener(){}, getElementById(){ return null; } }, navigator: {}, localStorage: { getItem(){ return null; }, setItem(){} }, console };
-  try { vm.runInNewContext(readFile('shared.js') + '\nthis.fmt=isLoksewaFormat;this.norm=normalizeLoksewaScheme;this.dflt=defaultLoksewaScheme;this.grp=loksewaGroupFor;this.compose=composeLoksewaPaper;this.rows=loksewaGroupRows;this.conflict=loksewaSchemeConflict;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
+  try { vm.runInNewContext(readFile('shared.js') + '\nthis.fmt=isLoksewaFormat;this.norm=normalizeLoksewaScheme;this.dflt=defaultLoksewaScheme;this.grp=loksewaGroupFor;this.compose=composeLoksewaPaper;this.rows=loksewaGroupRows;this.conflict=loksewaSchemeConflict;this.topics=loksewaTopicScheme;', ctx); } catch (e) { fail('shared.js load: ' + e.message); return; }
   const eq = (n, got, want) => JSON.stringify(got) === JSON.stringify(want) ? pass(n) : fail(`${n}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
   const rng = (() => { let a = 12345; return () => { a = (a * 1664525 + 1013904223) >>> 0; return a / 4294967296; }; });
 
@@ -1583,6 +1583,34 @@ group('Loksewa scheme and where it shows');
   eq('the server refuses a malformed scheme', /key === "loksewaScheme"\) \{ const bad = loksewaSchemeProblem_\(value\)/.test(gas) && /key === "loksewaScheme" && loksewaSchemeProblem_\(value\)\) return;/.test(gas), true);
   eq('admin has the editor and saves it as a setting', /id="lks-panel"/.test(adm) && /key: 'loksewaScheme', value/.test(adm), true);
   eq('the daily-paper card lists the scheme groups, not fixed 25 and 50', /scheme\.groups\.map\(g => '<div class="syl-row">/.test(up) && !/General Knowledge<\/span><span class="syl-marks">25/.test(up), true);
+
+  /* 6. the 50 Level 7 marks split by topic (the default until an admin sets a scheme) */
+  const topics = ctx.topics;
+  const NAMES = [['survey','Engineering Survey'],['mat','Construction Materials'],['soil','Geotechnical Engineering'],['cm','Construction Management'],
+    ['sa','Structural Analysis'],['conc','Concrete Technology'],['est','Estimating & Costing'],['draw','Engineering Drawing'],['eco','Engineering Economics'],['prof','Professional Practices']];
+  const full = topics(NAMES.map(([id, name]) => ({ id, name })));
+  eq('topic default: Level 7 topics carry 7,6,6,6,5,5,5,4,3,3', full.groups.filter(g => g.level === 'level7').map(g => g.marks), [7,6,6,6,5,5,5,4,3,3]);
+  eq('topic default: Level 7 adds up to 50, GK stays 25, paper is 75', [full.groups.filter(g => g.level === 'level7').reduce((n, g) => n + g.marks, 0), full.groups[0].marks, full.total], [50, 25, 75]);
+  eq('topic default: each topic owns its own chapter', full.groups.filter(g => g.level === 'level7').map(g => g.chapters.join()), NAMES.map(n => n[0]));
+  eq('topic default: passes the editor\'s own conflict check', ctx.conflict(full.groups.map(g => ({ name: g.name, marks: g.marks, level: g.level, chapters: g.chapters }))), '');
+  const tricky = topics([{ id: 'a', name: 'Reinforced Concrete Structures' }, { id: 'b', name: 'Estimating and Costing of Works' }, { id: 'c', name: 'ENGINEERING SURVEYING' }, { id: 'd', name: 'Soil Mechanics' }, { id: 'e', name: 'Hydrology' }]);
+  eq('topic default: matching ignores case, "&" and wording; concrete beats structures', tricky.groups.filter(g => g.level === 'level7').map(g => g.name + ':' + g.chapters.join()),
+    ['Engineering Survey:c', 'Geotechnical Engineering:d', 'Concrete Technology:a', 'Estimating and Costing:b', 'Other Level 7 chapters:']);
+  eq('topic default: a chapter no topic claims is not lost (it feeds "Other")', tricky.groups.find(g => g.name === 'Other Level 7 chapters').chapters, []);
+  eq('topic default: marks of topics with no chapter go to "Other" when there are leftover chapters', tricky.groups.filter(g => g.level === 'level7').reduce((n, g) => n + g.marks, 0), 50);
+  const partial = topics([{ id: 'a', name: 'Surveying' }, { id: 'b', name: 'Concrete' }]);
+  eq('topic default: nothing left over -> no "Other" group, paper is shorter (not invented)', [partial.groups.map(g => g.name), partial.total], [['General Knowledge', 'Engineering Survey', 'Concrete Technology'], 37]);
+  eq('topic default: chapter names that fit no topic -> null (plain 25 + 50 split is used)', [topics([{ id: 'x', name: 'Misc' }]), topics([]), topics(null)], [null, null, null]);
+  eq('topic default: unsafe ids are ignored', topics([{ id: 'a b', name: 'Surveying' }]), null);
+  eq('without chapters loaded the default is still 25 GK + 50 Level 7', [ctx.dflt().total, ctx.dflt().groups.map(g => g.marks)], [75, [25, 50]]);
+  const topicPaper = ctx.compose(full, NAMES.flatMap(([id]) => Array.from({ length: 12 }, (_, i) => ({ q: { id: id + i }, lv: 'level7', ch: id }))).concat(Array.from({ length: 30 }, (_, i) => ({ q: { id: 'gk' + i }, lv: 'gk', ch: 'g1' }))), rng());
+  eq('a paper built from it draws exactly the marks of each topic', NAMES.map(([id]) => topicPaper.questions.filter(q => String(q.id).indexOf(id) === 0 && !/^gk/.test(q.id)).length).join(), '7,6,6,6,5,5,5,4,3,3');
+  eq('the paper is 75 questions with no shortfall', [topicPaper.questions.length, topicPaper.shortfalls.length], [75, 0]);
+  const liveCtx = Object.assign({}, ctx, { ChapterData: {
+    allFileRefs: () => NAMES.map(([id]) => ({ lv: 'level7', ch: id })).concat([{ lv: 'gk', ch: 'g1' }]), chapterName: (lv, ch) => NAMES.find(n => n[0] === ch)[1] } });
+  require('vm').runInNewContext(readFile('shared.js') + '\nthis.d=defaultLoksewaScheme();', liveCtx);
+  const live = { d: liveCtx.d };
+  eq('with Level 7 chapters loaded, defaultLoksewaScheme() is topic-wise', [live.d.topicBased, live.d.groups.length, live.d.total], [true, 11, 75]);
 })();
 
 group('Loksewa scheme (backend check)');
@@ -1621,6 +1649,10 @@ group('Loksewa scheme (backend check)');
     ? pass('Pause / Resume / Stop controls exist') : fail('pause or stop controls are missing');
   /CACHE\._running\)\{ toast\('A download is already running/.test(app)
     ? pass('a second download cannot start while one is running') : fail('double-start guard is missing');
+  /CONCURRENCY: 4/.test(app) && /Promise\.all\(Array\.from\(\{length: Math\.min\(CACHE\._poolSize\(\)/.test(app) && /const GETFILE_GATE/.test(app)
+    ? pass('downloads fetch several files at once, still inside the shared request limit') : fail('parallel download pool is missing');
+  /session expired\|access has ended/.test(app)
+    ? pass('a download stops at once when the session or access has ended, instead of failing every file') : fail('download does not stop on an ended session');
   /!S\.online \|\| S\.forcedOffline\) && !CACHE\._stop/.test(app)
     ? pass('a running download waits for the connection instead of failing files') : fail('download does not wait for the connection');
   /async removeSelected\(/.test(app) && /ASK\.confirm/.test(app.slice(app.indexOf('async removeSelected(')))
@@ -1631,6 +1663,26 @@ group('Loksewa scheme (backend check)');
     ? pass('service worker serves vendor files from the saved copy and gives up on a weak line sooner') : fail('service worker savers are missing');
   /weakConnection\(\)/.test(ld) && /60 \* 60 \* 1000/.test(ld)
     ? pass('chapter list checks run less often on a weak connection') : fail('chapter loader is not throttled');
+})();
+
+group('One safe escAttrJs (v1.34)');
+(function escAttrJsOnce(){
+  const sharedSrc = readFile('js/core/shared.js') || '';
+  const fn = (sharedSrc.match(/function escAttrJs\(s\) \{[\s\S]*?\n\}/) || [''])[0];
+  const defs = f => (readFile(f) || '').match(/function escAttrJs\s*\(|escAttrJs\s*=\s*function/g) || [];
+  defs('admin.html').length === 0 && defs('js/app/user-page.js').length === 0
+    ? pass('admin.html and user-page.js use the shared escAttrJs instead of their own copy') : fail('a second escAttrJs copy is back');
+  if (!fn) { fail('escAttrJs not found in shared.js'); return; }
+  const esc = new Function(fn + '; return escAttrJs;')();
+  /* what the browser does: decode the attribute value, then run it as JS */
+  const decode = a => a.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+  const run = payload => { let got = null, boom = false;
+    try { new Function('f', 'alert', decode("f('" + esc(payload) + "')"))(v => { got = v; }, () => { boom = true; }); } catch (e) { return { err: e.message }; }
+    return { got, boom }; };
+  ["&#39;);alert(1);//", "O'Brien", 'a\\b"c<d>&e', "x');alert(1);('"].forEach(p => {
+    const r = run(p);
+    r.got === p && !r.boom ? pass('escAttrJs round-trips ' + JSON.stringify(p)) : fail('escAttrJs breaks on ' + JSON.stringify(p));
+  });
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -75,7 +75,7 @@
      3. Handle `mustChangePassword: true` from login / adminLogin.
    ═══════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = "1.33";
+const APP_VERSION = "1.35";
 /* v1.12 — adminListSubjectiveSubmissions gained kind / dateFrom / dateTo
    filters so a specific grading day stays reachable once the sheet grows
    past MAX_SUBJ_SUBMISSIONS. No other runtime behaviour changed; every
@@ -190,6 +190,11 @@ const LOCKOUT_MINUTES = 15;
 
 const GETFILE_RATE_LIMIT_PER_MINUTE = 600;       // global safety net
 const GETFILE_RATE_LIMIT_PER_USER_PER_MINUTE = 60;
+/* getFiles (several files in one request, used by the offline download). It counts as ONE request against the two
+   limits above, plus a separate per-student budget in FILES so a batch cannot be used to read more than before. */
+const GETFILES_MAX_BATCH = 8;                        // files per request
+const GETFILES_PER_USER_FILES_PER_MINUTE = 360;      // files per student per minute, across all requests
+const GETFILES_MAX_RESPONSE_CHARS = 8 * 1024 * 1024; // stop adding files past this; the rest come back in "deferred"
 const SIGNUP_RATE_LIMIT_PER_MINUTE = 15;
 const UNKNOWN_LOGIN_LIMIT_PER_MINUTE = 120;
 
@@ -388,6 +393,7 @@ function doGet(e) {
       case "gethardquestions":     result = { success: true, map: getHardQuestionsCache_() }; break;
       case "getsettings":          result = getSettings(); break;
       case "getfile":              result = handleGetFile(e.parameter); break;
+      case "getfiles":             result = handleGetFiles(e.parameter); break;
 
       case "adminlogin":           result = adminLogin(e.parameter); break;
       case "adminchangepassword":  result = adminChangePassword(e.parameter); break;
@@ -505,16 +511,16 @@ function withLock_(fn) {
    the 500 KB Script Properties store). Best-effort: two truly simultaneous
    requests can under-count by one, which is fine for abuse limiting.
    Keep windowMs <= 6h (CacheService's max TTL). */
-function checkRateLimit_(bucket, maxCount, windowMs, logLabel) {
+function checkRateLimit_(bucket, maxCount, windowMs, logLabel, inc) {
   const cache = CacheService.getScriptCache();
   const windowBucket = Math.floor(Date.now() / windowMs);
   let key = "rl_" + bucket + "_" + windowBucket;
   if (key.length > 240) key = "rl_" + hashPass_(String(bucket)).slice(0, 48) + "_" + windowBucket;
   const ttl = Math.min(21600, Math.max(60, Math.ceil(windowMs / 1000) + 5));
-  const count = (Number(cache.get(key)) || 0) + 1;
+  const count = (Number(cache.get(key)) || 0) + (inc > 0 ? inc : 1);
   cache.put(key, String(count), ttl);
   const withinLimit = count <= maxCount;
-  if (!withinLimit && logLabel && count === maxCount + 1) {
+  if (!withinLimit && logLabel && count > maxCount && count - (inc > 0 ? inc : 1) <= maxCount) {
     logAction_("system", logLabel, "",
       "Exceeded " + maxCount + " per " + Math.round(windowMs / 1000) + "s (bucket: " + bucket + ").");
   }
@@ -2753,6 +2759,58 @@ function handleGetFile(p) {
     return { success: false, error: "That file is not available." };
   }
   return readJsonFileById_(fileId);
+}
+
+/* v1.34: several question files in one request: ?action=getFiles&fileIds=id1,id2,...&username=..&token=..
+   Same checks as getFile for every file (login, paid/trial access, registered content only, weekly sets only after
+   release). Answer: { success:true, files:{ <id>: {success:true,result:[...]} | {success:false,error:"..."} },
+   deferred:[ids not read because the response was getting large; ask for them again] }. */
+function handleGetFiles(p) {
+  const ids = [];
+  String(p.fileIds || "").split(",").forEach(function (raw) {
+    const id = String(raw).trim();
+    if (id && ids.indexOf(id) === -1) ids.push(id);
+  });
+  if (!ids.length) return { success: false, error: "Missing fileIds parameter." };
+  if (ids.length > GETFILES_MAX_BATCH) return { success: false, error: "Too many files in one request (most " + GETFILES_MAX_BATCH + ")." };
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i].length > 200 || !/^[A-Za-z0-9_-]+$/.test(ids[i])) return { success: false, error: "Invalid fileId." };
+  }
+  if (!checkGetFileRateLimit_()) return { success: false, error: "Server is busy, please try again in a moment.", rateLimited: true };
+
+  let isAdminCaller = false;
+  if (GETFILE_REQUIRES_AUTH) {
+    const adminActor = p.adminToken ? checkAdmin_({ adminToken: p.adminToken }) : null;
+    if (adminActor) {
+      isAdminCaller = true;
+    } else {
+      const auth = authUser_(p);
+      if (!auth.ok) return auth.error;
+      const gate = requireAccess_(auth);
+      if (gate) return gate;
+      const who = auth.username.toLowerCase();
+      if (!checkRateLimit_("getfile_" + who, GETFILE_RATE_LIMIT_PER_USER_PER_MINUTE, 60000)) {
+        return { success: false, error: "Too many file requests — please slow down.", rateLimited: true };
+      }
+      if (!checkRateLimit_("getfiles_" + who, GETFILES_PER_USER_FILES_PER_MINUTE, 60000, null, ids.length)) {
+        return { success: false, error: "Too many files requested — please slow down.", rateLimited: true };
+      }
+    }
+  }
+
+  const files = {};
+  const deferred = [];
+  let total = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (i > 0 && total > GETFILES_MAX_RESPONSE_CHARS) { deferred.push(id); continue; }
+    const entry = isContentFileAllowed_(id, isAdminCaller)
+      ? readJsonFileById_(id)
+      : { success: false, error: "That file is not available." };
+    files[id] = entry;
+    try { total += JSON.stringify(entry).length; } catch (e) {}
+  }
+  return { success: true, files: files, deferred: deferred };
 }
 
 /* v1.32: getFile used to open ANY Drive file the script owner can read.

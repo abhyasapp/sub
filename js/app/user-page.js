@@ -8,10 +8,7 @@
 const $   = id => document.getElementById(id);
 const set = (id, v) => { const e = $(id); if (e) e.textContent = v; };
 
-window.escAttrJs = function escAttrJs(s){
-  const js = String(s == null ? '' : s).replace(/[\\'"]/g, c => '\\' + c);
-  return js.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-};
+/* escAttrJs comes from shared.js (one copy) */
 
 function applyTheme(dark){
   document.documentElement.classList.toggle('dark', dark);
@@ -3346,13 +3343,13 @@ window.SYLLABUS_PROGRESS = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════════
-   SYLLABUS_MOCK — daily 75-mark paper: 25 GK + 50 Level 7.
+   SYLLABUS_MOCK — daily 75-mark paper: 25 GK + 50 Level 7 (by topic unless the admin set a scheme).
 
    Two pools, straight sample. Deterministic per day. Loksewa scoring:
    +1 correct, −0.2 wrong, 0 skipped.
    ═══════════════════════════════════════════════════════════════════════ */
 window.LKS = {
-  /* The admin's mark scheme (kept from the last time the app was online), or the default 25 + 50. */
+  /* The admin's mark scheme (kept from the last time the app was online), or the built-in default (25 GK + the 50 Level 7 marks by topic). */
   scheme(){ let raw = ''; try { raw = localStorage.getItem('abhyas_lscheme') || ''; } catch(e){} return normalizeLoksewaScheme(raw); },
   minutes(){ return Math.max(10, Math.round(this.scheme().total * 0.8)); }     /* 75 marks = 60 minutes */
 };
