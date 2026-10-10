@@ -1,33 +1,37 @@
 /* ══════════════════════════════════════════════════════════════════════
    chapters-loader.js — ABHYAS
    ──────────────────────────────────────────────────────────────────────
-   Replaces the bundled chapters-data.js. Fetches the source from Drive,
+   Fetches chapters-data.js from jsDelivr (the GitHub content repo),
    caches it in localStorage for 24 h, and executes it so the same four
    globals the old file defined are attached to window before app.js runs:
 
      window.CH_NAMES, window.LEVEL_LABELS, window.DRIVE, window.ChapterData
 
    Load order in user.html:
-     <script src="chapters-loader.js"></script>   ← replaces chapters-data.js
-     <script src="app.js"></script>
-     <script src="objective.js"></script>
+     <script src="js/data/chapters-loader.js"></script>
+     <script src="js/app/app.js"></script>
+     <script src="js/app/objective.js"></script>
 
-   Requires:
-     • FILE_ID below points at the chapters-data.js file on Drive
-     • API_KEY below is a Google API key, restricted to the Drive API
-       and to this site's referrer(s)
-     • The Drive file is shared "Anyone with the link → Viewer"
+   Requires only that the content repo has been published to GitHub and
+   jsDelivr has mirrored it (it does this automatically for any public
+   GitHub repo).
    ══════════════════════════════════════════════════════════════════════ */
 (function(){
 'use strict';
 
 /* ── Config ───────────────────────────────────────────────────────── */
-const FILE_ID   = '1wr_2W4UHotzWe6djopAXxmPIaNGBhLqM';
-const API_KEY   = 'AIzaSyAkm6iyFSV8lB82zWfD9gdjwdoldjXa2Vk';
+/* CHANGE THIS to your GitHub username. Repo name is 'content' by default;
+   change it if you called your repo something else. */
+const CDN_BASE  = 'https://cdn.jsdelivr.net/gh/abhyasapp/content@main';
 const CACHE_KEY = 'abhyas_chapters_cache_v2';
 const TTL_MS    = 24 * 60 * 60 * 1000;
-const URL = 'https://www.googleapis.com/drive/v3/files/' + FILE_ID
-          + '?alt=media&key=' + encodeURIComponent(API_KEY);
+const URL       = CDN_BASE + '/chapters-data.js';
+
+/* jsDelivr ignores unknown query params, so this is a safe cache-buster. */
+function urlWithBust(){
+  const sep = URL.indexOf('?') === -1 ? '?' : '&';
+  return URL + sep + '_=' + Date.now();
+}
 
 /* ── Helpers ──────────────────────────────────────────────────────── */
 function readCache(){
@@ -81,7 +85,7 @@ if(!hasGlobals()){
   let src = null;
   try{
     const xhr = new XMLHttpRequest();
-    xhr.open('GET', URL + '&_=' + Date.now(), false);
+    xhr.open('GET', urlWithBust(), false);
     xhr.send(null);
     if(xhr.status < 200 || xhr.status >= 300) throw new Error('HTTP ' + xhr.status);
     src = xhr.responseText;
@@ -105,15 +109,10 @@ if(!hasGlobals()){
   return;
 }
 
-/* ── 3. Warm path complete — refresh fresh data in the background ────
-   Cache-first makes every cold boot instant. But a stale chapter list is
-   worse than a slower one: when you rename a chapter in Drive, students
-   should see it the next time they open the app, not 24 hours later. So:
-   fetch on every launch, every 'online', every tab-visible, and every 15
-   minutes. Never auto-reload — a student might be mid-quiz. Offer a toast. */
+/* ── 3. Warm path complete — refresh fresh data in the background ──── */
 let _inFlight = false;
-
 let _lastFresh = 0;
+
 function weakConnection(){
   const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   return !!(c && (c.saveData || c.type === 'cellular' || /^(slow-2g|2g|3g)$/i.test(c.effectiveType || '')));
@@ -121,7 +120,6 @@ function weakConnection(){
 function fetchFresh(reason){
   if(_inFlight) return;
   if(typeof navigator !== 'undefined' && navigator.onLine === false) return;
-  /* repeated tab switches and the timer should not keep hitting a slow line */
   if(reason === 'visible' || reason === 'interval'){
     const gap = weakConnection() ? 60 * 60 * 1000 : 5 * 60 * 1000;
     if(Date.now() - _lastFresh < gap) return;
@@ -129,11 +127,11 @@ function fetchFresh(reason){
   _lastFresh = Date.now();
   _inFlight = true;
 
-  fetch(URL + '&_=' + Date.now(), { cache: 'no-store' })
+  fetch(urlWithBust(), { cache: 'no-store' })
     .then(r => r.ok ? r.text() : null)
     .then(src => {
       if(!src) return;
-      if(src === cache.source){
+      if(cache && src === cache.source){
         writeCache(src);
         return;
       }

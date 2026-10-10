@@ -765,6 +765,13 @@ const REV = {
 
 /* ═══════════════ QUIZ — MCQ engine ═══════════════ */
 const QUIZ = {
+  /* ── v1.36: chapter MCQ files are published to a GitHub content repo and
+     served through jsDelivr after the daily sync. Weekly sets and the
+     subjective bank are NOT mirrored, so a 404 here just falls through
+     to the Apps Script path below. Replace YOUR-USERNAME with your
+     GitHub username (the same one used in chapters-loader.js). ── */
+  CDN_BASE: 'https://cdn.jsdelivr.net/gh/abhyasapp/content@main',
+
   async _fetch(fileId, cacheKey, attempt=1, kind='fg'){
     function _validCache(v){
       if(!v) return false;
@@ -782,6 +789,16 @@ const QUIZ = {
       if(_validCache(hit)){ QUIZ._maybeRevalidate(fileId, cacheKey); return hit; }
     }
     try{
+      /* ── v1.36: try the CDN first for objective chapter files. ──
+         jsDelivr mirrors the GitHub content repo, so a hit returns the
+         same JSON Apps Script would, from an edge cache. A 404 means the
+         file is not mirrored (weekly set, subjective bank) — fall through. */
+      try{
+        const cdnData = await QUIZ._fetchFromCDN(fileId, attempt === 1 ? 12000 : 8000);
+        if(_validCache(cdnData)) await QDB.set(cacheKey, cdnData);
+        return cdnData;
+      }catch(cdnErr){ /* 404 / timeout / offline / non-JSON — try Apps Script */ }
+
       const timeoutMs = attempt === 1 ? 25000 : 15000;
       if(typeof GETFILE_GATE !== 'undefined') await GETFILE_GATE.take(kind);
       const auth = { username: (S.user && S.user.username) || '', token: (S.user && S.user.token) || '' };
@@ -833,6 +850,24 @@ const QUIZ = {
       throw err;
     }
   },
+
+  /* ── v1.36: one question file, straight from jsDelivr. ── */
+  async _fetchFromCDN(fileId, timeoutMs){
+    if(!S.online || S.forcedOffline) throw new Error('OFFLINE');
+    const ctrl  = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs || 12000);
+    try{
+      const r = await fetch(`${this.CDN_BASE}/content/${fileId}.json`,
+                            { signal: ctrl.signal, cache: 'default' });
+      clearTimeout(timer);
+      if(!r.ok) throw new Error('CDN ' + r.status);
+      return await r.json();
+    }catch(e){
+      clearTimeout(timer);
+      throw e;
+    }
+  },
+
   /* v1.34: fetch several question files in ONE request (action getFiles) and save each one. Used by the offline
      download. refs = [{fid, key}]. Returns:
        { unsupported:true }              the server is the older version without getFiles (caller falls back to _fetch)
