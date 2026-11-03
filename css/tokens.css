@@ -1,0 +1,165 @@
+/* ═════════════════════════════════════════════════════════════════════
+   css/tokens.css — the ONE source of truth for the Abhyas brand palette.
+   Shared by index.html and user.html (the two student-facing pages). The
+   admin console is intentionally a different theme and does not use this.
+   Page-specific tokens (layout rails, z-index, legacy aliases) stay inline
+   in each page. Load this BEFORE any page <style> so page overrides win.
+   ═════════════════════════════════════════════════════════════════════ */
+
+:root{
+  color-scheme: light;
+  --fs-display:1.75rem;
+  /* surfaces */
+  --bg:#F2F4F3;
+  --bg-sunken:#E9ECEA;
+  --surface:#FFFFFF;
+  --surface-2:#FFFFFF;
+  --surface-alt:#F7F9F8;
+  --scrim:rgba(14,22,18,.46);
+  /* hairlines (0.5px rendered by browsers on retina) */
+  --hairline-w:0.5px;
+  --sep:#E3E7E4;
+  --sep-strong:#D2D8D4;
+  --hairline:rgba(20,30,24,.06);
+  /* ink */
+  --ink:#15201A;
+  --ink-2:#434E47;
+  /* Was #7F8A84 — 3.2:1 on the page background, below the 4.5:1 AA minimum
+     for the 11–12px secondary text this token paints (hints, timestamps,
+     sidebar sublines). #667169 measures 4.6:1 on --bg and 5.1:1 on white
+     while keeping the same muted grey. */
+  --ink-3:#5E6963;
+  --ink-4:#AAB3AE;
+  --on-accent:#FFFFFF;
+  /* brand */
+  --accent:#1E7A4C;
+  --accent-hover:#196741;
+  --accent-pressed:#145536;
+  --accent-soft:#E2F0E8;
+  --accent-line:rgba(30,122,76,.24);
+  --accent-rgb:30,122,76;
+  /* semantic */
+  --success:#1E7A4C; --success-soft:#E2F0E8; --success-line:rgba(30,122,76,.26);
+  --warning:#8F5407; --warning-soft:#FAEEDF; --warning-line:rgba(143,84,7,.24);
+  --danger:#B23029;  --danger-soft:#FBE7E5;  --danger-line:rgba(178,48,41,.24);
+  --info:#215C99;    --info-soft:#E6EFF9;    --info-line:rgba(33,92,153,.24);
+  --violet:#5A4A8A;  --violet-ink:#5A4A8A;  --violet-soft:#EDE9F7;  --violet-line:rgba(90,74,138,.24);
+  /* focus */
+  --focus:#1E7A4C;
+  --selection:rgba(30,122,76,.18);
+  /* fonts */
+  --font:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,'SF Mono',monospace;
+  /* type scale */
+  --fs-hero:1.5rem;
+  --fs-t1:1.1875rem;
+  --fs-t2:1.0625rem;
+  --fs-t3:.9375rem;
+  --fs-body:.875rem;
+  --fs-callout:.8125rem;
+  --fs-foot:.75rem;
+  --fs-cap:.6875rem;
+  --fs-sect:.6875rem;
+  --fs-num-xl:2.5rem;
+  --fs-num-lg:1.625rem;
+  --fs-num-md:1.125rem;
+  /* space */
+  --sp-1:.25rem; --sp-2:.5rem;  --sp-3:.75rem; --sp-4:1rem;
+  --sp-5:1.25rem;--sp-6:1.5rem; --sp-8:2rem;   --sp-10:2.5rem;
+  --sp-12:3rem;  --sp-16:4rem;
+  /* radius */
+  --r-control:10px;
+  --r-input:12px;
+  --r-card:16px;
+  --r-panel:20px;
+  --r-sheet:22px;
+  --r-full:999px;
+  /* shadow */
+  --sh-1:0 1px 2px rgba(18,28,22,.05),0 1px 1px rgba(18,28,22,.03);
+  --sh-2:0 4px 16px rgba(18,28,22,.07),0 1px 2px rgba(18,28,22,.05);
+  --sh-3:0 12px 32px rgba(18,28,22,.10),0 2px 6px rgba(18,28,22,.05);
+  --sh-modal:0 24px 64px rgba(18,28,22,.22),0 4px 16px rgba(18,28,22,.10);
+  /* motion */
+  --dur-fast:150ms; --dur-base:220ms; --dur-slow:320ms;
+  --ease:cubic-bezier(.4,0,.2,1);
+  --ease-out:cubic-bezier(0,0,.2,1);
+  --ease-spring:cubic-bezier(.32,1.35,.5,1);
+  /* layout */
+  --rail-w:236px; --topbar-h:52px; --tabbar-h:60px; --content-max:1080px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+  --z-sticky:10; --z-quizbar:60; --z-rail:400; --z-tabbar:500;
+  --z-sheet:600; --z-modal:700; --z-toast:800; --z-gate:900;
+  /* legacy aliases so existing selectors keep working */
+  --amb:var(--accent);       --amb2:var(--accent-pressed);
+  --neon:var(--accent);
+  --b0:var(--hairline);      --b1:var(--sep);        --bd:var(--sep);
+  --c1:var(--bg-sunken);     --c2:var(--surface);    --bg1:var(--surface-alt);
+  --surf2:var(--accent-soft);
+  --t1:var(--ink);           --t2:var(--ink-2);      --t3:var(--ink-3);
+  --grn:var(--success);      --ok:var(--success);
+  --ok-bg:var(--success-soft);   --ok-bd:var(--success-line);
+  --ros:var(--danger);       --bad:var(--danger);
+  --bad-bg:var(--danger-soft);   --bad-bd:var(--danger-line);
+  --sky:var(--info);
+  --ff:var(--font);          --fd:var(--font);
+  --r1:var(--r-control);     --r2:var(--r-input);    --r3:var(--r-card);
+  --sh3:var(--sh-3);
+  --bn-h:var(--tabbar-h);
+}
+
+.dark{
+  color-scheme: dark;
+  --bg:#080B14;
+  --bg-sunken:#0C111C;
+  --surface:#121829;
+  --surface-2:#182036;
+  --surface-alt:#0F1524;
+  --scrim:rgba(0,0,0,.62);
+  --sep:rgba(255,255,255,.08);
+  --sep-strong:rgba(255,255,255,.16);
+  --hairline:rgba(255,255,255,.05);
+  --ink:#EDF2EF;
+  --ink-2:#9AA6B8;
+  --ink-3:#8591A8;
+  --ink-4:#4E5870;
+  --on-accent:#04140C;
+  --accent:#46C46E;
+  --accent-hover:#5FD183;
+  --accent-pressed:#35A95C;
+  --accent-soft:rgba(70,196,110,.14);
+  --accent-line:rgba(70,196,110,.32);
+  --accent-rgb:70,196,110;
+  --success:#46C46E; --success-soft:rgba(70,196,110,.14); --success-line:rgba(70,196,110,.32);
+  --warning:#E0A048; --warning-soft:rgba(224,160,72,.14); --warning-line:rgba(224,160,72,.32);
+  --danger:#F4606D;  --danger-soft:rgba(244,96,109,.14);  --danger-line:rgba(244,96,109,.32);
+  --info:#54B9F0;    --info-soft:rgba(84,185,240,.13);    --info-line:rgba(84,185,240,.30);
+  --violet:#9B7DF0;  --violet-ink:#B5A0F6;  --violet-soft:rgba(155,125,240,.14); --violet-line:rgba(155,125,240,.32);
+  --focus:#46C46E;
+  --selection:rgba(70,196,110,.24);
+  --sh-1:0 1px 2px rgba(0,0,0,.45);
+  --sh-2:0 4px 18px rgba(0,0,0,.50);
+  --sh-3:0 12px 34px rgba(0,0,0,.60);
+  --sh-modal:0 28px 72px rgba(0,0,0,.68);
+}
+
+/* Aliases are var() references: they resolve where they are DEFINED. Declared only on :root they
+   froze to light-theme values and dark mode inherited them (e.g. text #556059 on #121829, 2.7:1).
+   Re-declaring them under .dark makes them resolve against the dark tokens. */
+.dark{
+  --amb:var(--accent);       --amb2:var(--accent-pressed);
+  --neon:var(--accent);
+  --b0:var(--hairline);      --b1:var(--sep);        --bd:var(--sep);
+  --c1:var(--bg-sunken);     --c2:var(--surface);    --bg1:var(--surface-alt);
+  --surf2:var(--accent-soft);
+  --t1:var(--ink);           --t2:var(--ink-2);      --t3:var(--ink-3);
+  --grn:var(--success);      --ok:var(--success);
+  --ok-bg:var(--success-soft);   --ok-bd:var(--success-line);
+  --ros:var(--danger);       --bad:var(--danger);
+  --bad-bg:var(--danger-soft);   --bad-bd:var(--danger-line);
+  --sky:var(--info);
+  --sh3:var(--sh-3);
+}
+
+/* Icon glyphs are square 1em boxes. Reserving that box stops text from shifting when the icon font arrives. */
+i.ph, i[class^="ph-"], i[class*=" ph-"]{display:inline-block;width:1em;height:1em;text-align:center;vertical-align:-.125em;flex-shrink:0}

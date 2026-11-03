@@ -6,7 +6,7 @@
   "dir": "ltr",
   "scope": "./",
   "start_url": "./index.html",
-  "id": "/abhyas",
+  "id": "./",
 
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui", "browser"],
@@ -42,6 +42,16 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+
+  "screenshots": [
+    {
+      "src": "og-cover.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Abhyas practice and offline study"
     }
   ],
 

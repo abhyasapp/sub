@@ -1,12 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SUBJECTIVE-DATA.JS — Drive fileIds for subjective question banks.
+   SUBJECTIVE-DATA.JS — Supabase Storage paths for subjective question banks.
 
    ONE file per chapter (not per topic). File shape:
      { "group": "...", "sections": [
          { "section": "...", "questions": [
              { "type":"subjective", "chapter":"...", "q":"...", "marks":"..." }
-         ] }
-     ] }
+         ] } ] }
 
    `marks` may be a number (5, 10) or a string like "5+5=10" or
    "3+3.5+3.5=10". subjective.js's _parseMarks() reads the total.
@@ -21,41 +20,37 @@ window.SUBJECTIVE_DATA = {
     name: "Structure",
     group: "A",
     icon: "🏗️",
-    fileId: "1M_gf06-_oWoHU6X1nro1uYUyEHadfo8f"
+    fileId: "subjective-content/questions/GROUP-A-STRUCTURE.json"
   },
   geotech: {
     name: "Geotechnical Engineering",
     group: "A",
     icon: "⛰️",
-    fileId: "1Jz0mRSRN9EYgBUKkVpXYzwvSEIfCuVOU"
+    fileId: "subjective-content/questions/GROUP-A-GEOTECH.json"
   },
   irrigationAndCo: {
     name: "Water Resource / Irrigation",
     group: "B",
     icon: "💧",
-    // ⚠️ This Drive file currently contains Geotechnical content.
-    //    Replace its contents in Drive (Manage versions → Upload new
-    //    version) so this fileId stays valid. If you upload a NEW file
-    //    instead, swap the ID here.
-    fileId: "1EBzA8mMf4JDO6FHlzGxCeDm4VExMVFXZ"
+    fileId: "subjective-content/questions/GROUP-B.json"
   },
   transportAndCo: {
     name: "Transportation Engineering",
     group: "C",
     icon: "🛣️",
-    fileId: "1ExPxsek82lNZY-Xe3NG4-RRlKlo0fD8F"
+    fileId: "subjective-content/questions/group-C.json"
   },
   publicHealth: {
     name: "Public Health Engineering",
     group: "D",
     icon: "🚰",
-    fileId: "149YRTk28P7-Wa-ECCbBp83dzGH2zfdFA"
+    fileId: "subjective-content/questions/group-D.json"
   },
   miscellaneous: {
     name: "Miscellaneous / General",
     group: "D",
     icon: "📚",
-    fileId: "1_zVE-YGJjqwXBZJ8NJuZANWwnFwlp5hB"
+    fileId: "subjective-content/questions/MISCELLENIOUS.json"
   }
 };
 

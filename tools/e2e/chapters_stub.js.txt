@@ -1,0 +1,14 @@
+(function(){
+  var NAMES={level7:{"1": "Strength of Materials", "2": "Structural Analysis", "3": "Concrete Technology", "4": "Hydrology"},gk:{"1": "Nepal Constitution", "2": "Current Affairs"}};
+  var REFS=[["level7", "1", "Core Book", "Strength of Materials", "L7-1"], ["level7", "2", "Core Book", "Structural Analysis", "L7-2"], ["level7", "3", "Core Book", "Concrete Technology", "L7-3"], ["level7", "4", "Core Book", "Hydrology", "L7-4"], ["gk", "1", "GK Book", "Nepal Constitution", "GK-1"], ["gk", "2", "GK Book", "Current Affairs", "GK-2"]].map(function(r){return {lv:r[0],ch:r[1],book:r[2],subtopic:r[3],fid:r[4],key:r[4]};});
+  window.ChapterData={
+    levels:function(){return ['level7','gk'];},
+    levelLabel:function(l){return l==='gk'?'General Knowledge':'Level 7';},
+    chapters:function(l){return NAMES[l]||{};},
+    chapterName:function(l,c){return (NAMES[l]||{})[c]||c;},
+    fileCount:function(l,c){return REFS.filter(function(r){return r.lv===l&&r.ch===c;}).length;},
+    allFileRefs:function(){return REFS.slice();},
+    chapterFileRefs:function(l,c){return REFS.filter(function(r){return r.lv===l&&r.ch===c;});},
+    files:function(){return REFS;},books:function(){return ['Core Book','GK Book'];}
+  };
+})();

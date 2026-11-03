@@ -1,0 +1,119 @@
+<!doctype html>
+<!-- tools/og-card.html — source for og-cover.png (1200×630 social preview).
+     Regenerate: open this page in a 1200×630 viewport and screenshot it.
+     Kept out of the app shell; never linked from a page. -->
+<html lang="en-NP">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Abhyas social card</title>
+<link rel="stylesheet" href="vendor/fonts/fonts.css">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1200px;height:630px;overflow:hidden}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:#0B2117;color:#F2F7F4;
+    -webkit-font-smoothing:antialiased;
+  }
+  .stage{
+    position:relative;width:1200px;height:630px;padding:64px 72px;
+    display:flex;flex-direction:column;justify-content:space-between;
+    background:
+      radial-gradient(720px 520px at 88% -10%, rgba(70,196,110,.30), transparent 62%),
+      radial-gradient(560px 460px at -6% 112%, rgba(30,122,76,.55), transparent 68%),
+      #0B2117;
+  }
+  /* faint paper grid */
+  .stage::before{
+    content:'';position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+    background-size:48px 48px;
+    mask-image:radial-gradient(circle at 72% 34%,#000 0%,transparent 72%);
+    -webkit-mask-image:radial-gradient(circle at 72% 34%,#000 0%,transparent 72%);
+  }
+  .row{display:flex;align-items:center;gap:18px;position:relative;z-index:2}
+  .mark{width:64px;height:64px;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.38)}
+  .brand{font-size:30px;font-weight:700;letter-spacing:-.02em}
+  .brand small{display:block;font-size:16px;font-weight:500;letter-spacing:.14em;
+    text-transform:uppercase;color:#8FD3AE;margin-top:4px}
+
+  .hero{position:relative;z-index:2;max-width:700px;margin-top:-4px}
+  h1{font-size:76px;line-height:1.02;letter-spacing:-.035em;font-weight:800;white-space:nowrap}
+  h1 span{color:#6FDF9B}
+  .sub{margin-top:18px;max-width:600px;font-size:29px;line-height:1.3;font-weight:550;color:#D8E8DF;letter-spacing:-.012em}
+  .tags{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+  .tag{
+    font-size:19px;font-weight:600;color:#CFE9DA;
+    border:1px solid rgba(143,211,174,.34);background:rgba(143,211,174,.09);
+    padding:9px 18px;border-radius:999px;
+  }
+
+  .foot{position:relative;z-index:2;display:flex;align-items:center;justify-content:space-between;
+    font-size:19px;color:#9CC4AE;font-weight:500}
+  .foot .url{font-family:'JetBrains Mono',monospace;font-size:17px;letter-spacing:.06em;text-transform:uppercase;color:#8FD3AE}
+  .foot .dot{color:#6FDF9B}
+
+  /* device card, right side */
+  .device{
+    position:absolute;right:64px;bottom:96px;width:318px;
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:26px;padding:20px 20px 18px;
+    box-shadow:0 34px 70px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.14);
+    backdrop-filter:blur(6px);z-index:2;
+  }
+  .device .bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .device .bar b{font-size:14px;font-weight:650;color:#CFE9DA;letter-spacing:.02em}
+  .device .bar i{font-style:normal;font-size:12px;color:#7FE0A4;background:rgba(111,223,155,.14);
+    border:1px solid rgba(111,223,155,.28);padding:4px 10px;border-radius:999px}
+  .q{font-size:16px;line-height:1.42;color:#F0F7F3;font-weight:550}
+  .opt{display:flex;align-items:center;gap:10px;margin-top:11px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);
+    border-radius:12px;padding:9px 12px;font-size:14px;color:#C9DCD2}
+  .opt b{width:20px;height:20px;border-radius:50%;border:1.5px solid rgba(255,255,255,.24);
+    display:grid;place-items:center;font-size:11px;font-weight:600;color:#A9C9B8;flex:none}
+  .opt.ok{border-color:rgba(111,223,155,.55);background:rgba(111,223,155,.13);color:#EAFBF0}
+  .opt.ok b{border-color:#6FDF9B;background:#6FDF9B;color:#062516}
+  .streak{display:flex;align-items:center;gap:10px;margin-top:16px;padding-top:14px;
+    border-top:1px solid rgba(255,255,255,.10);font-size:13px;color:#A9C9B8}
+  .streak strong{color:#6FDF9B;font-size:15px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="row">
+    <img class="mark" src="../icon-192.png" alt="">
+    <div class="brand">Abhyas<small>Loksewa · Civil Engineering</small></div>
+  </div>
+
+  <div class="hero">
+    <h1>Practice that works<br><span>with the power out.</span></h1>
+    <p class="sub">Level 7 Civil Engineering question bank, offline on your phone, with written answers marked by a person.</p>
+    <div class="tags">
+      <span class="tag">Nepal · Lok Sewa Aayog</span>
+      <span class="tag">Offline practice</span>
+      <span class="tag">Free trial</span>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>app.mku.name.np <span class="dot">·</span> study on the bus, during load-shedding</span>
+    <span class="url">Loksewa · Level 7</span>
+  </div>
+
+  <aside class="device" aria-hidden="true">
+    <div class="bar"><b>Structural Engineering</b><i>offline</i></div>
+    <p class="q">Which limit state governs the deflection of a reinforced concrete beam?</p>
+    <div class="opt"><b>A</b> Collapse</div>
+    <div class="opt ok"><b>B</b> Serviceability</div>
+    <div class="opt"><b>C</b> Fatigue</div>
+    <div class="streak"><strong>14-day</strong> streak · 82% accuracy</div>
+  </aside>
+
+</div>
+</body>
+</html>

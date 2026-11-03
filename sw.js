@@ -1,154 +1,145 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   SW.JS — Abhyas Service Worker  (v1.20)
-
-   Strategy
-   • API (script.google.com)  → never touched. POSTs and question files go
-                                straight to the network; app.js keeps the
-                                question cache in IndexedDB (QDB).
-   • App shell (same origin)  → network-first, but with a 2.5 s timeout when a
-                                cached copy exists, so a weak connection or
-                                load-shedding never hangs the app. Falls back
-                                to the cached copy, then to a friendly offline
-                                page.
-   • Fonts / KaTeX / pdf.js / confetti (public CDNs) → cache-first in their
-                                own cache, fetched with CORS so nothing is
-                                stored as an opaque (quota-hungry) response.
-                                Math, fonts and the PDF reader now work offline
-                                after the first online visit.
-   • Precache is tolerant: one missing file no longer cancels the whole
-     offline install.
-   • admin.html is never served from cache.
+   SW.JS — Abhyas Service Worker (v1.58.0)
+   Version is derived from js/core/version.js. Update that file (and
+   config.js and package.json — a test fails if any of the three differ)
+   to invalidate every cache on the next page load.
    ═══════════════════════════════════════════════════════════════════════ */
 
 importScripts('./js/core/version.js');
 const CACHE_NAME = 'abhyas-v' + APP_VERSION;
-const CDN_CACHE = 'abhyas-cdn-v1';
-const NETWORK_TIMEOUT_MS = 2500;   /* weak connection: use the saved copy sooner */
+
+/* The browser decides whether to install a new worker by comparing the bytes
+   of THIS file. A change inside js/core/version.js alone (pulled in by
+   importScripts below) does not trigger an update, so an already-installed
+   app keeps its old shell cache and never sees a deployed fix. Bump SW_BUILD
+   together with APP_VERSION in config.js, version.js and package.json. */
+const SW_BUILD = '2.14';
+const CDN_CACHE  = 'abhyas-cdn-v1';
+const NETWORK_TIMEOUT_MS = 2500;
 const CDN_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 
-/* ── PUSH NOTIFICATIONS (Firebase Cloud Messaging) ──
-   Wrapped in try/catch so a network hiccup during install can never break
-   offline caching just because push could not initialise. */
-let _fcmMessaging = null;
-try {
-  importScripts('./js/core/firebase-config.js');
-  if (typeof FIREBASE_CONFIGURED !== 'undefined' && FIREBASE_CONFIGURED) {
-    importScripts(
-      'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
-      'https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging-compat.js'
-    );
-    firebase.initializeApp(FIREBASE_CONFIG);
-    _fcmMessaging = firebase.messaging();
-  }
-} catch (err) {
-  console.warn('SW: push notifications unavailable (not configured yet, or offline during install)', err);
-}
-
-if (_fcmMessaging) {
-  _fcmMessaging.onBackgroundMessage(payload => {
-    const title = (payload.notification && payload.notification.title) || 'Abhyas';
-    const body = (payload.notification && payload.notification.body) || '';
-    self.registration.showNotification(title, {
-      body,
-      icon: './icon-192.png',
-      badge: './icon-192.png'
-    });
-  });
-}
-
-/* Everything the app loads from its own origin. Missing files are reported in
-   the console but do not stop the rest from being cached. Self-host pdf.js in
-   ./vendor/pdfjs/ and it is cached here automatically. */
 const SHELL = [
-  './',
-  './index.html',
-  './user.html',
-  './privacy.html',
-  './terms.html',
-
-  './js/core/config.js',
-  './js/data/content-index.js',
-  './js/core/version.js',
-  './js/core/shared.js',
-  './js/core/nav.js',
-  './js/core/firebase-config.js',
-  './js/data/chapters-loader.js',
-  './js/app/cloud-sync.js',
-  './js/app/storage-health.js',
-  './js/app/display-prefs.js',
-
-  './js/app/app.js',
-  './js/app/user-page.js',
-  './js/app/objective.js',
-  './js/app/subjective.js',
-  './js/data/subjective_chapters.js',
-  './js/data/subjective-data.js',
-  './js/app/pdf-viewer.js',
-
-  './icon-192.png',
-  './icon-512.png',
-  './favicon.png',
-
-  './css/design-system.css',
-  './manifest.json',
-
-  './vendor/phosphor/phosphor-regular.css',
-  './vendor/phosphor/Phosphor.woff2',
-
-  './vendor/pdfjs/pdf.min.js',
-  './vendor/pdfjs/pdf.worker.min.js',
-  './vendor/pdf-lib/pdf-lib.min.js',
-  './vendor/katex/katex.min.js',
-  './vendor/katex/katex.min.css',
-  './vendor/katex/auto-render.min.js',
-  './vendor/confetti/confetti.browser.js',
-  './vendor/fonts/fonts.css',
-  './vendor/fonts/inter-latin-400-normal.woff2',
-  './vendor/fonts/inter-latin-500-normal.woff2',
-  './vendor/fonts/inter-latin-600-normal.woff2',
-  './vendor/fonts/inter-latin-700-normal.woff2',
-  './vendor/fonts/inter-latin-800-normal.woff2',
-  './vendor/fonts/jetbrains-mono-latin-400-normal.woff2',
-  './vendor/fonts/jetbrains-mono-latin-500-normal.woff2',
-  './vendor/fonts/jetbrains-mono-latin-700-normal.woff2',
-  './vendor/katex/fonts/KaTeX_AMS-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Caligraphic-Bold.woff2',
-  './vendor/katex/fonts/KaTeX_Caligraphic-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Fraktur-Bold.woff2',
-  './vendor/katex/fonts/KaTeX_Fraktur-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Main-Bold.woff2',
-  './vendor/katex/fonts/KaTeX_Main-BoldItalic.woff2',
-  './vendor/katex/fonts/KaTeX_Main-Italic.woff2',
-  './vendor/katex/fonts/KaTeX_Main-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Math-BoldItalic.woff2',
-  './vendor/katex/fonts/KaTeX_Math-Italic.woff2',
-  './vendor/katex/fonts/KaTeX_SansSerif-Bold.woff2',
-  './vendor/katex/fonts/KaTeX_SansSerif-Italic.woff2',
-  './vendor/katex/fonts/KaTeX_SansSerif-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Script-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Size1-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Size2-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Size3-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Size4-Regular.woff2',
-  './vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2'
-
-  /* admin.html is deliberately NOT here: it must never be served from cache. */
+  './', './index.html', './user.html', './privacy.html', './terms.html', './manifest.json',
+  './js/core/config.js', './js/core/version.js', './js/core/nav.js', './js/app.js',
+  './js/data/chapters-loader.js', './js/data/content-index.js', './js/data/subjective_chapters.js', './js/data/subjective-data.js',
+  './icon-192.png', './icon-512.png', './favicon.png',
+  './tools/vendor/phosphor/phosphor-regular.css', './tools/vendor/phosphor/Phosphor.woff2',
+  './tools/vendor/pdfjs/pdf.min.js', './tools/vendor/pdfjs/pdf.worker.min.js', './tools/vendor/pdf-lib/pdf-lib.min.js',
+  './tools/vendor/katex/katex.min.js', './tools/vendor/katex/katex.min.css', './tools/vendor/katex/auto-render.min.js',
+  './tools/vendor/confetti/confetti.browser.js',
+  './tools/vendor/fonts/fonts.css',
+  './tools/vendor/fonts/inter-latin-400-normal.woff2', './tools/vendor/fonts/inter-latin-500-normal.woff2',
+  './tools/vendor/fonts/inter-latin-600-normal.woff2', './tools/vendor/fonts/inter-latin-700-normal.woff2',
+  './tools/vendor/fonts/inter-latin-800-normal.woff2',
+  './tools/vendor/fonts/jetbrains-mono-latin-400-normal.woff2', './tools/vendor/fonts/jetbrains-mono-latin-500-normal.woff2', './tools/vendor/fonts/jetbrains-mono-latin-700-normal.woff2',
+  './tools/vendor/katex/fonts/KaTeX_AMS-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Caligraphic-Bold.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Caligraphic-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Fraktur-Bold.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Fraktur-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Main-Bold.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Main-BoldItalic.woff2', './tools/vendor/katex/fonts/KaTeX_Main-Italic.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Main-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Math-BoldItalic.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Math-Italic.woff2', './tools/vendor/katex/fonts/KaTeX_SansSerif-Bold.woff2',
+  './tools/vendor/katex/fonts/KaTeX_SansSerif-Italic.woff2', './tools/vendor/katex/fonts/KaTeX_SansSerif-Regular.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Script-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Size1-Regular.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Size2-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Size3-Regular.woff2',
+  './tools/vendor/katex/fonts/KaTeX_Size4-Regular.woff2', './tools/vendor/katex/fonts/KaTeX_Typewriter-Regular.woff2',
+  './js/app/index-page.js',
+  './js/core/access.js',
+  './js/core/actions.js',
+  './js/core/auth.js',
+  './js/core/constants.js',
+  './js/core/crash-report.js',
+  './js/core/dom.js',
+  './js/core/expose.js',
+  './js/core/float-space.js',
+  './js/core/format.js',
+  './js/core/insights.js',
+  './js/core/loksewa.js',
+  './js/core/modal.js',
+  './js/core/net.js',
+  './js/core/perf.js',
+  './js/core/progress.js',
+  './js/core/psync.js',
+  './js/core/question.js',
+  './js/core/router.js',
+  './js/core/scope.js',
+  './js/core/state.js',
+  './js/core/storage.js',
+  './js/core/study-docs.js',
+  './js/core/subjective-api.js',
+  './js/core/sync.js',
+  './js/core/text.js',
+  './js/core/theme.js',
+  './js/core/toast.js',
+  './js/features/boot.js',
+  './js/features/cache.js',
+  './js/features/chapter-nav.js',
+  './js/features/chapter-stats.js',
+  './js/features/cloud-drive.js',
+  './js/features/count.js',
+  './js/features/data.js',
+  './js/features/focus.js',
+  './js/features/home-layout.js',
+  './js/features/home-ui.js',
+  './js/features/home.js',
+  './js/features/hourly.js',
+  './js/features/insights.js',
+  './js/features/local-file.js',
+  './js/features/mixed-practice.js',
+  './js/features/module-sheet.js',
+  './js/features/net-toggle.js',
+  './js/features/online-study.js',
+  './js/features/pdf-viewer.js',
+  './js/features/print-q.js',
+  './js/features/progress-reset.js',
+  './js/features/progress.js',
+  './js/features/push.js',
+  './js/features/pwa.js',
+  './js/features/quiz-engine.js',
+  './js/features/quiz-extras.js',
+  './js/features/quiz-search.js',
+  './js/features/quiz-wrappers.js',
+  './js/features/review.js',
+  './js/features/session.js',
+  './js/features/shell-hooks.js',
+  './js/features/shell-ui.js',
+  './js/features/sprint-plan.js',
+  './js/features/sprint-log.js',
+  './js/features/sprint-report.js',
+  './js/features/sprint.js',
+  './js/features/streak.js',
+  './js/features/study-docs.js',
+  './js/features/subj-bank.js',
+  './js/features/subj-builder.js',
+  './js/features/subj-exam.js',
+  './js/features/subj-list.js',
+  './js/features/subj-pdf.js',
+  './js/features/subj-public.js',
+  './js/features/subj-qotd.js',
+  './js/features/subj-queue.js',
+  './js/features/submissions.js',
+  './js/features/syllabus.js',
+  './js/features/timetable.js',
+  './js/features/today-plan.js',
+  './js/features/tutorial.js',
+  './js/features/weekly.js',
+  './js/features/wrong-bank-ui.js',
+  './js/report/report-matching.js',
+  './js/report/report-shared.js',
+  './js/report/userreport.js',
+  './js/app/index-admin-router.js',
+  './css/tokens.css',
+  './js/core/i18n.js',
+  './css/app.css',
+  './js/features/settings-ui.js',
+  './js/core/qna.js',
+  './js/features/qna.js'
 ];
 
 function offlinePage() {
-  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
-    '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title>' +
-    '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;' +
-    'font:16px/1.6 system-ui,sans-serif;background:#f2f4f3;color:#1c2321;text-align:center;padding:24px}' +
-    'h1{font-size:1.3rem;margin:0 0 8px}p{margin:0 0 16px;color:#4a5551}' +
-    'a{display:inline-block;padding:10px 18px;border-radius:10px;background:#1e7a4c;color:#fff;text-decoration:none;font-weight:600}' +
-    '@media(prefers-color-scheme:dark){body{background:#080b14;color:#edf2ef}p{color:#9aa6b8}}</style></head><body>' +
-    '<div><h1>You are offline</h1><p>This page has not been saved on your phone yet.<br>' +
-    'Chapters you downloaded still open from the app.</p><a href="./user.html">Open Abhyas</a></div></body></html>';
+  const html = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font:16px/1.6 system-ui,sans-serif;background:#f2f4f3;color:#1c2321;text-align:center;padding:24px}h1{font-size:1.3rem;margin:0 0 8px}p{margin:0 0 16px;color:#4a5551}a{display:inline-block;padding:10px 18px;border-radius:10px;background:#1e7a4c;color:#fff;text-decoration:none;font-weight:600}@media(prefers-color-scheme:dark){body{background:#080b14;color:#edf2ef}p{color:#9aa6b8}}</style></head><body><div><h1>You are offline</h1><p>This page has not been saved on your phone yet.<br>Chapters you downloaded still open from the app.</p><a href="./user.html">Open Abhyas</a></div></body></html>';
   return new Response(html, { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
-/* ── INSTALL ── */
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
@@ -157,15 +148,12 @@ self.addEventListener('install', e => {
       if (!res.ok) throw new Error(path + ' -> ' + res.status);
       await cache.put(path, res);
     }));
-    const failed = results
-      .map((r, i) => (r.status === 'rejected' ? SHELL[i] : null))
-      .filter(Boolean);
-    if (failed.length) console.warn('SW install: these files could not be cached (offline use may be limited):', failed);
+    const failed = results.map((r, i) => (r.status === 'rejected' ? SHELL[i] : null)).filter(Boolean);
+    if (failed.length) console.warn('SW install: failed to cache:', failed);
   })());
   self.skipWaiting();
 });
 
-/* ── ACTIVATE ── */
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keep = [CACHE_NAME, CDN_CACHE];
@@ -174,13 +162,11 @@ self.addEventListener('activate', e => {
     await self.clients.claim();
     const clients = await self.clients.matchAll({ type: 'window' });
     clients.forEach(client => {
-      try { client.postMessage({ type: 'SW_ACTIVATED', version: APP_VERSION }); } catch (err) { /* closing */ }
+      try { client.postMessage({ type: 'SW_ACTIVATED', version: APP_VERSION }); } catch (err) {}
     });
   })());
 });
 
-/* Remove shell entries that are no longer part of the current SHELL. Vendor
-   files are kept because their exact names may differ from the list above. */
 async function clearStaleShellEntries() {
   const cache = await caches.open(CACHE_NAME);
   const keys = await cache.keys();
@@ -188,7 +174,7 @@ async function clearStaleShellEntries() {
   await Promise.all(keys.map(req => {
     const url = new URL(req.url);
     if (url.hostname.includes('script.google.com')) return Promise.resolve();
-    if (url.pathname.indexOf('/vendor/') !== -1) return Promise.resolve();
+    if (url.pathname.indexOf('/tools/vendor/') !== -1) return Promise.resolve();
     if (!shellAbs.has(req.url)) return cache.delete(req);
     return Promise.resolve();
   }));
@@ -200,7 +186,26 @@ self.addEventListener('message', e => {
   }
 });
 
-/* ── NOTIFICATION CLICK ── */
+self.addEventListener('push', function(event) {
+  if (!event.data) return;
+  try {
+    const data = event.data.json();
+    const title = data.notification?.title || 'Abhyas';
+    const options = {
+      body: data.notification?.body || 'You have a new update.',
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      data: data.data
+    };
+    event.waitUntil(self.registration.showNotification(title, options));
+  } catch (e) {
+    event.waitUntil(self.registration.showNotification('Abhyas', {
+      body: event.data.text(),
+      icon: './icon-192.png'
+    }));
+  }
+});
+
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil((async () => {
@@ -212,7 +217,6 @@ self.addEventListener('notificationclick', e => {
   })());
 });
 
-/* ── FETCH HELPERS ── */
 function fetchWithTimeout(req, ms) {
   if (!ms) return fetch(req, { cache: 'no-cache' });
   const ctrl = new AbortController();
@@ -220,8 +224,6 @@ function fetchWithTimeout(req, ms) {
   return fetch(req, { cache: 'no-cache', signal: ctrl.signal }).finally(() => clearTimeout(timer));
 }
 
-/* Only give up on the network quickly when there is something to fall back to;
-   on a first-ever visit, wait for the network as long as it takes. */
 async function networkFirst(req) {
   const isNav = req.mode === 'navigate';
   const cached = await caches.match(req, { ignoreSearch: isNav });
@@ -242,41 +244,62 @@ async function networkFirst(req) {
   }
 }
 
-/* Fonts, icons, KaTeX, pdf.js and the other vendor files never change inside one release
-   (the cache name carries the version), so serve them straight from the saved copy and
-   only touch the network when a file is missing. Saves data and time on a slow line. */
 async function localCacheFirst(req) {
   const hit = await caches.match(req);
   if (hit) return hit;
   return networkFirst(req);
 }
 
+/* Cache-key helper. A URL ending in refresh=1… means "fetch a fresh copy
+   from origin" (question content can change); the `_` param was only ever
+   used as a cache-buster on jsDelivr. Strip both so one canonical entry is
+   kept per file instead of a new one per request. */
+function cdnCacheKey(u) {
+  try {
+    const url = new URL(u);
+    url.searchParams.delete('_');
+    url.searchParams.delete('refresh');
+    return url.toString();
+  } catch (err) { return u; }
+}
+
 async function cdnCacheFirst(req) {
+  const key = cdnCacheKey(req.url);
   const cache = await caches.open(CDN_CACHE);
-  const hit = await cache.match(req.url);
+  if (/([?&])refresh=1(&|$)/.test(req.url)) {
+    /* Bypass the mirror entirely: revalidation passes need the CDN's
+       current answer, not the last one we cached (the mirror has no TTL,
+       so a plain cache-first read would answer with the stale copy and
+       downloaded question files would never update). */
+    const fresh = await fetch(key, { mode: 'cors', credentials: 'omit', cache: 'reload' });
+    if (fresh.ok) cache.put(key, fresh.clone()).catch(() => {});
+    return fresh;
+  }
+  const hit = await cache.match(key);
   if (hit) return hit;
   try {
     const res = await fetch(req.url, { mode: 'cors', credentials: 'omit' });
-    if (res.ok) cache.put(req.url, res.clone()).catch(() => {});
+    if (res.ok) cache.put(key, res.clone()).catch(() => {});
     return res;
   } catch (err) {
     try { return await fetch(req); } catch (e2) { return new Response('', { status: 504, statusText: 'Offline' }); }
   }
 }
 
-/* ── FETCH ── */
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET') return;                       // POSTs (Apps Script) go straight through
+  if (req.method !== 'GET') return;
   let url;
   try { url = new URL(req.url); } catch (err) { return; }
 
-  if (/^script\.google(usercontent)?\.com$/.test(url.hostname)) return;   // API: never touched
+  if (/^script\.google(usercontent)?\.com$/.test(url.hostname)) return;
   if (CDN_HOSTS.indexOf(url.hostname) !== -1) { e.respondWith(cdnCacheFirst(req)); return; }
   if (url.origin !== self.location.origin) return;
-  if (url.pathname.endsWith('/admin.html')) return;       // admin is never cached
+  if (url.pathname.endsWith('/admin.html')) return;
 
-  if (/\/vendor\//.test(url.pathname) || /\/(icon-\d+|favicon)\.png$/.test(url.pathname)) { e.respondWith(localCacheFirst(req)); return; }
+  if (/\/tools\/vendor\//.test(url.pathname) || /\/(icon-\d+|favicon)\.png$/.test(url.pathname)) {
+    e.respondWith(localCacheFirst(req)); return;
+  }
 
   e.respondWith(networkFirst(req));
 });

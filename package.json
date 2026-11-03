@@ -1,12 +1,44 @@
 {
   "name": "abhyas",
-  "version": "1.35.0",
+  "version": "2.14",
   "private": true,
-  "description": "Abhyas: Loksewa Civil Engineering exam prep (static PWA + Apps Script backend)",
+  "description": "Abhyas: Loksewa Civil Engineering exam prep (static PWA; backend in ../backend)",
   "scripts": {
-    "test": "node tests/check.js && node tests/download.test.js"
+    "serve": "npx --yes serve -l 5500 .",
+    "test": "vitest run",
+    "test:cov": "vitest run --coverage",
+    "lint": "eslint .",
+    "check-syntax": "node tools/check-syntax.mjs",
+    "audit:buttons": "node tools/audit-buttons.mjs",
+    "audit:handlers": "node tools/audit-handlers.js",
+    "check-i18n": "node tools/check-i18n.mjs",
+    "audit:seo": "node tools/audit-seo.mjs",
+    "audit": "node tools/audit.mjs",
+    "build:sites": "node tools/build-sites.mjs",
+    "sync-shell": "node tools/sync-shell.mjs",
+    "verify": "npm run check-syntax && npm run audit:handlers && npm run check-i18n && npm run audit:seo && npm run lint && npm test"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abhyasapp/sub.git",
+    "directory": "frontend"
+  },
+  "bugs": {
+    "url": "https://github.com/abhyasapp/sub/issues"
+  },
+  "homepage": "https://github.com/abhyasapp/sub/tree/main/frontend",
+  "author": "abhyasapp",
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@vitest/coverage-v8": "5.0.5",
+    "axe-core": "4.14.0",
+    "eslint": "10.14.0",
+    "fake-indexeddb": "6.2.7",
+    "globals": "17.14.0",
+    "jsdom": "30.1.3",
+    "vitest": "5.0.5"
   }
 }

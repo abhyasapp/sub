@@ -1,221 +1,119 @@
 # Abhyas
 
-Offline-first study app for Nepal's Lok Sewa Aayog Level 7 Civil Engineering exam, plus Level 5 Engineering and General Knowledge. Built as a static PWA on top of Google Apps Script + Google Sheets + Google Drive. No build step, no bundler, no server to run.
+Offline-first exam-prep PWA for **Loksewa Civil Engineering** (Nepal): practice
+questions by chapter, weekly sets, subjective answers with PDF upload and
+grading, progress/streak tracking, reports, and an admin console.
 
-Client version: 1.32 (version.js)
-Backend version: 1.32 (code.gs)
-Both must match. tests/check.js fails if they drift.
+Live: https://app.mku.name.np/
 
----
+## Quick start
 
-## What it does
-
-For a student studying alone:
-
-- Chapters downloaded to the device, working with no connection during load-shedding or on the bus
-- Flashcard practice with instant feedback, and a timed exam mode
-- A wrong-answer bank using spaced repetition (1, 3, 7, 14-day intervals), so questions come back just before you would forget them
-- Study PDFs: admins upload model answers, notes and past papers (Admin > Study PDFs); students read them under Written answers > Model answers & notes, with search, type filters, a New badge, offline copies, and a button on marked written submissions that opens the model answers for that chapter
-- Question reports and corrections: a report button wherever a question appears; the admin sees the options, the marked answer, what the student picked, the section and how many students reported it; fixing a question replaces it on every phone within minutes, including the copies saved in Missed / Saved / Flagged and weekly papers
-- Loksewa mark scheme (Admin > Settings): the daily 75-mark paper is built to the groups and marks you enter; Loksewa marking and the group / chapter tables show only on the weekly test, the daily paper and the hourly 50
-- A 60-day sprint card on Home: Learn (days 1-35), Drill (36-52) and Mock (53-60) phases with daily topic, question and time targets, plus an ahead/behind pace indicator
-- A Today's plan card on Home: weakest chapters, spaced review due, and one new topic, in one tap
-- An exam readiness score with confidence, and per-chapter strength verdicts
-- Confidence rating after each answer (Sure / Not sure / Guessed), which surfaces misconceptions: things you were sure about and got wrong
-- Recovery mode after three or more days away: five easy questions instead of a wall of overdue reviews
-- Streak forgiveness: one silent missed day per chain
-- Written-answer practice: Question of the Day and full 100-mark papers, uploaded as photos (converted to PDF on the phone) or a PDF, marked by an admin, annotations visible in the app
-- Weekly tests: one attempt, timed, server-authoritative start, submit and rank
-- Read-aloud button on every question (SpeechSynthesis)
-- Full-screen image zoom for engineering figures
-- Copy-explanation button for sharing to study groups
-
-For an admin:
-
-- Verify or reject payments (bulk actions supported)
-- Grant access (permanent or one year), bulk or single
-- Edit or delete students
-- Growth panel: sign-ups and approved payments per day, paid rate, revenue estimate
-- Fix-the-question editor: correct a reported question directly from the Reports tab; a backup is kept
-- Weekly test management: upload, schedule, preview before publishing, view results
-- Most-missed-questions analytics
-- Announcement banner shown to all students
-- Edit payment QR, amount, trial length, approval-time text
-- Activity log of every admin action
-- Admin permissions: an owner can create admins with granular feature access
-
----
-
-## Layout
-
-```
-index.html  user.html  admin.html  privacy.html  terms.html    Pages (stay at the root: URLs and the PWA depend on them)
-sw.js  manifest.json                                           Service worker and PWA manifest (must be at the root)
-icon-192.png  icon-512.png  favicon.png                        App icons (root, so existing installs and link previews keep working)
-
-js/
-  core/    config.js          GAS_URL, single source of truth for the backend
-           version.js         APP_VERSION (client)
-           shared.js          Cross-page utilities: sprint planner, progress insights,
-                              multi-device merge, frameThrottle
-           nav.js             Student navigation: sidebar, phone menus, page headers (one list)
-           admin-nav.js       Admin navigation: rail, titles, permissions (one list)
-           firebase-config.js Firebase Cloud Messaging config (optional)
-  app/     app.js             Core: state, auth, sync, offline, timetable, home
-           objective.js       MCQ engine, chapter picker, mixed practice, review
-           subjective.js      Written answers: QOTD, exam, Smart Paste parser
-           cloud-sync.js      Optional backup to the student's own Google Drive (5 versions, checksum, additive restore)
-           storage-health.js  Storage meter and 80% warning, storage breakdown, backup reminder
-           display-prefs.js   Text size, high contrast, AMOLED black
-           pdf-viewer.js      Shared PDF reader and ink annotation layer
-           user-page.js       Student-page features: sprint card, insights charts, sidebar, tools
-  data/    chapters-loader.js     Loads chapters-data.js from Drive
-           subjective-data.js     Drive file IDs for the written-answer bank
-           subjective_chapters.js Written-answer syllabus
-           content-index.js       Question count per Drive file (progress bars)
-
-css/       design-system.css      Shared theme tokens
-vendor/    Self-hosted fonts, KaTeX, pdf.js, pdf-lib, confetti
-gas/       Apps Script files (pasted into the editor, not loaded by the browser)
-  code.gs             Backend, all endpoints
-  setup.gs            Run-once setup
-  private-files.gs    Content file ID list and makeContentFilesPrivate()
-  content-index.gs    buildContentIndex() which generates js/data/content-index.js
-  debug.gs            Diagnostics (do NOT add to the production project)
-tests/check.js        Syntax, links, file references, versions, behaviour, CSP, handlers, navigation, auth audit, contrast, offline cache
-tests/browser/        Real-browser checks (accessibility audit, offline start); need `npm i --no-save puppeteer-core @sparticuz/chromium axe-core`, see its README
-vendor-assets.py      Re-download vendor/ from npm
+```bash
+npm install
+npm run serve        # http://localhost:5500
+npm run verify       # syntax + i18n + SEO audit + lint + tests (what CI runs)
 ```
 
-Script load order is set in each page. user.html loads core, then data, then app files, so keep that order when adding a file. The test "File references resolve" fails if any page, the service worker or the manifest points at a file that is missing.
+There is no build step: the app is static files (plain browser scripts, no bundler).
 
----
+## How it fits together
 
-## Setup
+| Path | What it is |
+|---|---|
+| `index.html` | Landing, sign-in, registration, payment entry |
+| `user.html` | The signed-in student app |
+| `admin.html` | Admin console (never cached by the service worker) |
+| `privacy.html`, `terms.html` | Legal pages |
+| `sw.js` | Service worker: app-shell precache, network-first shell, cache-first CDN/vendor |
+| `manifest.json` | PWA manifest |
+| `css/` | `tokens.css` (design tokens, light + dark, shared by both student pages) and `app.css` (all styles of `user.html`). The landing page keeps its small stylesheet inline for first paint; `admin.html` is self-contained |
+| `js/core/` | Shared foundations: config, constants, auth, access rules, storage, sync, net, text/format helpers, `modal.js` (dialog focus manager), `i18n.js` (English / Nepali) |
+| `js/features/settings-ui.js` | The "Display and accessibility" (theme, text size, language, reduce motion, focus mode) and "Storage" (usage meter, downloaded sets, protect data, backup, remove downloads) cards on Data & backup |
+| `js/features/` | Student features: quiz engine, review, weekly/hourly sets, PDF viewer, insights, subjective exams |
+| `js/admin/` | Admin features: users, payments, weekly sets, subjective grading, logs |
+| `js/report/` | User and admin reports |
+| `js/data/` | Loaders/indexes for chapter and question data |
+| `js/app/` | Page entry point for the landing page (`index-page.js`); the old `document.write` loader shims were removed |
+| `tools/` | `audit*.mjs/js`, `check-syntax.mjs`, `check-i18n.mjs`, `sync-shell.mjs`, `build-content-index.mjs`, `e2e/` (Playwright + axe suites) and self-hosted `vendor/` libraries |
+| `tests/` | Vitest unit + repo-integrity tests |
 
-Step 1: Deploy the backend in Apps Script
+### Backend (three tiers)
 
-- Open script.google.com and create a New project
-- Create a file for each of these and paste the matching content from gas/: code.gs, setup.gs, content-index.gs, private-files.gs
-- In the editor, add Services, then Drive API (v3). This is needed to overwrite marked PDFs.
-- Run setup() once from the function dropdown. This creates all sheets, seeds the owner admin, and installs the daily triggers.
-- Run showInitialAdminPassword() from the dropdown. Copy the one-time password from the log; it is deleted immediately after.
-- Deploy as a New deployment, type Web app. Execute as Me, and allow access to Anyone.
-- Copy the /exec URL.
+- **Supabase Edge Function** (`SUPABASE_URL`): primary API for everything not in `DRIVE_ACTIONS`.
+- **Google Apps Script** (`GAS_URL`): Drive-only actions (files, content keys, e-mail verification, hard questions).
+- **jsDelivr CDN** (`CONTENT_CDN_BASE`): question content from the `abhyasapp/content` repo.
 
-Step 2: Wire the frontend
+`abhyasEndpointFor(action)` in `js/core/config.js` decides which tier an action goes to.
+The server code lives in [`../backend`](../backend).
 
-Open config.js and set GAS_URL to the /exec URL.
+### Things to know before editing
 
-Step 3: Content
+- **Script load order matters.** `js/core/config.js` must load first and exactly once;
+  `constants.js`, `text.js`, `format.js` etc. follow. Everything shares globals.
+- **Always escape.** Any dynamic value put into `innerHTML` must go through `esc()`.
+- **Click handlers** are `data-on-click="OBJ.method()"` attributes dispatched by `js/core/actions.js`.
+  The target must be reachable as a global (see `js/core/expose.js`).
+- **PDFs share one component.** `js/features/pdf-viewer.js` is the only PDF
+  surface in the app — students read study PDFs and answer papers with it, admins
+  open the same paper in annotate mode. Marks are stored in PDF points (they
+  survive zooming and rotation) and on save it hands ink-only per-page PNG
+  overlays to `annotate.onSave(overlays, info)`; the admin console stamps them
+  onto the original PDF with pdf-lib. The pdf.js engine is self-hosted in
+  `tools/vendor/pdfjs/` (service-worker precached) with a cdnjs fallback.
+- **Content changes reach offline downloads.** `chapters-loader.js` fires
+  `abhyas:chapters-updated` when `chapters-data.js` changes while the app is open;
+  `CACHE.refreshFromUpdate` (`js/features/cache.js`) then purges deleted files,
+  fetches files added to your picked groups, and rechecks every downloaded set
+  against the CDN (`refresh=1` bypasses the service worker's CDN mirror in
+  `cdnCacheFirst`). Offline or on a weak connection it stores
+  `abhyas_chapters_refresh_pending` and retries on reconnect / next boot.
+- **Releasing:** bump the version in all three places — `js/core/config.js`,
+  `js/core/version.js`, `package.json` (a test fails if they differ). The service
+  worker cache name is derived from it, which is how clients pick up new files.
+  Add new shell files to the `SHELL` list in `sw.js`: run `npm run sync-shell` (a test fails if a script or
+  stylesheet loaded by `index.html`/`user.html` is not precached, or if a listed file does not exist).
 
-Question files are JSON on Drive, registered by file ID in chapters-data.js (a Drive file, loaded at runtime by chapters-loader.js) and subjective-data.js. After adding files, run makeContentFilesPrivate() once from the Apps Script editor so the paywall in getFile cannot be bypassed.
+## Testing
 
-Step 4: Optional exact progress bars
+```bash
+npm test             # vitest run
+npm run test:cov     # with coverage
+npm run lint         # ESLint (lenient on purpose — see eslint.config.mjs; no-eval / no-new-func are errors)
+npm run check-syntax # node --check on every first-party file
+npm run audit:buttons # boots every page, checks each button has a working handler (~45 s)
+npm run check-i18n   # every data-i18n string has a Nepali translation
+npm run audit:seo    # titles, canonical, structured data, heading and CSS-weight checks
+npm run audit        # duplicate symbols, orphan files, unused vendor files (report only)
 
-Run buildContentIndex() from the Apps Script editor. Copy the output over content-index.js and commit. Without it, progress bars still work; they just learn the totals as chapters are opened.
+# real-browser suites (need: pip install playwright && playwright install chromium; npm i --no-save axe-core)
+python3 tools/e2e/walk.py light 390   # every screen: JS errors, axe, overflow (also dark 390, light 320/768/1280, dark 1280)
+python3 tools/e2e/flows.py            # onboarding, quiz, bookmark, saved progress
+python3 tools/e2e/flows2.py           # landing, register, login, admin smoke, service worker + OFFLINE reload
+python3 tools/e2e/sprint.py           # 60-day sprint end to end
+python3 tools/e2e/search.py           # question search
+python3 tools/e2e/exam.py             # timed exam: unselect an answer (click again, Clear, c key) and scoring
+python3 tools/e2e/qbank.py            # remove from the wrong-answer bank (with Undo), report a question
+python3 tools/e2e/history.py          # practice history is never trimmed or lost on cloud merge
+python3 tools/e2e/storage.py          # early storage warning, nothing deleted automatically
+python3 tools/e2e/sprint-accuracy.py  # syllabus is complete only at 85% accuracy
+python3 tools/e2e/sprint-i18n.py      # sprint page in Nepali
+python3 tools/e2e/admin-perms.py      # what each kind of admin can see
+python3 tools/e2e/settings.py         # Data & backup: display and storage cards
+```
 
-Step 5: Host the files
+Scripts are plain globals, so tests load them with `tests/helpers/load-globals.js`
+(a small `vm` sandbox) instead of importing them.
 
-Any static host works: GitHub Pages, Cloudflare Pages, Netlify, Firebase Hosting. PWA install requires HTTPS or localhost.
+`tests/pages.test.js` boots `index.html`, `user.html` and `admin.html` in jsdom with
+the real scripts and fails on any `SyntaxError`. A classic-script redeclaration
+(two files both declaring `const ADMIN`) silently kills the later file — and the
+feature with it — so this is the check that catches it.
 
----
+## Roadmap (suggested)
 
-## Running the tests
-
-    node tests/check.js        (or: npm test)
-
-Checks:
-
-- Every JS file and inline script block parses
-- version.js and gas/code.gs agree
-- Every script src and link href in the HTML resolves
-- Every entry in sw.js's SHELL list exists
-- manifest.json is valid JSON
-- No private keys are committed
-- Behaviour tests on normQ, isOk, COV, PSYNC._syncPayload, REV.trackAnswer, SUBJ_SMART
-- Every onclick handler target exists
-- Content-Security-Policy in all three pages allows exactly the hosts they use
-- content-index.js (if populated) only lists registered files
-
-Exit code is non-zero on failure, so it is CI-safe. .github/workflows/check.yml runs it on every push.
-
----
-
-## How data flows
-
-Browser sends POST requests to Apps Script, which reads and writes Google Sheets and Google Drive.
-
-- Sheets are the database: Users, Payments, Settings, Logs, Admins, Progress, PushTokens, WeeklySets, WeeklyAttempts, WeeklyStarts, QuestionReports, SubjectiveSubmissions, AdminPermissions, ProgressImports, ProgressBackups
-- Drive hosts content: question JSON, payment screenshots, submitted PDFs, weekly-set uploads
-- The browser keeps its own copy: sessions in localStorage, question sets and per-file coverage in IndexedDB, everything else in localStorage
-
----
-
-## Offline
-
-The service worker caches the app shell network-first with a four-second timeout. Question files, fonts, KaTeX, pdf.js and pdf-lib are cached on first use. Once a chapter is downloaded, it opens with no connection at all.
-
-admin.html is deliberately never served from cache.
-
----
-
-## Things that must stay in sync
-
-APP_VERSION         version.js and gas/code.gs
-GAS_URL             config.js
-Cache key           level_chapter_book_subtopic, built once in chapters-data.js and used by ON, PSY, CACHE and QUIZ
-abhyas_session      Written by index.html, read by app.js
-Progress payload    prog, chapStats, cov, bk, fl, wr, stk (45,000 character limit)
-sw.js SHELL list    Must include every same-origin file the app loads
-CSP                 Every external host in any of the three pages must be allowed
-
-node tests/check.js catches drift on most of these.
-
----
-
-## Notes
-
-- The admin seed password is random and shown once. The owner is forced to change it at first login.
-- Google Sign-In: set the OAuth client ID in config.js and gas/code.gs, and add your origin to the authorised list.
-- Push notifications require a Firebase project. Fill in firebase-config.js and set FCM_PROJECT_ID, FCM_CLIENT_EMAIL and FCM_PRIVATE_KEY in Apps Script Script Properties. Without these, PUSH.supported() returns false and the notification buttons are hidden; nothing breaks.
-- Delete gas/debug.gs from the production Apps Script project before going live. It contains a password-reset helper.
-- MailApp has a daily quota (about 100 recipients on a free Gmail account). Password resets and verification emails count against it.
-
----
-
-## Status
-
-v1.26   Sidebar simplified: search / heatmap / share / export moved to the
-        Progress page. Small topbar search icon. More tools section removed.
-        Sidebar finder searches both screens and questions in one input.
-v1.25   Loksewa paper 75 questions at 60-minute timer, focus mode removed,
-        sidebar trimmed under More tools, Daily 10 auto-hides, practice resume
-v1.24   Daily 10, study calendar, chapter forecast, weekly digest, hardest-20
-        drill, syllabus progress, daily 75-mark Loksewa paper (25 GK + 50 L7 split by topic: Survey 7, Materials 6, Geotech 6, Construction Mgmt 6, Structural 5, Concrete 5, Estimating 5, Drawing 4, Economics 3, Professional Practices 3),
-        compact sidebar with More tools
-v1.23   Note shown only after the question is answered; weakest-question
-        flag, note sync, "practice 5 more like this", question history,
-        global search, keyboard sheet, focus mode, export notes
-v1.22   Personal notes on any question
-v1.21   Hard-question badge renders, note on missed questions, answer-changed tracking
-v1.20   Missed questions by chapter, syllabus heatmap, Loksewa-format mock paper,
-        hard-question badge, hourly grading tab, rich Google AI prompt,
-        skipped-exam-answer fix, careless / concept-gap tagging
-v1.19   Confidence rating, misconceptions, recovery mode, read-aloud
-v1.18   Today's plan, exam readiness, resume, chapter verdicts, streak forgiveness, image zoom, fast-guess flag
-v1.17   Chapters grid, Content-Security-Policy, content index
-v1.16   Question editor, growth panel, announcements, tests
-v1.15   Weekly test start/resume/rank recorded on the server, cached settings, nightly backup, crash reports
-v1.14   Self-service data control, offline hardening
-
-Tests: 383 passing, 0 failing.
-
----
-
-## Contact
-
-Abhyas is an independent product. Not affiliated with Lok Sewa Aayog or any government office.
-
-Email: abhyasbymku@gmail.com
-Live:  https://app.mku.name.np/
+1. Tests for progress sync (`js/core/psync.js`), scoring and the quiz engine.
+2. Replace the ~300 empty `catch {}` blocks with a tiny `warn()` helper (`no-empty` now flags empty non-catch blocks; empty catches are still allowed).
+3. ~~Remove `document.write` shims in `js/app/`~~ (done in 1.48.0).
+4. Move inline CSS/JS out of `user.html` / `admin.html`; then drop `'unsafe-inline'` from the CSP.
+5. Replace the `new Function` dispatcher with `addEventListener`-based delegation; then drop `'unsafe-eval'`.
+6. Add a licence once you decide how the code may be used.
